@@ -3,7 +3,7 @@
 #  WE WILL MAKE THE PDF THIS WAY
 
 
-\documentclass[conference]{IEEEtran}
+\documentclass[conference]{Memo-Lang}
 
 \usepackage{cite}
 \usepackage{amsmath}
@@ -16,27 +16,21 @@
 
 \begin{document}
 
-\title{OpenTransformer: Building and Verifying a Tiled 4$\times$4 Systolic Array Accelerator}
+\title{Memo-Lang: Building a memory optimized programming language 
 
 \author{
-\IEEEauthorblockN{Ibraheem Syed}
-\IEEEauthorblockA{
-Independent Hardware Design Project\\
+Independent Interpreter Project\\
 September 2026}
 }
 
 \maketitle
 
 \begin{abstract}
-This paper presents OpenTransformer, an independent hardware design project focused on building a small matrix-multiply accelerator in SystemVerilog. The current milestone uses a 4$\times$4 physical systolic array with 16 processing elements. Instead of building a full physical 16$\times$16 systolic array with 256 processing elements, the design reuses the smaller 4$\times$4 array through tiling to complete a 16$\times$16 matrix multiplication workload.
-
-The design was built from smaller RTL blocks, including a multiply-accumulate unit, a processing element, a 4$\times$4 processing-element array, a tile controller, and a top-level 16$\times$16 matrix multiplication module. The final top-level design passed Verilator simulation with all 256 output values correct, passed Verilator lint with no warnings or errors in the final lint log, synthesized successfully with Yosys, and produced FPGA artifacts for the Tang Nano 9K platform.
-
-The project also includes OpenROAD physical design evidence. The full 16$\times$16 top-level design was attempted in OpenROAD but did not complete the full flow. The 4$\times$4 PE-array compute core did complete the OpenROAD flow on Nangate45 through routing, final reports, and GDS generation. The final routed PE-array core had a reported design area of 14,764 $\mu$m$^2$ at 31\% utilization, 0 detailed-route violations, 0 antenna net violations, 0 antenna pin violations, 113,082 $\mu$m of routed wire length, and 52,211 vias. This paper documents the project by separating the completed FPGA top-level result from the completed OpenROAD PE-array core result.
+This paper presents Memo-Lang, an interpreter design project focused on building a interpreter with LLVM as backend optimized for Matrix Multiplication ( With integrated CuBlas Matrix Multiplication shared with a destructive read design). The design of the language is based on the specialized CUDA language with modifications in order to optimize the language for Matrix Multiplication (MatMul) operations.
 \end{abstract}
 
 \begin{IEEEkeywords}
-SystemVerilog, FPGA, OpenROAD, RTL design, systolic array, matrix multiplication, Verilator, Yosys, hardware acceleration.
+matrix multiplication, llvm, destructive-read, memory efficient, python-like syntax, C++
 \end{IEEEkeywords}
 
 \section{Introduction}

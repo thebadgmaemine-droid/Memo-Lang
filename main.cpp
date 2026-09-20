@@ -1,6 +1,5 @@
-﻿#include "ExprAST.h"
+﻿#include "AST.h"
 #include "parser.h"
-#include "types.h" // Empty for now
 wusing namespace llvm_frontend;
 
 // Initialize globals

@@ -24,3 +24,5 @@ to be passed on to the backend.
 ## Week 2: Basic logic statement + getting started on visitors
 -- [ ExprAST.h ]
 -[] implementing "if" & "for" & "else" statements
+-- [ ExprAST.h ] -> [ AST.h ]
+-[] Reorganized project structure to contain folders: Driver, Lex, Lsp, Macro, Parser, Semantics, Source, types, Codegen; Revamped ExprAST.h to AST.h, awaiting reprogram 20/9/2026

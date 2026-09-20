@@ -19,12 +19,6 @@
 namespace llvm_frontend {
 
 using namespace llvm;
-//----------------------------------------Error logging------------------------------------------------------------------------//
-inline Value* LogErrorV(const char* Message) {
-    errs() << "Error: " << Message << '\n'; // errs make sure stdout is flushed before stderr
-    return nullptr;
-}
-//---------------------------------------Abstract Syntax Tree class declaration------------------------------------------------//
 class ExprAST {
 public:
     virtual ~ExprAST() = default;
@@ -65,7 +59,12 @@ class BlockExprAST : ExprAST {
 
 };
 
-
+//----------------------------------------Error logging------------------------------------------------------------------------//
+inline Value* LogErrorV(const char* Message) {
+    errs() << "Error: " << Message << '\n'; // errs make sure stdout is flushed before stderr
+    return nullptr;
+}
+//------------------------------------Abstract Syntax Tree class declaration------------------------------------------------//
 
 // Numeric literals expression class
 
