@@ -26,3 +26,5 @@ to be passed on to the backend.
 -[] implementing "if" & "for" & "else" statements
 -- [ ExprAST.h ] -> [ AST.h ]
 -[] Reorganized project structure to contain folders: Driver, Lex, Lsp, Macro, Parser, Semantics, Source, types, Codegen; Revamped ExprAST.h to AST.h, awaiting reprogram 20/9/2026
+-[] Added new corresponding source file to the header files above.
+Building IRGenerator and visior pattern.

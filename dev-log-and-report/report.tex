@@ -35,15 +35,18 @@ matrix multiplication, llvm, destructive-read, memory efficient, python-like syn
 
 \section{Introduction}
 
-Matrix multiplication is one of the main operations used in modern computing. It appears in graphics, signal processing, scientific computing, and machine learning. In neural networks and transformer models, a lot of the work eventually becomes repeated multiply-and-accumulate operations. Because of that, matrix multiplication is a good starting point for learning how AI-style hardware accelerators work.
+Matrix multiplication is one of the main operations used in modern computing. It appears in graphics, signal processing, scientific computing, and machine learning. In neural networks and transformer models, a lot of the work eventually becomes repeated multiply-and-accumulate operations. It is important to have a fast and efficient matrix multiplication implementation. The idea of this project is to build a programming language which integrates CuBlas's advanced Matrix Multiplication capabilities with destructive read in order to experiment with memory optimization and speed up Matrix Multiplication operations.
 
-OpenTransformer is an independent hardware project that I built to understand how matrix multiplication can be mapped into actual digital hardware. I did not start with a complete accelerator. I started with smaller building blocks such as basic logic, an ALU, a register file, a finite-state-machine controller, a multiply-accumulate unit, and processing elements. After those smaller blocks worked, I connected them into a 4$\times$4 systolic array and then built a tiled 16$\times$16 matrix multiplication design around it.
+The project is to address this growing computing need. In the modern world of machine learning, matrix multiplication is a fundamental operation that underpins many algorithms and models. As datasets grow larger and models become more complex, the efficiency of matrix multiplication can significantly impact overall performance. By leveraging CuBlas's optimized routines and incorporating a destructive read design, we set out to solve the modern world's computing needs as well as experiment with different memory hierarchies such as O(n^3). If this problem were to be adressed and solve,
 
-The main idea in this milestone is hardware reuse. A full physical 16$\times$16 systolic array would need 256 processing elements. That would be much larger. OpenTransformer uses a 4$\times$4 physical systolic array with 16 processing elements. The larger 16$\times$16 workload is completed by reusing that smaller array across multiple tiles.
+we can expect the following benefits:
+\begin{itemize}
+\item Improved performance for matrix multiplication operations, leading to faster training and inference times for machine learning models.
+\item Lower entry barrier for developers to implement machine learning algorthms, as well as LLMs, by providing a high-level programming language that abstracts away the complexities of low-level optimization.
+\item Enhanced memory efficiency, allowing for the processing of larger datasets and models without running into memory constraints.
 
-This difference matters. The design does not physically contain a 16$\times$16 array. It physically contains a 4$\times$4 array, and the tile controller reuses that array over time. This paper explains the architecture, how the tiling works, how the RTL was tested, and what evidence was produced from simulation, FPGA implementation, and OpenROAD.
+This project was inspired by the programming language Sere, the CuBLAS library and the Clean compiler.
 
-The final milestone includes two main implementation results. The first is the full top-level FPGA-oriented design for 16$\times$16 matrix multiplication. The second is the OpenROAD physical-design result for the 4$\times$4 PE-array compute core. The OpenROAD result is not for the full top-level design. It is for the compute core, which is still important because that is the actual 16-PE systolic array used in the design.
 
 \section{Background}
 
