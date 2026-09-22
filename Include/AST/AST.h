@@ -1,6 +1,6 @@
 ﻿#ifndef EXPRAST_H_
 #define EXPRAST_H_
-
+#pragma once
 #include <map>
 #include <memory>
 #include <string>
@@ -16,6 +16,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 // REMINDER THAT LLVM IS HERE FOR DEMO CHECKS, FINAL BACKEND IS WRITTEN IN ASSEMBLY
+
 namespace llvm_frontend {
 
 using namespace llvm;
@@ -246,8 +247,48 @@ public:
         return FunctionValue;
     }
 };
-
+*/
 } // namespace llvm_frontend
+
+namespace Memolang {
+    enum class Node {
+        Expr,
+        IntegerLiteral,
+        FloatLiteral,
+        StringLiteral,
+        BooleanLiteral,
+        BinaryExpr,
+        UnaryExpr,
+        CallExpr,
+        MemberExpr,
+        [[maybe_unused]] CastExpr, // Maybe unusued
+        LambdaExpr,
+        VarDeclaration,
+        FunctionDef,
+        MacroDef,
+        Module,
+    };
+    class Node {
+    public:
+        virtual ~Node() = default; 
+        Node(Node&&) = default;
+
+    private:
+        const Type* resolvedtype = nullptr;
+
+    };
+
+    class Expr final : public Node {
+
+    };
+
+
+
+
+
+}
+
+
 // ----------------------------------------------------------------------------------------------------------------//
 #endif // EXPRAST_H_
 
