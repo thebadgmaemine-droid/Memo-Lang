@@ -249,14 +249,15 @@ public:
 };
 */
 } // namespace llvm_frontend
-
+/* // means holder has been declared, // // means sourcefile implemented, // // // is fully implemented*/
 namespace Memolang {
     enum class Node {
-        Expr,
-        IntegerLiteral,
-        FloatLiteral,
-        StringLiteral,
-        BooleanLiteral,
+        Expr, //
+        TypeExpr, // 
+        IntegerLiteral, //
+        FloatLiteral, //
+        StringLiteral, // 
+        BooleanLiteral, //
         BinaryExpr,
         UnaryExpr,
         CallExpr,
@@ -268,6 +269,35 @@ namespace Memolang {
         MacroDef,
         Module,
     };
+    enum class BinaryOp {
+        Add,
+        Sub,
+        Mul,
+        Div,
+        Mod,
+        Eq,
+        isNot
+    };
+    enum class UnaryOp {
+        Inc,
+        Dec,
+        Neg,
+        Inv,
+    };
+    enum class AssignOp {
+        Assign,
+        Add,
+        Sub,
+        Mul,
+        Div
+    };
+    struct StringPart {
+        std::string literal;
+        std::unique_ptr<Expr> value;
+        std::string spec; // Format spec after ':', Empty means plain stringo   
+    };
+
+
     class Node {
     public:
         virtual ~Node() = default; 
@@ -278,12 +308,46 @@ namespace Memolang {
 
     };
 
-    class Expr final : public Node {
+    class TypeExpr final : public Node {
+    public:
+        Expr(std::string name, std::vector<std::unique_ptr<TypeExpr>> args);
+        [[nodiscard]] const std::string& name() const;
+        [[nodiscard]] const std::vector<std::unique_ptr<TypeExpr>>& args() const;
+    private:
+        std::string name_;
+        std::vector<std::unique_ptr<TypeExpr>>& args_; 
 
     };
 
+    class Expr : public Node {
+    public:
+        using Node::Node;
+    };
 
+    class IntegerLiteral final : public Expr {
+        IntegerLiteral(int64_t value, bool Isbyte = false);
+        [[nodiscard]] double value() const;
+        [[nodiscard]] bool isByte const;
+    };
+    class FloatLiteral final : public Expr {
+        FloatLiteral(double value, bool isf32 = false);
+        [[nodiscard]] double value() const;
+        [[nodiscard]] bool isf32 const;
+    };
+    class StringLiteral final : public Expr {
+        StringLiteral(std::string callee, bool regex = false);
+        [[nodiscard]] std::string callee() const;
+        [[nodiscard]] bool regex const;
+    };
+    class BooleanLiteral final : public Expr {
+        BooleanLiteral(bool boole);
+        [[nodiscard]] boole() const;
 
+    private:
+        bool boole_;
+    };
+    
+   
 
 
 }

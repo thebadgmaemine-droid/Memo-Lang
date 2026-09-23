@@ -1,8 +1,3 @@
-#  TEMPORARY FORK FROM 
-#  ibraheemsyed-sys's OPEN TRANSFORMER PROJECT, WHICH IS ALSO THE INSPIRATION FOR THIS PROJECT
-#  WE WILL MAKE THE PDF THIS WAY
-
-
 \documentclass[conference]{Memo-Lang}
 
 \usepackage{cite}
@@ -11,44 +6,50 @@
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{url}
+\usepackage{listings}
 
 \graphicspath{{./}{paper/}{paper/figures/}}
 
 \begin{document}
 
-\title{Memo-Lang: Building a memory optimized programming language 
+\title{Report on the Research's Findings \\
+\large MemoLang: Building a Memory-Optimized Programming Language}
 
 \author{
 Independent Interpreter Project\\
 September 2026}
-}
 
 \maketitle
 
 \begin{abstract}
-This paper presents Memo-Lang, an interpreter design project focused on building a interpreter with LLVM as backend optimized for Matrix Multiplication ( With integrated CuBlas Matrix Multiplication shared with a destructive read design). The design of the language is based on the specialized CUDA language with modifications in order to optimize the language for Matrix Multiplication (MatMul) operations.
+This paper presents MemoLang, an interpreter design project focused on building an interpreter with LLVM as a backend, optimized for matrix multiplication (with integrated CuBLAS matrix multiplication combined with a destructive-read design). The language design wants to acomplish a streamlined building process, calling into the CuBLAS Library for GPU-optimized routines.
 \end{abstract}
 
 \begin{IEEEkeywords}
-matrix multiplication, llvm, destructive-read, memory efficient, python-like syntax, C++
+matrix multiplication, LLVM, destructive-read, memory efficient, Python-like syntax, C++, CuBLAS
 \end{IEEEkeywords}
 
 \section{Introduction}
 
-Matrix multiplication is one of the main operations used in modern computing. It appears in graphics, signal processing, scientific computing, and machine learning. In neural networks and transformer models, a lot of the work eventually becomes repeated multiply-and-accumulate operations. It is important to have a fast and efficient matrix multiplication implementation. The idea of this project is to build a programming language which integrates CuBlas's advanced Matrix Multiplication capabilities with destructive read in order to experiment with memory optimization and speed up Matrix Multiplication operations.
+Matrix multiplication is one of the main operations used in modern computing. It appears in graphics, signal processing, scientific computing, and machine learning. In neural networks and transformer models, a large share of the computation reduces to repeated multiply-and-accumulate operations. A fast and memory-efficient matrix multiplication implementation is therefore valuable.
 
-The project is to address this growing computing need. In the modern world of machine learning, matrix multiplication is a fundamental operation that underpins many algorithms and models. As datasets grow larger and models become more complex, the efficiency of matrix multiplication can significantly impact overall performance. By leveraging CuBlas's optimized routines and incorporating a destructive read design, we set out to solve the modern world's computing needs as well as experiment with different memory hierarchies such as O(n^3). If this problem were to be adressed and solve,
+The goal of this project is to build a programming language that integrates CuBLAS's optimized matrix multiplication routines with a destructive-read design, in order to experiment with memory optimization and speed up matrix multiplication operations at the language level rather than only at the library level.
 
-we can expect the following benefits:
+As datasets grow larger and models become more complex, the efficiency of matrix multiplication increasingly affects overall performance. By leveraging CuBLAS's optimized routines and incorporating a destructive-read design, this project aims to:
+
 \begin{itemize}
-\item Improved performance for matrix multiplication operations, leading to faster training and inference times for machine learning models.
-\item Lower entry barrier for developers to implement machine learning algorthms, as well as LLMs, by providing a high-level programming language that abstracts away the complexities of low-level optimization.
-\item Enhanced memory efficiency, allowing for the processing of larger datasets and models without running into memory constraints.
+\item Improve performance for matrix multiplication operations, supporting faster training and inference for machine learning models.
+\item Lower the hardware-specification entry barrier for developers implementing machine learning algorithms and LLM-related code, by providing a high-level language that abstracts away low-level optimization details.
+\item Improve memory efficiency, allowing larger datasets and models to be processed without running into memory constraints.
+\end{itemize}
 
-This project was inspired by the programming language Sere, the CuBLAS library and the Clean compiler.
-
+This project was inspired by the Sere programming language, the CuBLAS library, and the Clean compiler.
 
 \section{Background}
+
+% TODO: Motivate destructive-read semantics, explain why they help memory
+% efficiency for matrix workloads, and give any relevant background on LLVM
+% IR generation or CuBLAS's programming model.
 
 Matrix multiplication can be written as
 
@@ -56,433 +57,156 @@ Matrix multiplication can be written as
 C_{i,j} = \sum_{k=0}^{N-1} A_{i,k}B_{k,j}
 \end{equation}
 
-Each value in output matrix $C$ is created by multiplying one row from matrix $A$ with one column from matrix $B$ and adding all the products. This looks simple as an equation, but the hardware design has to handle data movement, timing, storage, and control.
+Each value in the output matrix $C$ is produced by multiplying one row of $A$ with one column of $B$ and summing the products. Efficient implementations must manage data movement, memory reuse, and (in a destructive-read scheme) the lifetime of operand buffers once they are consumed.
 
-The basic operation is multiply-and-accumulate. A multiply-accumulate unit, or MAC, multiplies two numbers and adds the product into an accumulator. This is useful for matrix multiplication because every output element is a sum of products.
-
-A systolic array connects many processing elements together in a grid. Each processing element does a small piece of the computation and passes data to its neighbors. In this project, $A$ values move horizontally across rows and $B$ values move vertically through columns. Each PE uses the data passing through it to update a local partial sum.
-
-A larger systolic array can compute more work in parallel, but it also uses more hardware. A smaller array uses fewer resources, but it has to be reused across more cycles. This is where tiling becomes useful. Instead of building a physical array for the whole matrix, the matrix is split into smaller tiles, and the same hardware is reused for each tile.
+% TODO: Add background on destructive read: what it means for a value to be
+% "consumed" once read, how this differs from ordinary immutable/borrowed
+% semantics, and what memory-safety guarantees (if any) the language provides.
 
 \section{Project Goal}
 
-The goal of OpenTransformer was not just to write code that looks like hardware. The goal was to build a design and collect real evidence from tools. For this milestone, the target was:
+% TODO: Restate the concrete milestone goals for MemoLang, analogous to the
+% original OpenTransformer goal list but scoped to the interpreter/compiler
+% project. Suggested structure below -- replace with the real targets.
+
+For this milestone, the target was:
 
 \begin{itemize}
-\item Build a 4$\times$4 physical systolic array in SystemVerilog.
-\item Use the array as the compute core for a tiled 16$\times$16 matrix multiplication design.
-\item Verify the full 16$\times$16 result in simulation.
-\item Run lint and synthesis.
-\item Generate FPGA artifacts for Tang Nano 9K.
-\item Run OpenROAD physical design on the 4$\times$4 PE-array core.
-\item Save logs, reports, layouts, hashes, and final evidence files.
+\item Define MemoLang's core syntax (Python-like, C++-influenced) and its destructive-read semantics.
+\item Implement a lexer, parser, and AST (\texttt{ExprAST}) for the language.
+\item Generate LLVM IR from the AST for arithmetic and matrix operations.
+\item Integrate calls into CuBLAS for matrix multiplication.
+\item Verify correctness of generated code against reference NumPy/CuBLAS results.
+\item Benchmark memory usage and runtime against a naive (non-destructive-read) baseline.
+\item Save logs, test results, and build artifacts as evidence.
 \end{itemize}
 
-This project was also meant to teach the full hardware flow. Simulation is important, but it is not the whole process. A design also needs linting, synthesis, implementation reports, and saved artifacts. The project became more realistic once the outputs from the tools were treated as the real source of truth.
+\section{Language Design}
 
-\section{Architecture Overview}
+% TODO: Describe MemoLang's syntax and semantics. Suggested subsections:
+% - Surface syntax and Python-like conventions
+% - Type system (if any) for matrices/tensors
+% - Destructive-read semantics: how a read consumes a value, what happens on
+%   re-use, error/ownership model
+% - How CUDA's programming model influenced the design
 
-The OpenTransformer design is built as a hierarchy of SystemVerilog modules. Fig.~\ref{fig:architecture} shows the high-level architecture. The main design files are summarized in Table~\ref{tab:modules}.
+\subsection{Syntax Overview}
+% TODO: Example MemoLang snippet(s) illustrating matrix declarations and
+% multiplication, e.g.:
+%
+% \begin{lstlisting}
+% let A = matrix(4, 4)
+% let B = matrix(4, 4)
+% let C = A @ B   # destructive read of A and B
+% \end{lstlisting}
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.95\textwidth]{image1.png}
-\caption{OpenTransformer architecture overview. The design uses a 4$\times$4 physical systolic array with 16 processing elements. A tile controller reuses this smaller array to complete a 16$\times$16 matrix multiplication workload.}
-\label{fig:architecture}
-\end{figure*}
+\subsection{Destructive-Read Semantics}
+% TODO: Formal or informal description of destructive read: once a matrix
+% value is read (e.g., consumed by @), it can no longer be used unless
+% explicitly cloned. Explain how this reduces peak memory usage.
+
+\section{Compiler and Runtime Architecture}
+
+% TODO: Describe the pipeline: source -> lexer -> parser -> ExprAST ->
+% LLVM IR -> JIT/AOT compilation -> CuBLAS call for MatMul kernels.
+% A table of main source files (mirroring Table~\ref{tab:modules} in the
+% original hardware paper, but for this project) belongs here, e.g.:
 
 \begin{table}[h]
 \centering
-\caption{Main RTL Modules}
+\caption{Main Source Files}
 \label{tab:modules}
 \begin{tabular}{ll}
 \toprule
-Module & Purpose \\
+File & Purpose \\
 \midrule
-\texttt{mac.sv} & Multiply-accumulate unit \\
-\texttt{pe.sv} & Processing element \\
-\texttt{pe\_array\_4x4.sv} & Physical 4$\times$4 systolic array \\
-\texttt{tile\_controller.sv} & Controls tiled execution \\
-\texttt{matmul\_16x16.sv} & Top-level tiled matrix multiply \\
-\texttt{fpga\_top.sv} & FPGA wrapper \\
+\texttt{Lexer.h/.cpp} & Tokenizes MemoLang source \\
+\texttt{Parser.h/.cpp} & Builds the AST \\
+\texttt{ExprAST.h} & AST node definitions \\
+\texttt{CodeGen.cpp} & LLVM IR generation \\
+\texttt{CuBLASRuntime.cpp} & CuBLAS MatMul bindings \\
+\texttt{main.cpp} & Driver / REPL \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The lowest-level arithmetic block is the MAC. The PE wraps the MAC and adds the data movement needed for the systolic array. The 4$\times$4 array connects 16 PEs together. The tile controller handles which part of the 16$\times$16 matrix is being computed. The top-level module connects the controller, matrix storage, array, and result readout.
+\section{LLVM Backend and CuBLAS Integration}
 
-This hierarchy made the project easier to build because each block had a clear job. It also made debugging easier. A problem could be narrowed down to the MAC, PE, array, controller, or top-level result path.
-
-\section{Processing Element Datapath}
-
-The processing element is the basic compute unit of the systolic array. Fig.~\ref{fig:pe} shows the PE datapath.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.90\textwidth]{image2.png}
-\caption{Processing element datapath. Each PE receives INT8-style input values, forwards A and B values through the array, multiplies them, and accumulates the result into a wider accumulator.}
-\label{fig:pe}
-\end{figure*}
-
-Each PE receives an $A$ input and a $B$ input. The $A$ value is passed to the right, and the $B$ value is passed downward. At the same time, the PE multiplies the local $A$ and $B$ values and adds the product into an accumulator.
-
-The accumulator is wider than the input values because each output value is the sum of many products. In this project, the design uses INT8-style inputs and a wider accumulation path. This matches the basic idea used in many quantized accelerator designs, where smaller input values are multiplied and accumulated into a larger result.
-
-The PE is small by itself, but the full array is built by repeating it. A 4$\times$4 array has 16 PEs. This also matches the FPGA result, where the final resource extraction showed 16 multiplier blocks for the physical compute array.
-
-\section{Tiled Matrix Multiplication}
-
-The main design choice in this project is tiling. A 16$\times$16 output matrix contains 256 output values. Building a physical 16$\times$16 systolic array would mean building 256 processing elements. OpenTransformer instead uses a 4$\times$4 physical array with 16 processing elements.
-
-The 16$\times$16 output matrix is divided into 4$\times$4 output tiles. The same physical 4$\times$4 array computes one tile at a time. After one tile is finished, the controller moves to the next tile. This continues until all output tiles are finished.
-
-Since the 16$\times$16 matrix has four 4-row groups and four 4-column groups, there are 16 output tiles total. For each output tile, the design also has to move through the inner dimension of the multiplication. This is why the controller is important. It has to keep track of row tiles, column tiles, and the partial sums.
-
-The basic process is:
-
-\begin{enumerate}
-\item Select the current 4$\times$4 output tile.
-\item Feed the needed $A$ values across the rows.
-\item Feed the needed $B$ values down the columns.
-\item Let the PE array multiply and accumulate.
-\item Preserve partial sums when needed.
-\item Store the completed output tile.
-\item Repeat until the full 16$\times$16 output matrix is complete.
-\end{enumerate}
-
-This design is slower than a full physical 16$\times$16 array because it reuses hardware over time. However, it uses far fewer processing elements. For this project, that tradeoff made sense because the goal was to build a complete working design and fit the implementation into a small learning-focused hardware flow.
-
-\section{RTL Implementation}
-
-The design was written in SystemVerilog. The project was built in stages. Earlier stages focused on smaller blocks, and later stages connected those blocks into a larger accelerator.
-
-The MAC was built first as the arithmetic block. Then the PE was built around the MAC. After that, 16 PEs were connected into a 4$\times$4 systolic array. The tile controller and top-level matrix multiply module were added after the compute array was working.
-
-The main RTL source files are:
-
-\begin{itemize}
-\item \texttt{rtl/mac.sv}
-\item \texttt{rtl/pe.sv}
-\item \texttt{rtl/pe\_array\_4x4.sv}
-\item \texttt{rtl/tile\_controller.sv}
-\item \texttt{rtl/matmul\_16x16.sv}
-\item \texttt{rtl/fpga\_top.sv}
-\end{itemize}
-
-The final full-design testbench is:
-
-\begin{itemize}
-\item \texttt{tb/tb\_matmul\_16x16.sv}
-\end{itemize}
-
-This testbench loads matrix data, starts the design, waits for completion, and then checks the result values. The most important part is that it checks every output value, not just a done signal.
-
-The Yosys synthesis hierarchy also confirmed that the intended structure was present. The top-level module was \texttt{matmul\_16x16}. Under it, the design contained the 4$\times$4 PE array and the tile controller. Inside the PE array were 16 processing elements, and each processing element contained a MAC datapath.
+% TODO: Describe how MatMul expressions lower to LLVM IR, and how/when
+% control transfers to CuBLAS (e.g., via an external function call inserted
+% during codegen). Discuss the destructive-read buffer handoff to CuBLAS.
 
 \section{Verification}
 
-Verification was done with Verilator. The final simulation tested the complete 16$\times$16 matrix multiplication path. The testbench checked all 256 output values.
+% TODO: Describe how correctness was tested (e.g., comparing MemoLang
+% MatMul output against NumPy or cuBLAS reference results for various
+% matrix sizes). Replace with a results table once available, e.g.:
 
 \begin{table}[h]
 \centering
-\caption{Final Top-Level Simulation Result}
-\label{tab:sim}
+\caption{Correctness Test Results (Template)}
+\label{tab:verification}
 \begin{tabular}{ll}
 \toprule
-Item & Result \\
+Test Case & Result \\
 \midrule
-Design tested & \texttt{matmul\_16x16} \\
-Matrix size & 16$\times$16 \\
-Output values checked & 256 \\
-Correct output values & 256 \\
-Incorrect output values & 0 \\
-Final status & PASS \\
+$N \times N$ MatMul vs. reference & TBD \\
+Destructive-read re-use error detection & TBD \\
+Edge cases (empty, 1x1, non-square) & TBD \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The final simulation log reported:
+\section{Benchmarks}
 
-\begin{verbatim}
-16x16 MATRIX MULTIPLY TEST PASS
-All 256 outputs correct
-\end{verbatim}
-
-This matters because it proves the top-level tiled design worked for the directed test case. It also proves that the controller, array, partial-sum behavior, and output readout worked together for a complete matrix result.
-
-The verification result should still be described honestly. This was a directed test, not a full formal proof and not a complete randomized verification environment. A future version should test random matrices, negative values, zero matrices, repeated operations, reset during operation, and edge cases.
-
-\section{Lint and RTL Synthesis}
-
-Final lint was performed with Verilator. The final lint log did not report warnings or errors. This helped check that the RTL was clean before synthesis.
-
-Yosys synthesis was also run on the top-level matrix multiplication design. The final Yosys statistics are shown in Table~\ref{tab:yosys}.
-
-\begin{table}[h]
-\centering
-\caption{Final Yosys Design Statistics for \texttt{matmul\_16x16}}
-\label{tab:yosys}
-\begin{tabular}{lr}
-\toprule
-Metric & Value \\
-\midrule
-Wires & 5,983 \\
-Wire bits & 58,258 \\
-Public wires & 1,169 \\
-Public wire bits & 16,341 \\
-Memories & 0 \\
-Memory bits & 0 \\
-Processes & 0 \\
-Cells & 38,170 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Yosys reported warnings related to replacing internal array-style bus structures with registers. These warnings came from internal signals in the 4$\times$4 array. They did not stop synthesis and did not represent a functional test failure. They showed how the tool converted SystemVerilog structures into lower-level logic.
-
-\section{FPGA Implementation}
-
-The full \texttt{matmul\_16x16} design produced FPGA artifacts for the Tang Nano 9K platform. The saved FPGA evidence includes the bitstream, synthesis JSON, place-and-route JSON, constraint file, hashes, and summary.
-
-The main FPGA evidence files are:
-
-\begin{verbatim}
-reports/final/opent_final.fs
-reports/final/opent_synth_final.json
-reports/final/opent_pnr_final.json
-reports/final/tangnano9k_final.cst
-reports/final/final_fpga_summary.md
-reports/final/final_fpga_hashes.txt
-\end{verbatim}
-
-Resource counts extracted from the FPGA place-and-route JSON are shown in Table~\ref{tab:fpga}.
-
-\begin{table}[h]
-\centering
-\caption{FPGA Resource Counts}
-\label{tab:fpga}
-\begin{tabular}{lr}
-\toprule
-Resource Group & Count \\
-\midrule
-LUT group & 4,703 \\
-DFF group & 843 \\
-RAM16SDP4 & 168 \\
-MULT9X9 & 16 \\
-IO & 4 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The 16 \texttt{MULT9X9} blocks are important because they match the 16 PEs in the physical 4$\times$4 array. This is another piece of evidence that the compute fabric is a 4$\times$4 physical array, not a physical 16$\times$16 array.
-
-\section{OpenROAD Physical Design}
-
-The OpenROAD part of the project was done after the FPGA and simulation evidence. This was important because the paper should not claim physical-design results before the physical-design flow was actually run.
-
-There were two OpenROAD attempts. The first was for the full \texttt{matmul\_16x16} top-level design. That run reached clock tree synthesis, but it did not complete the full OpenROAD flow. The run ended because the OpenROAD Docker process hit an illegal-instruction crash. Because of that, the full top-level OpenROAD result is only partial and should not be described as a completed routed ASIC result.
-
-The completed OpenROAD result is for the 4$\times$4 PE-array compute core, \texttt{pe\_array\_4x4}. This is the real physical compute array used in the accelerator. The PE-array core completed the OpenROAD flow through synthesis, floorplanning, placement, CTS, global routing, detailed routing, filler insertion, RC extraction, final report generation, and GDS generation.
-
-Fig.~\ref{fig:chip} shows the routed OpenROAD layout view.
-
-\begin{figure*}[t]
-\centering
-\IfFileExists{paper/figures/chip_layout.png}
-{\includegraphics[width=0.78\textwidth]{paper/figures/chip_layout.png}}
-{\fbox{\parbox{0.78\textwidth}{Missing file: \texttt{paper/figures/chip\_layout.png}. Add the OpenROAD final layout PNG here before final submission.}}}
-\caption{Final OpenROAD routed layout view of the 4$\times$4 PE-array compute core on the Nangate45 platform. This is physical-design evidence for the compute core, not the full 16$\times$16 top-level controller design.}
-\label{fig:chip}
-\end{figure*}
-
-\begin{table}[h]
-\centering
-\caption{OpenROAD Physical Results for \texttt{pe\_array\_4x4}}
-\label{tab:openroad}
-\begin{tabular}{lr}
-\toprule
-Metric & Result \\
-\midrule
-Platform & Nangate45 \\
-Clock target & 10 ns \\
-Final design area & 14,764 $\mu$m$^2$ \\
-Final utilization & 31\% \\
-Detail-route violations & 0 \\
-Antenna net violations & 0 \\
-Antenna pin violations & 0 \\
-Total routed wire length & 113,082 $\mu$m \\
-Total vias & 52,211 \\
-Final GDS generated & Yes \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The OpenROAD result is useful because it shows that the 4$\times$4 compute core is not only a simulated RTL block. It was also taken through a physical-design flow and produced routed layout artifacts.
-
-\section{Clock Tree and Timing}
-
-Clock tree synthesis was an important part of the OpenROAD run. In the manual CTS check, the clock tree for the PE-array core started with 704 clock sinks. OpenROAD clustered the sinks and created 146 clock buffers and 146 clock nets. The maximum clock-tree level was 4.
-
-\begin{table}[h]
-\centering
-\caption{Manual CTS Results for \texttt{pe\_array\_4x4}}
-\label{tab:cts}
-\begin{tabular}{lr}
-\toprule
-Metric & Result \\
-\midrule
-Original clock sinks & 704 \\
-Clustered sinks & 129 \\
-Created clock buffers & 146 \\
-Created clock nets & 146 \\
-Max clock-tree level & 4 \\
-Worst max slack & 8.82 ns \\
-Worst min slack & 0.12 ns \\
-TNS max & 0.00 \\
-TNS min & 0.00 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The timing numbers show that the PE-array core met the 10 ns clock target at the CTS stage. The global-route report also showed a reported clock period of 1.149 ns and slack of 8.790 ns. These values are evidence from the tool flow, but they should be interpreted as results for the PE-array core only.
-
-\section{Routing, IR, and Cell Report}
-
-The detailed router completed with 0 violations after optimization. During routing, the violation count decreased across iterations until the final detailed routing pass reached 0 violations. The final routed wire length was 113,082 $\mu$m and the total number of vias was 52,211.
-
-The final report also included IR-drop information. The VDD report showed a worst-case IR drop of 1.83e-03 V, or 0.17\%. The VSS report showed a worst-case IR drop of 2.92e-03 V, or 0.27\%. The total reported power was 6.48e-03 W.
-
-\begin{table}[h]
-\centering
-\caption{OpenROAD IR and Power Results}
-\label{tab:ir}
-\begin{tabular}{lrr}
-\toprule
-Metric & VDD & VSS \\
-\midrule
-Total power & 6.48e-03 W & 6.48e-03 W \\
-Worst-case IR drop & 1.83e-03 V & 2.92e-03 V \\
-Percentage drop & 0.17\% & 0.27\% \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The cell type report is shown in Table~\ref{tab:cells}. The largest area contribution came from fill cells, which are part of completing the physical layout. The active logic included sequential cells, combinational cells, clock buffers, timing repair buffers, and inverters.
-
-\begin{table}[h]
-\centering
-\caption{OpenROAD Cell Type Report}
-\label{tab:cells}
-\begin{tabular}{lrr}
-\toprule
-Cell Type & Count & Area \\
-\midrule
-Fill cell & 12,843 & 32,998.36 \\
-Tap cell & 391 & 104.01 \\
-Clock buffer & 200 & 239.93 \\
-Timing repair buffer & 617 & 517.37 \\
-Inverter & 290 & 154.81 \\
-Clock inverter & 61 & 41.23 \\
-Sequential cell & 704 & 3,745.28 \\
-Multi-input combinational cell & 5,639 & 9,960.90 \\
-Total & 20,745 & 47,761.90 \\
-\bottomrule
-\end{tabular}
-\end{table}
+% TODO: Report runtime and peak-memory measurements comparing:
+% (a) naive/non-destructive baseline, (b) MemoLang with destructive read,
+% (c) raw CuBLAS call for reference. A results table/figure goes here.
 
 \section{Evidence and Reproducibility}
 
-A major goal of this project was to save evidence instead of only describing results. For hardware projects, it is easy to say that something works. It is better to save the exact logs, reports, and generated files that prove what happened.
-
-The final evidence is organized in the repository. Table~\ref{tab:evidence} lists the most important files.
-
-\begin{table}[h]
-\centering
-\caption{Final Evidence Files}
-\label{tab:evidence}
-\begin{tabular}{ll}
-\toprule
-File or Folder & Purpose \\
-\midrule
-\texttt{reports/final/} & FPGA and top-level logs \\
-\texttt{final\_sim\_16x16.log} & 16$\times$16 simulation result \\
-\texttt{final\_lint.log} & Verilator lint result \\
-\texttt{final\_yosys\_synth.log} & Yosys synthesis result \\
-\texttt{opent\_final.fs} & FPGA bitstream \\
-\texttt{opent\_pnr\_final.json} & FPGA PNR JSON \\
-\texttt{reports/openroad/} & OpenROAD evidence \\
-\texttt{OPENROAD\_SUMMARY.md} & OpenROAD summary \\
-\texttt{6\_final.gds} & Final PE-array GDS \\
-\texttt{6\_final.def} & Final PE-array DEF \\
-\texttt{SHA256SUMS.txt} & Artifact hashes \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The OpenROAD evidence was committed after the PE-array physical flow completed. The commit added the OpenROAD configs, reports, final routed files, final GDS, final DEF, summary file, and hashes.
-
-This evidence-based workflow helped keep the project honest. The paper reports the full top-level FPGA result because the full top-level design was simulated and implemented for FPGA. The paper reports the completed OpenROAD result only for the PE-array core because that is the part that completed routing and GDS generation in OpenROAD.
+% TODO: List where logs, benchmark results, and build artifacts are saved
+% (mirroring the "Evidence and Reproducibility" approach in hardware
+% projects) so claims in this paper are traceable to saved output.
 
 \section{Discussion}
 
-The biggest thing I learned from this project is that hardware design is more than writing RTL. A design has to pass through many steps before the result is meaningful. Simulation checks behavior. Lint catches common RTL issues. Synthesis checks whether the code can become hardware. FPGA implementation and OpenROAD physical design give more evidence about how the hardware maps into real structures.
-
-Another lesson was that control logic is just as important as datapath logic. The MAC operation is simple by itself, but the full accelerator also needs tile control, result storage, output selection, and timing. Many of the hard parts came from making sure values were checked at the right time and that the controller moved through the matrix correctly.
-
-The project also showed why wording matters. Saying ``16$\times$16 systolic array'' would be misleading if someone thinks that means 256 physical processing elements. The accurate description is that the workload is 16$\times$16, but the physical array is 4$\times$4. The larger matrix is handled through tiling.
-
-The OpenROAD work also changed the project. Before running OpenROAD, it would have been wrong to claim physical-design results. After the flow completed for the PE-array core, the project had actual routed layout and GDS evidence. At the same time, the full top-level OpenROAD run did not complete, so that result has to be described as partial. This is still useful because failed or partial tool runs are part of real engineering.
+% TODO: Reflect on design tradeoffs -- e.g., what destructive-read semantics
+% cost in usability vs. what they save in memory; how closely the language
+% tracks CUDA's model; what was learned building an LLVM frontend.
 
 \section{Limitations}
 
-This milestone has several limitations.
-
-First, the final full top-level simulation is a directed test. It checks all 256 output values for one full 16$\times$16 case, but it does not prove every possible input. Future verification should include random matrices, negative values, zero values, identity-like matrices, overflow cases, reset behavior, and repeated start/done transactions.
-
-Second, the FPGA implementation was focused on producing working artifacts and resource evidence. It does not yet include a detailed performance study with latency, throughput, or maximum measured frequency.
-
-Third, the completed OpenROAD result is for the 4$\times$4 PE-array compute core, not the full \texttt{matmul\_16x16} top-level design. The full top-level design was attempted in OpenROAD but did not complete the full route/signoff flow. This paper does not claim that the full top-level 16$\times$16 design has a completed ASIC layout.
-
-Fourth, Nangate45 is used as an OpenROAD educational/platform flow. It is useful for learning physical design, but the numbers should not be treated as final product silicon results.
+% TODO: State current limitations honestly, e.g., subset of matrix ops
+% supported, no autograd, single-GPU only, limited type system, etc.
 
 \section{Future Work}
 
-Future work should start with stronger verification. The testbench should include randomized matrices and edge cases. It should also run multiple operations back to back to make sure the accelerator returns to a correct state after finishing one matrix multiplication.
-
-The design should also measure performance. Important numbers would include cycle count, latency per tile, total latency for 16$\times$16 matrix multiplication, and throughput. These numbers would make it easier to compare the 4$\times$4 tiled design with larger physical arrays.
-
-The memory and input/output interface can also be improved. The current design focuses on proving the compute and tiling concept. A stronger accelerator would need better buffering, clearer host communication, and a more realistic data-loading path.
-
-The full \texttt{matmul\_16x16} top-level OpenROAD flow should also be revisited. The design may need changes to memory structure, top-level interface, or physical-design configuration before it can complete cleanly through routing and signoff. A future paper could compare the PE-array core layout with a full top-level layout.
-
-Longer term, OpenTransformer can move closer to transformer workloads. Matrix multiplication is the foundation, but future work could add quantization experiments, activation functions, memory scheduling, and more complete accelerator datapaths.
+% TODO: Outline next steps -- broader operator support, multi-GPU,
+% integration with autodiff, formal semantics for destructive read, etc.
 
 \section{Conclusion}
 
-This paper presented OpenTransformer, a tiled matrix-multiply accelerator project built in SystemVerilog. The current milestone uses a 4$\times$4 physical systolic array with 16 processing elements and reuses that array to compute a 16$\times$16 matrix multiplication workload.
-
-The full top-level design passed Verilator simulation with all 256 output values correct, passed final lint, synthesized with Yosys, and produced FPGA artifacts for the Tang Nano 9K platform. The FPGA resource evidence showed 16 multiplier blocks, matching the 16 PEs in the physical 4$\times$4 compute array.
-
-The project also produced OpenROAD physical-design evidence for the 4$\times$4 PE-array core. That core completed the OpenROAD flow through detailed routing, final reports, and GDS generation on Nangate45. The final routed core had 14,764 $\mu$m$^2$ design area at 31\% utilization, 0 detail-route violations, 0 antenna violations, 113,082 $\mu$m routed wire length, and 52,211 vias.
-
-The final result is a complete and documented milestone: a verified tiled matrix-multiply accelerator with FPGA evidence and a completed routed OpenROAD layout for the compute core. The most important part is that the claims are tied to saved evidence, and the paper clearly separates what completed from what remains future work.
+% TODO: Summarize what was built and verified, and what remains as future
+% work, tying claims back to saved evidence as in Section~\ref{tab:evidence}
+% above (adjust reference once that section is filled in).
 
 \begin{thebibliography}{1}
 
-\bibitem{openroad}
-The OpenROAD Project, ``OpenROAD-flow-scripts.''
+\bibitem{cublas}
+NVIDIA, ``cuBLAS Library.''
 
-\bibitem{yosys}
-YosysHQ, ``Yosys Open SYnthesis Suite.''
+\bibitem{llvm}
+LLVM Project, ``The LLVM Compiler Infrastructure.''
 
-\bibitem{verilator}
-Verilator, ``Verilator SystemVerilog simulator and lint tool.''
+\bibitem{clean}
+Clean Language Team, ``The Clean Programming Language.''
 
-\bibitem{nangate}
-Nangate, ``Nangate Open Cell Library.''
+\bibitem{sere}
+Sere Language Project, ``Sere Programming Language.''
 
-\bibitem{opentransformer}
-I. Syed, ``OpenTransformer final RTL, FPGA, and OpenROAD evidence,'' project repository, September 2026.
+\bibitem{memolang}
+Independent Interpreter Project, ``MemoLang: source and benchmark evidence,'' project repository, September 2026.
 
 \end{thebibliography}
 
