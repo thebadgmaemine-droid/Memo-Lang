@@ -7,11 +7,14 @@
 \usepackage{array}
 \usepackage{url}
 \usepackage{listings}
+\usepackage{listings}
 
 \graphicspath{{./}{paper/}{paper/figures/}}
 
 \begin{document}
 
+\title{Report on the Research's Findings \\
+\large MemoLang: Building a Memory-Optimized Programming Language}
 \title{Report on the Research's Findings \\
 \large MemoLang: Building a Memory-Optimized Programming Language}
 
@@ -23,9 +26,11 @@ September 2026}
 
 \begin{abstract}
 This paper presents MemoLang, an interpreter design project focused on building an interpreter with LLVM as a backend, optimized for matrix multiplication (with integrated CuBLAS matrix multiplication combined with a destructive-read design). The language design wants to acomplish a streamlined building process, calling into the CuBLAS Library for GPU-optimized routines.
+This paper presents MemoLang, an interpreter design project focused on building an interpreter with LLVM as a backend, optimized for matrix multiplication (with integrated CuBLAS matrix multiplication combined with a destructive-read design). The language design wants to acomplish a streamlined building process, calling into the CuBLAS Library for GPU-optimized routines.
 \end{abstract}
 
 \begin{IEEEkeywords}
+matrix multiplication, LLVM, destructive-read, memory efficient, Python-like syntax, C++, CuBLAS
 matrix multiplication, LLVM, destructive-read, memory efficient, Python-like syntax, C++, CuBLAS
 \end{IEEEkeywords}
 
@@ -47,6 +52,10 @@ As datasets grow larger and models become more complex, the efficiency of matrix
 This project was inspired by the Sere programming language, the CUTLASS library, and the Clean compiler.
 
 \section{Background}
+
+% TODO: Motivate destructive-read semantics, explain why they help memory
+% efficiency for matrix workloads, and give any relevant background on LLVM
+% IR generation or CuBLAS's programming model.
 
 % TODO: Motivate destructive-read semantics, explain why they help memory
 % efficiency for matrix workloads, and give any relevant background on LLVM
@@ -90,8 +99,45 @@ For this milestone, the target was:
 \item Verify correctness of generated code against reference NumPy/CuBLAS results.
 \item Benchmark memory usage and runtime against a naive (non-destructive-read) baseline.
 \item Save logs, test results, and build artifacts as evidence.
+\item Define MemoLang's core syntax (Python-like, C++-influenced) and its destructive-read semantics.
+\item Implement a lexer, parser, and AST (\texttt{ExprAST}) for the language.
+\item Generate LLVM IR from the AST for arithmetic and matrix operations.
+\item Integrate calls into CuBLAS for matrix multiplication.
+\item Verify correctness of generated code against reference NumPy/CuBLAS results.
+\item Benchmark memory usage and runtime against a naive (non-destructive-read) baseline.
+\item Save logs, test results, and build artifacts as evidence.
 \end{itemize}
 
+\section{Language Design}
+
+% TODO: Describe MemoLang's syntax and semantics. Suggested subsections:
+% - Surface syntax and Python-like conventions
+% - Type system (if any) for matrices/tensors
+% - Destructive-read semantics: how a read consumes a value, what happens on
+%   re-use, error/ownership model
+% - How CUDA's programming model influenced the design
+
+\subsection{Syntax Overview}
+% TODO: Example MemoLang snippet(s) illustrating matrix declarations and
+% multiplication, e.g.:
+%
+% \begin{lstlisting}
+% let A = matrix(4, 4)
+% let B = matrix(4, 4)
+% let C = A @ B   # destructive read of A and B
+% \end{lstlisting}
+
+\subsection{Destructive-Read Semantics}
+% TODO: Formal or informal description of destructive read: once a matrix
+% value is read (e.g., consumed by @), it can no longer be used unless
+% explicitly cloned. Explain how this reduces peak memory usage.
+
+\section{Compiler and Runtime Architecture}
+
+% TODO: Describe the pipeline: source -> lexer -> parser -> ExprAST ->
+% LLVM IR -> JIT/AOT compilation -> CuBLAS call for MatMul kernels.
+% A table of main source files (mirroring Table~\ref{tab:modules} in the
+% original hardware paper, but for this project) belongs here, e.g.:
 \section{Language Design}
 
 % TODO: Describe MemoLang's syntax and semantics. Suggested subsections:
@@ -126,11 +172,19 @@ For this milestone, the target was:
 \begin{table}[h]
 \centering
 \caption{Main Source Files}
+\caption{Main Source Files}
 \label{tab:modules}
 \begin{tabular}{ll}
 \toprule
 File & Purpose \\
+File & Purpose \\
 \midrule
+\texttt{Lexer.h/.cpp} & Tokenizes MemoLang source \\
+\texttt{Parser.h/.cpp} & Builds the AST \\
+\texttt{ExprAST.h} & AST node definitions \\
+\texttt{CodeGen.cpp} & LLVM IR generation \\
+\texttt{CuBLASRuntime.cpp} & CuBLAS MatMul bindings \\
+\texttt{main.cpp} & Driver / REPL \\
 \texttt{Lexer.h/.cpp} & Tokenizes MemoLang source \\
 \texttt{Parser.h/.cpp} & Builds the AST \\
 \texttt{ExprAST.h} & AST node definitions \\
@@ -146,9 +200,17 @@ File & Purpose \\
 % TODO: Describe how MatMul expressions lower to LLVM IR, and how/when
 % control transfers to CuBLAS (e.g., via an external function call inserted
 % during codegen). Discuss the destructive-read buffer handoff to CuBLAS.
+\section{LLVM Backend and CuBLAS Integration}
+
+% TODO: Describe how MatMul expressions lower to LLVM IR, and how/when
+% control transfers to CuBLAS (e.g., via an external function call inserted
+% during codegen). Discuss the destructive-read buffer handoff to CuBLAS.
 
 \section{Verification}
 
+% TODO: Describe how correctness was tested (e.g., comparing MemoLang
+% MatMul output against NumPy or cuBLAS reference results for various
+% matrix sizes). Replace with a results table once available, e.g.:
 % TODO: Describe how correctness was tested (e.g., comparing MemoLang
 % MatMul output against NumPy or cuBLAS reference results for various
 % matrix sizes). Replace with a results table once available, e.g.:
@@ -157,10 +219,16 @@ File & Purpose \\
 \centering
 \caption{Correctness Test Results (Template)}
 \label{tab:verification}
+\caption{Correctness Test Results (Template)}
+\label{tab:verification}
 \begin{tabular}{ll}
 \toprule
 Test Case & Result \\
+Test Case & Result \\
 \midrule
+$N \times N$ MatMul vs. reference & TBD \\
+Destructive-read re-use error detection & TBD \\
+Edge cases (empty, 1x1, non-square) & TBD \\
 $N \times N$ MatMul vs. reference & TBD \\
 Destructive-read re-use error detection & TBD \\
 Edge cases (empty, 1x1, non-square) & TBD \\
@@ -173,9 +241,17 @@ Edge cases (empty, 1x1, non-square) & TBD \\
 % TODO: Report runtime and peak-memory measurements comparing:
 % (a) naive/non-destructive baseline, (b) MemoLang with destructive read,
 % (c) raw CuBLAS call for reference. A results table/figure goes here.
+\section{Benchmarks}
+
+% TODO: Report runtime and peak-memory measurements comparing:
+% (a) naive/non-destructive baseline, (b) MemoLang with destructive read,
+% (c) raw CuBLAS call for reference. A results table/figure goes here.
 
 \section{Evidence and Reproducibility}
 
+% TODO: List where logs, benchmark results, and build artifacts are saved
+% (mirroring the "Evidence and Reproducibility" approach in hardware
+% projects) so claims in this paper are traceable to saved output.
 % TODO: List where logs, benchmark results, and build artifacts are saved
 % (mirroring the "Evidence and Reproducibility" approach in hardware
 % projects) so claims in this paper are traceable to saved output.
@@ -185,9 +261,14 @@ Edge cases (empty, 1x1, non-square) & TBD \\
 % TODO: Reflect on design tradeoffs -- e.g., what destructive-read semantics
 % cost in usability vs. what they save in memory; how closely the language
 % tracks CUDA's model; what was learned building an LLVM frontend.
+% TODO: Reflect on design tradeoffs -- e.g., what destructive-read semantics
+% cost in usability vs. what they save in memory; how closely the language
+% tracks CUDA's model; what was learned building an LLVM frontend.
 
 \section{Limitations}
 
+% TODO: State current limitations honestly, e.g., subset of matrix ops
+% supported, no autograd, single-GPU only, limited type system, etc.
 % TODO: State current limitations honestly, e.g., subset of matrix ops
 % supported, no autograd, single-GPU only, limited type system, etc.
 
@@ -195,9 +276,14 @@ Edge cases (empty, 1x1, non-square) & TBD \\
 
 % TODO: Outline next steps -- broader operator support, multi-GPU,
 % integration with autodiff, formal semantics for destructive read, etc.
+% TODO: Outline next steps -- broader operator support, multi-GPU,
+% integration with autodiff, formal semantics for destructive read, etc.
 
 \section{Conclusion}
 
+% TODO: Summarize what was built and verified, and what remains as future
+% work, tying claims back to saved evidence as in Section~\ref{tab:evidence}
+% above (adjust reference once that section is filled in).
 % TODO: Summarize what was built and verified, and what remains as future
 % work, tying claims back to saved evidence as in Section~\ref{tab:evidence}
 % above (adjust reference once that section is filled in).
@@ -213,13 +299,21 @@ NVIDIA, ``cuBLAS Library.''
 
 \bibitem{llvm}
 LLVM Project, ``The LLVM Compiler Infrastructure.''
+\bibitem{llvm}
+LLVM Project, ``The LLVM Compiler Infrastructure.''
 
+\bibitem{clean}
+Clean Language Team, ``The Clean Programming Language.''
 \bibitem{clean}
 Clean Language Team, ``The Clean Programming Language.''
 
 \bibitem{sere}
 Sere Language Project, ``Sere Programming Language.''
+\bibitem{sere}
+Sere Language Project, ``Sere Programming Language.''
 
+\bibitem{memolang}
+Independent Interpreter Project, ``MemoLang: source and benchmark evidence,'' project repository, September 2026.
 \bibitem{memolang}
 Independent Interpreter Project, ``MemoLang: source and benchmark evidence,'' project repository, September 2026.
 
