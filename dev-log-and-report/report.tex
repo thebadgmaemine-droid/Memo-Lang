@@ -7,558 +7,324 @@
 \usepackage{array}
 \usepackage{url}
 \usepackage{listings}
-\usepackage{listings}
 
 \graphicspath{{./}{paper/}{paper/figures/}}
 
 \begin{document}
-
-\title{Report on the Research's Findings \\
-\largeMemoLang investigates whether destructive-read semantics can provide measurable memory-management benefits for GPU matrix workloads.}
-
-\author{
-Independent Interpreter Project\\
-September 2026}
-
-\maketitle
-
-\begin{abstract}
-This paper presents MemoLang, an interpreter and programming-language design
-project that investigates whether destructive-read semantics can reduce memory
-and runtime overhead in matrix-oriented programs. MemoLang uses LLVM as a
-backend and integrates optimized GPU matrix multiplication through NVIDIA's
-CUDA ecosystem, with CUTLASS and cuBLAS considered as underlying GPU
-implementations.
-
-The primary hypothesis is not that the language can make an optimized matrix
-multiplication kernel itself substantially faster. Instead, MemoLang explores
-whether explicit consumption of matrix operands can reduce the lifetime of
-intermediate tensor buffers, decrease temporary-buffer allocation, and lower
-peak GPU memory usage. Such effects may be particularly relevant to workloads
-containing chains of matrix operations or computation graphs with short-lived
-intermediate tensors.
-
-The project evaluates MemoLang against equivalent non-destructive
-implementations and optimized GPU-library baselines. Measurements include
-matrix multiplication time, end-to-end execution time, peak memory usage,
-buffer allocation behavior, and numerical correctness. This distinction
-allows improvements attributable to memory management to be separated from
-the performance of the underlying GPU kernels.
-
-The resulting evaluation is intended to determine the workloads for which
-destructive-read semantics provide measurable practical benefits, as well as
-the cases in which the additional language and runtime mechanisms provide
-little or no advantage.
-\end{abstract}
-
-\begin{IEEEkeywords}
-matrix multiplication, LLVM, destructive-read, memory efficient, Python-like syntax, C++, CUTLASS
-\end{IEEEkeywords}
-
-\section{Introduction}
-
-Matrix multiplication is one of the fundamental operations in modern
-computing. It appears in graphics, signal processing, scientific computing,
-machine learning, and transformer models. Modern GPU libraries such as
-cuBLAS and CUTLASS already provide highly optimized implementations of matrix
-multiplication, making it difficult for a higher-level programming language
-to improve the underlying arithmetic kernel without changing the generated
-GPU code or algorithm.
-
-This observation motivates the central research question of MemoLang:
-rather than attempting to make the matrix multiplication kernel itself
-faster, can a programming language improve the way memory surrounding matrix
-operations is managed?
-
-MemoLang is an interpreter and language design project that investigates
-destructive-read semantics for matrix and tensor values. Under this model,
-an operation may consume its input buffer when the value is known to have no
-future consumers. The consumed storage can subsequently become eligible for
-reuse by another intermediate value.
-
-For example, in a sequence of operations
-
-\begin{equation}
-T_1 = A B,\qquad
-T_2 = T_1 C,\qquad
-T_3 = T_2 D,
-\end{equation}
-
-a conventional implementation may maintain several intermediate buffers at
-the same time. If $A$ and $T_1$ are no longer required after their respective
-operations, destructive-read semantics may allow their storage to be reused.
-
-The expected benefit is therefore primarily a memory-management benefit,
-rather than an improvement to the arithmetic throughput of an individual
-matrix multiplication. If MemoLang generates the same optimized CUTLASS or
-cuBLAS kernel as an equivalent implementation, the GPU kernel itself should
-have approximately the same computational performance. Any end-to-end
-improvement would instead result from factors such as reduced temporary
-allocation, reduced buffer lifetime, or reduced memory pressure.
-
-This distinction is important because an optimized GPU matrix multiplication
-can dominate the execution time of a large workload. In such cases,
-language-level optimization may have little effect on kernel execution time.
-Conversely, workloads containing many intermediate tensors or relatively
-small matrix operations may spend a greater fraction of their execution time
-on memory management, making them more suitable for evaluating destructive
-reads.
-
-The project therefore investigates the following hypotheses:
-
-\begin{itemize}
-\item Destructive-read semantics can reduce peak memory usage for workloads
-containing short-lived intermediate matrices.
-\item Destructive reads can reduce the number or cost of temporary-buffer
-allocations when consumed buffers can safely be reused.
-\item For workloads in which memory management represents a significant
-portion of total execution time, buffer reuse may improve end-to-end
-performance.
-\item For large matrix multiplications dominated by GPU computation,
-destructive-read semantics may have little measurable effect on kernel
-execution time.
-\end{itemize}
-
-This project was inspired by research into destructive-read memory systems,
-the Sere programming language, the Clean programming language, and optimized
-GPU matrix-multiplication libraries.
-
-\begin{itemize}
-\item Improve performance for matrix multiplication operations, supporting faster training and inference for machine learning models.
-\item Lower the hardware-specification entry barrier for developers implementing machine learning algorithms and LLM-related code, by providing a high-level language that abstracts away low-level optimization details.
-\item Allows compiler to effectively reuse immediate tensor buffers.
-\item Eliminate run-time buffer and cache allocating overhead.
-\end{itemize}
-
-
-This project was inspired by the Sere programming language, the CUTLASS library, and the Clean compiler.
-
-\section{Background}
-
-% TODO: Motivate destructive-read semantics, explain why they help memory
-% efficiency for matrix workloads, and give any relevant background on LLVM
-% IR generation or CuBLAS's programming model.
-
-% TODO: Motivate destructive-read semantics, explain why they help memory
-% efficiency for matrix workloads, and give any relevant background on LLVM
-% IR generation or CuBLAS's programming model.
-
-Matrix multiplication can be written as
-
-\begin{equation}
-C_{i,j} = \sum_{k=0}^{N-1} A_{i,k}B_{k,j}
-\end{equation}
-
-Each value in the output matrix $C$ is produced by multiplying one row of $A$ with one column of $B$ and summing the products. Efficient implementations must manage data movement, memory reuse, and (in a destructive-read scheme) the lifetime of operand buffers once they are consumed.
-
-Destructive-read is a memory read operation that inherently erases the value that it reads, which means that data is destroyed at the same time that it is accessed and read. In the case that a memory must be preserved, a write-back operation must be specified to immediately write the value back, or use external buffer/cache to restore the memory.
-In modern, day, this practice is not used much in software due to the complexity of implementation. Modern day programming languages use a combination of ownership, and immutability to implement move semantics to maximize safety and minimize performance drawbacks or through other systems instead of the unsafe destructive-read. Past implementation of Linear systems ( variables must be used exactly once ). Studies show that a modified DRAM can offer lower random access time for DRAM, large performance benefits [1]. Though this is at a hardware level, we believe that applying it to software such as an Interpreter can offer the same or different emerging benefits. The research presented an optimized scheme:
-" We have proposed new schemes that remove the large write-back buﬀer and increase performance by utilizing the cache. The data is ﬁrst read from DRAM and into the cache. At this time data are not stored in DRAM, only in the cache. Data are written back to DRAM when the cache line is replaced."
-Judging by the emerged performance benefit on the modified DRAM, we believe a software-level implementation could optimize buffer and cache allocating as well as an increase in performance.
-Though the domain of destructive-read exist largely in hardware and circuit architecture, we believe that implementing it for software, specifically one where optimizing performance is at foremost concern, could offer universal benefits for both software developers and users.
-	% TODO: Add background on destructive read: what it means for a value to be
-	% "consumed" once read, how this differs from ordinary immutable/borrowed
-	% semantics, and what memory-safety guarantees (if any) the language provides. BUFFER AS BIG AS DRAM BANK SIZE
-	%" We have proposed new schemesthat remove the large write-back buﬀer and increaseperformance by utilizing the cache [5]. The data is ﬁrstread from DRAM and into the cache. At this time dataare not stored in DRAM, only in the cache. Data are written back to DRAM when the cache line is replaced."
-
-\section{Project Goal}
-
-The goal of MemoLang is to determine whether language-level destructive-read
-semantics can provide measurable memory-management benefits for
-matrix-oriented GPU programs while retaining the performance of optimized
-matrix multiplication kernels.
-
-The project will be implemented and evaluated through the following goals:
-
-\begin{itemize}
-\item Define MemoLang's core Python-like syntax and destructive-read
-semantics.
-\item Implement a lexer, parser, AST, and LLVM-based code-generation
-pipeline.
-\item Generate LLVM IR for arithmetic and matrix operations.
-\item Integrate optimized GPU matrix multiplication through CUTLASS and/or
-cuBLAS.
-\item Implement explicit ownership and consumption tracking for matrix
-operands.
-\item Determine when consumed matrix buffers can safely be reused.
-\item Verify generated results against an independent numerical reference.
-\item Measure peak GPU memory usage and temporary-buffer allocation behavior.
-\item Measure both GPU kernel execution time and end-to-end program runtime.
-\item Compare destructive-read execution against an equivalent
-non-destructive implementation.
-\item Compare MemoLang against optimized GPU-library baselines where
-appropriate.
-\item Preserve benchmark logs, correctness results, compiler output, and
-build artifacts to make the experimental results reproducible.
-\end{itemize}
-
-The evaluation will not assume that destructive reads provide a performance
-improvement. A reduction in peak memory usage without a reduction in runtime
-will be treated as a meaningful result, while an observed runtime improvement
-will be analyzed to determine whether it originates from reduced memory
-management overhead rather than from changes to the underlying matrix
-multiplication kernel.
-
-\subsection{Destructive-Read Semantics}
-
-A destructive read treats a value as consumed when an operation has exclusive
-use of that value. After consumption, the original value is no longer
-available to subsequent operations unless the programmer explicitly creates a
-copy or otherwise preserves it.
-
-For matrix operations, this provides an opportunity for storage reuse. For
-example,
-
-\begin{lstlisting}
-C = A @ B
-D = C @ W
-\end{lstlisting}
-
-may permit the storage associated with $A$ or $C$ to become eligible for
-reuse once the compiler establishes that the corresponding value has no
-remaining consumers.
-
-The purpose of this mechanism is not to alter the mathematical computation
-performed by matrix multiplication. Instead, it changes the lifetime of
-buffers associated with the computation. If a buffer can be reused without
-copying its contents, the implementation may reduce peak memory consumption
-and allocation activity.
-
-This optimization is inherently workload-dependent. A matrix with multiple
-future consumers cannot safely be destroyed after its first use. In such
-cases, the implementation may require a copy, borrow, or other mechanism to
-preserve the value. Consequently, destructive-read semantics can introduce a
-tradeoff between memory efficiency and the flexibility to reuse values.
-
-The language therefore treats destructive reads as an explicit ownership
-mechanism rather than assuming that consuming every operand will necessarily
-improve performance.
-
-% TODO: Describe MemoLang's syntax and semantics. Suggested subsections:
-% - Surface syntax and Python-like conventions
-% - Type system (if any) for matrices/tensors
-% - Destructive-read semantics: how a read consumes a value, what happens on
-%   re-use, error/ownership model
-% - How CUDA's programming model influenced the design
-
-\subsection{Syntax Overview}
-% TODO: Example MemoLang snippet(s) illustrating matrix declarations and
-% multiplication, e.g.:
-%
-% \begin{lstlisting}
-% let A = matrix(4, 4)
-% let B = matrix(4, 4)
-% let C = A @ B   # destructive read of A and B
-% \end{lstlisting}
-
-\subsection{Destructive-Read Semantics}
-% TODO: Formal or informal description of destructive read: once a matrix
-% value is read (e.g., consumed by @), it can no longer be used unless
-% explicitly cloned. Explain how this reduces peak memory usage.
-
-\section{Compiler and Runtime Architecture}
-
-% TODO: Describe the pipeline: source -> lexer -> parser -> ExprAST ->
-% LLVM IR -> JIT/AOT compilation -> CuBLAS call for MatMul kernels.
-% A table of main source files (mirroring Table~\ref{tab:modules} in the
-% original hardware paper, but for this project) belongs here, e.g.:
-\section{Maths and Algorithms}
-
-% TODO: Describe MemoLang's syntax and semantics. Suggested subsections:
-% - Surface syntax and Python-like conventions
-% - Type system (if any) for matrices/tensors
-% - Destructive-read semantics: how a read consumes a value, what happens on
-%   re-use, error/ownership model
-% - How CUDA's programming model influenced the design
-
-\subsection{Math behind FP32 Matrix Multiplication}
-% TODO: Example MemoLang snippet(s) illustrating matrix declarations and
-% multiplication, e.g.:
-%
-% \begin{lstlisting}
-% let A = matrix(4, 4)
-% let B = matrix(4, 4)
-% let C = A @ B   # destructive read of A and B
-% \end{lstlisting}
-
-\subsection{The "special scheme" of destructive-read semantics}
-% TODO: Formal or informal description of destructive read: once a matrix
-% value is read (e.g., consumed by @), it can no longer be used unless
-% explicitly cloned. Explain how this reduces peak memory usage.
-
-\section{CUTLASS Integration}
-
-% TODO: Describe the pipeline: source -> lexer -> parser -> ExprAST ->
-% LLVM IR -> JIT/AOT compilation -> CUTLASS call for MatMul kernels.
-% A table of main source files (mirroring Table~\ref{tab:modules} in the
-% original hardware paper, but for this project) belongs here, e.g.:
-
-\begin{table}[h]
-\centering
-\caption{Main Source Files}
-\caption{Main Source Files}
-\label{tab:modules}
-\begin{tabular}{ll}
-\toprule
-File & Purpose \\
-File & Purpose \\
-\midrule
-\texttt{Lexer.h/.cpp} & Tokenizes MemoLang source \\
-\texttt{Parser.h/.cpp} & Builds the AST \\
-\texttt{ExprAST.h} & AST node definitions \\
-\texttt{CodeGen.cpp} & LLVM IR generation \\
-\texttt{CuBLASRuntime.cpp} & CuBLAS MatMul bindings \\
-\texttt{main.cpp} & Driver / REPL \\
-\texttt{Lexer.h/.cpp} & Tokenizes MemoLang source \\
-\texttt{Parser.h/.cpp} & Builds the AST \\
-\texttt{ExprAST.h} & AST node definitions \\
-\texttt{CodeGen.cpp} & LLVM IR generation \\
-\texttt{CuBLASRuntime.cpp} & CuBLAS MatMul bindings \\
-\texttt{main.cpp} & Driver / REPL \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-% TODO: Describe how MatMul expressions lower to LLVM IR, and how/when
-% control transfers to CUTLASS (e.g., via an external function call inserted
-% during codegen). Discuss the destructive-read buffer handoff to CUTLASS.
-
-\section{Verification}
-
-% TODO: Describe how correctness was tested (e.g., comparing MemoLang
-% MatMul output against NumPy or cuBLAS reference results for various
-% matrix sizes). Replace with a results table once available, e.g.:
-% TODO: Describe how correctness was tested (e.g., comparing MemoLang
-% MatMul output against NumPy or cuBLAS reference results for various
-% matrix sizes). Replace with a results table once available, e.g.:
-
-\begin{table}[h]
-\centering
-\caption{Correctness Test Results (Template)}
-\label{tab:verification}
-\caption{Correctness Test Results (Template)}
-\label{tab:verification}
-\begin{tabular}{ll}
-\toprule
-Test Case & Result \\
-Test Case & Result \\
-\midrule
-$N \times N$ MatMul vs. reference & TBD \\
-Destructive-read re-use error detection & TBD \\
-Edge cases (empty, 1x1, non-square) & TBD \\
-$N \times N$ MatMul vs. reference & TBD \\
-Destructive-read re-use error detection & TBD \\
-Edge cases (empty, 1x1, non-square) & TBD \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\section{Benchmarks}
-
-The benchmark evaluation is designed to distinguish improvements in memory
-management from improvements in matrix multiplication itself.
-
-Three primary implementations will be compared:
-
-\begin{enumerate}
-\item An optimized GPU-library implementation used as a kernel-performance
-reference.
-\item MemoLang using conventional non-destructive value semantics.
-\item MemoLang using destructive-read semantics.
-\end{enumerate}
-
-Where appropriate, a simple C++ or CUDA implementation will also be included
-as a baseline.
-
-The most important comparison is between the two MemoLang configurations.
-Both configurations perform the same mathematical operations and use the
-same underlying GPU matrix multiplication implementation. This comparison
-isolates the effect of destructive-read semantics more effectively than a
-comparison against an unrelated implementation.
-
-The benchmark suite will include isolated matrix multiplications as well as
-chains of matrix operations. Matrix dimensions will include small, medium,
-large, and non-square matrices. This allows the evaluation to determine
-whether the effect of destructive reads depends on workload size.
-
-The following measurements will be collected:
-
-\begin{itemize}
-\item GPU kernel execution time.
-\item End-to-end execution time.
-\item Peak GPU memory consumption.
-\item Number of temporary-buffer allocations.
-\item Number of buffer reuse events.
-\item Host-to-device and device-to-host transfer time where applicable.
-\item Compiler and runtime overhead.
-\item Numerical error relative to a reference implementation.
-\end{itemize}
-
-GPU measurements will use multiple repetitions and appropriate warm-up
-iterations. CUDA initialization and compilation overhead will be separated
-from steady-state execution measurements where possible.
-
-The benchmark will report both absolute measurements and relative changes.
-No performance improvement will be attributed to destructive-read semantics
-unless the corresponding measurements support that interpretation.
-
-% TODO: Report runtime and peak-memory measurements comparing:
-% (a) naive/non-destructive baseline, (b) MemoLang with destructive read,
-% (c) raw CuBLAS call for reference. A results table/figure goes here.
-\section{Benchmarks}
-
-% TODO: Report runtime and peak-memory measurements comparing:
-% (a) naive/non-destructive baseline, (b) MemoLang with destructive read,
-% (c) raw CuBLAS call for reference. A results table/figure goes here.
-
-\section{Evidence and Reproducibility}
-
-% TODO: List where logs, benchmark results, and build artifacts are saved
-% (mirroring the "Evidence and Reproducibility" approach in hardware
-% projects) so claims in this paper are traceable to saved output.
-% TODO: List where logs, benchmark results, and build artifacts are saved
-% (mirroring the "Evidence and Reproducibility" approach in hardware
-% projects) so claims in this paper are traceable to saved output.
-
-\subsection{Real-World Benefits}
-
-The primary potential real-world benefit of MemoLang is improved memory
-efficiency rather than faster individual matrix multiplication kernels.
-
-Modern GPU libraries already provide highly optimized matrix multiplication
-kernels. If MemoLang ultimately invokes the same kernel with equivalent
-inputs, there is little reason to expect destructive-read semantics alone to
-significantly increase the arithmetic throughput of that kernel.
-
-The potential advantage instead occurs when multiple operations create
-intermediate tensors. Consider a computation such as
-
-\begin{equation}
-T_1 = AB,\qquad
-T_2 = T_1C,\qquad
-T_3 = T_2D.
-\end{equation}
-
-A conventional implementation may need to maintain several intermediate
-buffers simultaneously. If each intermediate has only one consumer, a
-destructive-read implementation can potentially reuse storage after that
-consumer has completed.
-
-This can produce practical benefits even if individual matrix multiplication
-kernels execute at exactly the same speed. Lower peak memory consumption can
-allow larger batch sizes, larger sequence lengths, or larger models to fit
-within a fixed GPU memory capacity. Reducing allocation and deallocation
-activity may also reduce runtime overhead in workloads containing many small
-operations.
-
-However, these benefits are not universal. Machine-learning workloads often
-contain residual connections, branching computation graphs, parameter reuse,
-concatenation, normalization, and other operations in which values have
-multiple consumers. Such workloads may require values to remain alive or may
-require explicit copies, potentially reducing or eliminating the memory
-advantage.
-
-The practical value of MemoLang should therefore be evaluated according to
-the workload rather than expressed as a universal performance improvement.
-
-\subsection{Expected Relationship Between Language and MatMul Performance}
-
-The expected execution time can be approximately decomposed as
-
-\begin{equation}
-T_{\mathrm{total}} =
-T_{\mathrm{language}} +
-T_{\mathrm{memory}} +
-T_{\mathrm{launch}} +
-T_{\mathrm{kernel}}.
-\end{equation}
-
-Destructive-read semantics primarily target
-$T_{\mathrm{memory}}$. They are not expected to substantially reduce
-$T_{\mathrm{kernel}}$ when the same optimized GPU kernel is used.
-
-For a large matrix multiplication, $T_{\mathrm{kernel}}$ may dominate the
-total execution time, resulting in little observable end-to-end improvement.
-For workloads containing many intermediate tensors or small matrix
-operations, however, $T_{\mathrm{memory}}$ and other runtime costs may become
-more significant.
-
-Consequently, a successful result does not require MemoLang to make an
-individual matrix multiplication faster. A reduction in peak memory usage,
-allocation activity, or end-to-end overhead can constitute a meaningful
-result even when kernel execution time remains approximately unchanged.
-\section{Threats to Validity}
-
-The proposed benefits of destructive-read semantics should not be interpreted
-as guaranteed improvements for all matrix workloads.
-
-First, optimized GPU matrix multiplication libraries already perform
-substantial low-level optimization. If MemoLang ultimately invokes the same
-kernel with the same input dimensions and precision, destructive-read
-semantics should not be expected to substantially change the arithmetic
-throughput of that kernel.
-
-Second, memory savings do not necessarily imply runtime savings. A program
-may use less memory while spending approximately the same amount of time
-performing the underlying matrix operations. Conversely, additional ownership
-tracking or copying could make some workloads slower.
-
-Third, benchmark results depend on GPU architecture, CUDA version, library
-version, matrix dimensions, precision, synchronization behavior, allocation
-strategy, and data-transfer policy. These variables must therefore be
-reported and controlled when comparing implementations.
-
-Finally, improvements measured on synthetic matrix chains may not directly
-translate to complete machine-learning systems. Real computation graphs
-contain values with different numbers of consumers and different lifetime
-requirements. Results should therefore be interpreted in terms of the
-specific workloads tested rather than generalized to all GPU applications.
-
-\section{Future Work}
-
-% TODO: Outline next steps -- broader operator support, multi-GPU,
-% integration with autodiff, formal semantics for destructive read, etc.
-% TODO: Outline next steps -- broader operator support, multi-GPU,
-% integration with autodiff, formal semantics for destructive read, etc.
-
-\section{Conclusion}
-
-% TODO: Summarize what was built and verified, and what remains as future
-% work, tying claims back to saved evidence as in Section~\ref{tab:evidence}
-% above (adjust reference once that section is filled in).
-% TODO: Summarize what was built and verified, and what remains as future
-% work, tying claims back to saved evidence as in Section~\ref{tab:evidence}
-% above (adjust reference once that section is filled in).
-
-\begin{thebibliography}{1}
-\bibitem{DybdahlKGN06}
-Haakon Dybdahl, Per Gunnar Kjeldsberg, Marius Grannæs, and Lasse Natvig,
-``Destructive-read in embedded DRAM, impact on power consumption,''
-\emph{Journal of Embedded Computing}, vol.~2, no.~1, pp.~83--96, 2006.
-\url{http://dblp.uni-trier.de/rec/bibtex/journals/jec/DybdahlKGN06}
-\bibitem{cublas}
-NVIDIA, ``cuBLAS Library.''
-
-\bibitem{llvm}
-LLVM Project, ``The LLVM Compiler Infrastructure.''
-\bibitem{llvm}
-LLVM Project, ``The LLVM Compiler Infrastructure.''
-
-\bibitem{clean}
-Clean Language Team, ``The Clean Programming Language.''
-\bibitem{clean}
-Clean Language Team, ``The Clean Programming Language.''
-
-\bibitem{sere}
-Sere Language Project, ``Sere Programming Language.''
-\bibitem{sere}
-Sere Language Project, ``Sere Programming Language.''
-
-\bibitem{memolang}
-Independent Interpreter Project, ``MemoLang: source and benchmark evidence,'' project repository, September 2026.
-\bibitem{memolang}
-Independent Interpreter Project, ``MemoLang: source and benchmark evidence,'' project repository, September 2026.
-
-\end{thebibliography}
-
+	
+	\title{Report on the Research's Findings \\
+		{\large MemoLang: Destructive-Read Semantics on GPU Matrix Workloads}}
+	
+	\author{
+		Independent Interpreter Project\\
+		September 2026}
+	
+	\maketitle
+	
+	\begin{abstract}
+		The recent rise of AI has led to the explosion of machine learning algorithms and deep learning models. Consequently, the demand for computing power due to massive dataset training has also risen.
+		
+		The main operation for training machine learning algorithms is the GEMM (General Matrix Multiplication). The general equation is written as:
+		
+		\begin{equation}
+			C = \alpha AB + \beta C
+		\end{equation}
+		where $\alpha$ and $\beta$ are scalar multipliers and $A$, $B$, and $C$ are matrix operands.
+		
+		This routine implies a nested loop of computation. $A$ and $B$ are matrices with rows and columns, and this routine iterates over the rows of $A$, the columns of $B$, and the shared inner dimension. The routine can be expressed as a nested loop:
+		
+		\begin{verbatim}
+			for i in 1..m:
+			for j in 1..n:
+			for p in 1..k:
+			C[i][j] += A[i][p] * B[p][j]
+		\end{verbatim}
+		
+		This tells us that memory scales quadratically ($N^2$) and compute scales cubically ($N^3$).
+		
+		Deep learning models perform numerous stacks of linear transformations, convolutions (where a kernel matrix slides over an input matrix to extract information), and other mechanisms, all of which are expressed through GEMM operations.
+		
+		During training, each matrix multiplication operation outputs a matrix which is then chained onto other matrix multiplication operations. As operations persist, buffers and intermediates accumulate and persist until garbage collection or freed by explicit rules. On systems utilizing garbage collection, buffer lifetimes could accumulate to be a real problem on memory-constrained systems or systems under heavy workload. Allocation/deallocation overhead can compound, which costs performance, and repeated malloc/free cycles cost latency across a long chain.
+		
+		As such, the primary design aims not to optimize the GEMM kernel, but to optimize the lifetime of intermediate tensor buffers and temporary-buffer allocation by ensuring buffers, pointers, and cache are freed as soon as possible, which could lower peak GPU memory usage.
+		
+		The project evaluates MemoLang against equivalent non-destructive implementations and optimized GPU-library baselines. Measurements include matrix multiplication time, end-to-end execution time, peak memory usage, buffer allocation behavior, and numerical correctness. These measurements will then be factored in and evaluated to answer the main question: Can destructive-read semantics optimize tensor and temporary buffers for large GEMM chain workloads?
+	\end{abstract}
+	
+	\begin{IEEEkeywords}
+		matrix multiplication, LLVM, destructive-read, memory efficient, Python-like syntax, C++, CUTLASS
+	\end{IEEEkeywords}
+	
+	\section{Novelty}
+	
+	Our main goal is to directly link the precompiled cuBLAS runtime library for a specific application, evaluated with a specific methodology, under an enforcement model resembling a strictly linear type system. Other languages have pursued related consumption-tracking semantics: Rust's ownership system~\cite{rust} enforces a comparable use-once discipline through its affine type system, and Futhark~\cite{futhark} is a purely functional array language that uses uniqueness types to support safe in-place updates. Futhark, however, generates its own GPU kernels from source rather than integrating with external, independently maintained high-performance libraries such as cuBLAS or CUTLASS -- a limitation that has been noted as one of the practical hurdles of the language. MemoLang instead separates compile-time consumption analysis from kernel execution, delegating the arithmetic itself to an externally linked, production-grade GEMM library.
+	
+	\begin{equation}
+		T_1 = A B,\qquad
+		T_2 = T_1 C,\qquad
+		T_3 = T_2 D,
+	\end{equation}
+	
+	In a conventional implementation, several intermediate buffers may remain live at the same time. If $A$ and $T_1$ are no longer required after their respective operations, destructive-read semantics may allow their storage to be reused.
+	
+	The expected benefit is therefore primarily a memory-management benefit, rather than an improvement to the arithmetic throughput of an individual matrix multiplication. If MemoLang generates the same optimized CUTLASS or cuBLAS kernel as an equivalent implementation, the GPU kernel itself should have approximately the same computational performance. Any end-to-end improvement would instead result from factors such as reduced temporary allocation, reduced buffer lifetime, or reduced memory pressure.
+	
+	This distinction is important because an optimized GPU matrix multiplication can dominate the execution time of a large workload. In such cases, language-level optimization may have little effect on kernel execution time. Conversely, workloads containing many intermediate tensors or relatively small matrix operations may spend a greater fraction of their execution time on memory management, making them more suitable for evaluating destructive reads.
+	
+	The project therefore investigates the following hypotheses:
+	
+	\begin{itemize}
+		\item Destructive-read semantics can reduce peak memory usage for workloads containing short-lived intermediate matrices.
+		\item Destructive reads can reduce the number or cost of temporary-buffer allocations when consumed buffers can safely be reused.
+		\item For workloads in which memory management represents a significant portion of total execution time, buffer reuse may improve end-to-end performance.
+	\end{itemize}
+	
+	This project was inspired by research into destructive-read memory systems, the Sere programming language~\cite{sere}, the Clean programming language~\cite{clean}, and optimized GPU matrix-multiplication libraries.
+	
+	Potential real-world benefits include:
+	
+	\begin{itemize}
+		\item Improved performance for matrix multiplication operations, supporting faster training and inference for machine learning models.
+		\item A lower hardware-specification entry barrier for developers implementing machine learning algorithms and LLM-related code, by providing a high-level language that abstracts away low-level optimization details.
+		\item More effective compiler-driven reuse of intermediate tensor buffers.
+		\item Reduced run-time buffer and cache allocation overhead.
+	\end{itemize}
+	
+	\section{Background}
+	
+	% TODO: Motivate destructive-read semantics, explain why they help memory
+	% efficiency for matrix workloads, and give any relevant background on LLVM
+	% IR generation or cuBLAS's programming model.
+	
+	Matrix multiplication can be written as
+	
+	\begin{equation}
+		C_{i,j} = \sum_{k=0}^{N-1} A_{i,k}B_{k,j}
+	\end{equation}
+	
+	Each value in the output matrix $C$ is produced by multiplying one row of $A$ with one column of $B$ and summing the products. Efficient implementations must manage data movement, memory reuse, and, in a destructive-read scheme, the lifetime of operand buffers once they are consumed.
+	
+	Destructive-read is a memory read operation that inherently erases the value it reads: data is destroyed at the same time it is accessed. If a value must be preserved, a write-back operation must immediately restore it, or an external buffer/cache must hold a copy.
+	
+	In modern software, this practice is rarely used directly, owing to its implementation complexity. Contemporary programming languages instead use ownership and immutability to implement move semantics, aiming for similar safety and memory-reuse guarantees without the sharp edges of unsynchronized destructive reads. Related work on linear type systems takes a similar approach at the language level, requiring that a variable be used exactly once.
+	
+	Destructive-read has, historically, been more common in hardware and circuit design than in software. Dybdahl et al.~\cite{DybdahlKGN06} studied destructive-read behavior in embedded DRAM and found that removing the write-back buffer and instead relying on the cache -- reading data into the cache without immediately restoring it to DRAM, and writing it back only when the cache line is replaced -- offered measurable power and performance benefits. While that result is specific to a hardware memory system, it motivates the broader question this project investigates: whether a comparable consume-on-read discipline, applied at the software/interpreter level for GEMM-heavy workloads, can yield analogous benefits in memory pressure and allocation overhead.
+	
+	% TODO: Describe MemoLang's syntax and semantics. Suggested subsections:
+	% - Surface syntax and Python-like conventions
+	% - Type system (if any) for matrices/tensors
+	% - Destructive-read semantics: how a read consumes a value, what happens on
+	%   re-use, error/ownership model
+	% - How CUDA's programming model influenced the design
+	
+	\section{Project Goal}
+	
+	The goal of MemoLang is to determine whether language-level destructive-read semantics can provide measurable memory-management benefits for matrix-oriented GPU programs while retaining the performance of optimized matrix multiplication kernels.
+	
+	The project will be implemented and evaluated through the following goals:
+	
+	\begin{itemize}
+		\item Define MemoLang's core Python-like syntax and destructive-read semantics.
+		\item Implement a lexer, parser, AST, and LLVM-based code-generation pipeline.
+		\item Generate LLVM IR for arithmetic and matrix operations.
+		\item Integrate optimized GPU matrix multiplication through CUTLASS and/or cuBLAS.
+		\item Implement explicit ownership and consumption tracking for matrix operands.
+		\item Determine when consumed matrix buffers can safely be reused.
+		\item Verify generated results against an independent numerical reference.
+		\item Measure peak GPU memory usage and temporary-buffer allocation behavior.
+		\item Measure both GPU kernel execution time and end-to-end program runtime.
+		\item Compare destructive-read execution against an equivalent non-destructive implementation.
+		\item Compare MemoLang against optimized GPU-library baselines where appropriate.
+		\item Preserve benchmark logs, correctness results, compiler output, and build artifacts to make the experimental results reproducible.
+	\end{itemize}
+	
+	The evaluation will not assume that destructive reads provide a performance improvement. A reduction in peak memory usage without a reduction in runtime will be treated as a meaningful result, while an observed runtime improvement will be analyzed to determine whether it originates from reduced memory-management overhead rather than from changes to the underlying matrix multiplication kernel.
+	
+	\subsection{Destructive-Read Semantics}
+	
+	A destructive read treats a value as consumed when an operation has exclusive use of that value. After consumption, the original value is no longer available to subsequent operations unless the programmer explicitly creates a copy or otherwise preserves it.
+	
+	For matrix operations, this provides an opportunity for storage reuse. For example,
+	
+	\begin{lstlisting}
+		C = A @ B
+		D = C @ W
+	\end{lstlisting}
+	
+	may permit the storage associated with $A$ or $C$ to become eligible for reuse once the compiler establishes that the corresponding value has no remaining consumers.
+	
+	The purpose of this mechanism is not to alter the mathematical computation performed by matrix multiplication. Instead, it changes the lifetime of buffers associated with the computation. If a buffer can be reused without copying its contents, the implementation may reduce peak memory consumption and allocation activity.
+	
+	This optimization is inherently workload-dependent. A matrix with multiple future consumers cannot safely be destroyed after its first use. In such cases, the implementation may require a copy, borrow, or other mechanism to preserve the value. Consequently, destructive-read semantics can introduce a tradeoff between memory efficiency and the flexibility to reuse values.
+	
+	The language therefore treats destructive reads as an explicit ownership mechanism rather than assuming that consuming every operand will necessarily improve performance.
+	
+	\section{Compiler and Runtime Architecture}
+	
+	% TODO: Describe the pipeline: source -> lexer -> parser -> ExprAST ->
+	% LLVM IR -> JIT/AOT compilation -> cuBLAS call for MatMul kernels.
+	
+	\section{Maths and Algorithms}
+	
+	\subsection{Math Behind FP32 Matrix Multiplication}
+	
+	% TODO: Elaborate on FP32 accumulation, tiling, and precision considerations
+	% for the GEMM kernel.
+	
+	\subsection{The Free-on-Consume Scheme}
+	
+	% TODO: Formal or informal description of destructive read: once a matrix
+	% value is read (e.g., consumed by @), it can no longer be used unless
+	% explicitly cloned. Explain how this reduces peak memory usage, and how
+	% consume_a/consume_b flags are computed and passed to the runtime.
+	
+	\section{CUTLASS Integration}
+	
+	% TODO: Describe the pipeline: source -> lexer -> parser -> ExprAST ->
+	% LLVM IR -> JIT/AOT compilation -> CUTLASS call for MatMul kernels.
+	
+	\begin{table}[h]
+		\centering
+		\caption{Main Source Files}
+		\label{tab:modules}
+		\begin{tabular}{ll}
+			\toprule
+			File & Purpose \\
+			\midrule
+			\texttt{Lexer.h/.cpp} & Tokenizes MemoLang source \\
+			\texttt{Parser.h/.cpp} & Builds the AST \\
+			\texttt{ExprAST.h} & AST node definitions \\
+			\texttt{CodeGen.cpp} & LLVM IR generation \\
+			\texttt{CuBLASRuntime.cpp} & cuBLAS MatMul bindings \\
+			\texttt{main.cpp} & Driver / REPL \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+	
+	% TODO: Describe how MatMul expressions lower to LLVM IR, and how/when
+	% control transfers to CUTLASS (e.g., via an external function call inserted
+	% during codegen). Discuss the destructive-read buffer handoff to CUTLASS.
+	
+	\section{Verification}
+	
+	% TODO: Describe how correctness was tested (e.g., comparing MemoLang
+	% MatMul output against NumPy or cuBLAS reference results for various
+	% matrix sizes). Replace with a results table once available.
+	
+	\begin{table}[h]
+		\centering
+		\caption{Correctness Test Results (Template)}
+		\label{tab:verification}
+		\begin{tabular}{ll}
+			\toprule
+			Test Case & Result \\
+			\midrule
+			$N \times N$ MatMul vs. reference & TBD \\
+			Destructive-read re-use error detection & TBD \\
+			Edge cases (empty, 1x1, non-square) & TBD \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+	
+	\section{Benchmarks}
+	
+	The benchmark evaluation is designed to distinguish improvements in memory management from improvements in matrix multiplication itself.
+	
+	Three primary implementations will be compared:
+	
+	\begin{enumerate}
+		\item An optimized GPU-library implementation used as a kernel-performance reference.
+		\item MemoLang using conventional non-destructive value semantics.
+		\item MemoLang using destructive-read semantics.
+	\end{enumerate}
+	
+	Where appropriate, a simple C++ or CUDA implementation will also be included as a baseline.
+	
+	The most important comparison is between the two MemoLang configurations. Both configurations perform the same mathematical operations and use the same underlying GPU matrix multiplication implementation. This comparison isolates the effect of destructive-read semantics more effectively than a comparison against an unrelated implementation.
+	
+	The benchmark suite will include isolated matrix multiplications as well as chains of matrix operations. Matrix dimensions will include small, medium, large, and non-square matrices. This allows the evaluation to determine whether the effect of destructive reads depends on workload size.
+	
+	The following measurements will be collected:
+	
+	\begin{itemize}
+		\item GPU kernel execution time.
+		\item End-to-end execution time.
+		\item Peak GPU memory consumption.
+		\item Number of temporary-buffer allocations.
+		\item Number of buffer reuse events.
+		\item Host-to-device and device-to-host transfer time where applicable.
+		\item Compiler and runtime overhead.
+		\item Numerical error relative to a reference implementation.
+	\end{itemize}
+	
+	GPU measurements will use multiple repetitions and appropriate warm-up iterations. CUDA initialization and compilation overhead will be separated from steady-state execution measurements where possible.
+	
+	The benchmark will report both absolute measurements and relative changes. No performance improvement will be attributed to destructive-read semantics unless the corresponding measurements support that interpretation.
+	
+
+
+	\subsection{Expected Relationship Between Language and MatMul Performance}
+	
+	The expected execution time can be approximately decomposed as
+	
+	\begin{equation}
+		T_{\mathrm{total}} =
+		T_{\mathrm{language}} +
+		T_{\mathrm{memory}} +
+		T_{\mathrm{launch}} +
+		T_{\mathrm{kernel}}.
+	\end{equation}
+	
+	Destructive-read semantics primarily target $T_{\mathrm{memory}}$. They are not expected to substantially reduce $T_{\mathrm{kernel}}$ when the same optimized GPU kernel is used.
+	
+	For a large matrix multiplication, $T_{\mathrm{kernel}}$ may dominate the total execution time, resulting in little observable end-to-end improvement. For workloads containing many intermediate tensors or small matrix operations, however, $T_{\mathrm{memory}}$ and other runtime costs may become more significant.
+	
+	Consequently, a successful result does not require MemoLang to make an individual matrix multiplication faster. A reduction in peak memory usage, allocation activity, or end-to-end overhead can constitute a meaningful result even when kernel execution time remains approximately unchanged.
+	
+	
+	
+		
+	\section{Evidence and Reproducibility}
+	\label{sec:evidence}
+	
+	% TODO: List where logs, benchmark results, and build artifacts are saved
+	% (mirroring the "Evidence and Reproducibility" approach in hardware
+	% projects) so claims in this paper are traceable to saved output.
+	
+	
+	\section{Conclusion}
+	
+	% TODO: Summarize what was built and verified, and what remains as future
+	% work, tying claims back to saved evidence as in Section~\ref{sec:evidence}
+	% above.
+	
+	\begin{thebibliography}{9}
+		\bibitem{DybdahlKGN06}
+		Haakon Dybdahl, Per Gunnar Kjeldsberg, Marius Grann{\ae}s, and Lasse Natvig,
+		``Destructive-read in embedded DRAM, impact on power consumption,''
+		\emph{Journal of Embedded Computing}, vol.~2, no.~1, pp.~83--96, 2006.
+		
+		\bibitem{cublas}
+		NVIDIA, ``cuBLAS Library.'' \url{https://developer.nvidia.com/cublas}
+		
+		\bibitem{llvm}
+		LLVM Project, ``The LLVM Compiler Infrastructure.'' \url{https://llvm.org}
+		
+		\bibitem{clean}
+		Clean Language Team, ``The Clean Programming Language.'' \url{https://clean.cs.ru.nl}
+		
+		\bibitem{sere}
+		Sere Language Project, ``Sere Programming Language.'' \url{https://clean-lang.org}
+		
+		\bibitem{rust}
+		N.~D.~Matsakis and F.~S.~Klock, ``The Rust language,'' in \emph{Proc. ACM SIGAda Ada Letters}, 2014. \url{https://www.rust-lang.org}
+		
+		\bibitem{futhark}
+		T.~Henriksen, N.~G.~W.~Serup, M.~Elsman, F.~Henglein, and C.~E.~Oancea, ``Futhark: purely functional GPU-programming with nested parallelism and in-place array updates,'' in \emph{Proc. 38th ACM SIGPLAN Conference on Programming Language Design and Implementation (PLDI)}, 2017. \url{https://futhark-lang.org}
+		
+		\bibitem{memolang}
+		Independent Interpreter Project, ``MemoLang: source and benchmark evidence,'' project repository, September 2026.
+		
+	\end{thebibliography}
+	
 \end{document}
