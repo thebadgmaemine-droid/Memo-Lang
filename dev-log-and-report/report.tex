@@ -1,4 +1,18 @@
-\documentclass[conference]{IEEEtran}
+\documentclass[a4paper]{article}
+% A4, margins: left 3cm, right 2cm, top 2cm, bottom 2cm
+\usepackage[a4paper, left=3cm, right=2cm, top=2cm, bottom=2cm]{geometry}
+% Times New Roman
+\usepackage{times}
+% Single line spacing + 3pt paragraph spacing
+\usepackage{setspace}
+\singlespacing
+\setlength{\parskip}{3pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\normalsize}{\fontsize{13pt}{15.6pt}\selectfont}
+\normalsize
+
+
+
 
 \usepackage{cite}
 \usepackage{amsmath}
@@ -17,47 +31,25 @@
 	
 	\author{
 		Independent Interpreter Project\\
-		September 2026}
+		September 2026, Hanoi}
 	
 	\maketitle
 	
 	\begin{abstract}
+		\normalsize
 		The recent rise of AI has led to the explosion of machine learning algorithms and deep learning models. Consequently, the demand for computing power due to massive dataset training has also risen.
 		
-		The main operation for training machine learning algorithms is the GEMM (General Matrix Multiplication). The general equation is written as:
+		The main operation for training machine learning algorithms is the GEMM (General Matrix Multiplication). 
 		
-		\begin{equation}
-			C = \alpha AB + \beta C
-		\end{equation}
-		where $\alpha$ and $\beta$ are scalar multipliers and $A$, $B$, and $C$ are matrix operands.
+		During training, each matrix multiplication operation outputs a matrix which is then chained onto other matrix multiplication operations. As operations persist, buffers and intermediates accumulate and persist and accumulate until garbage collection or freed by explicit rules. On systems utilizing garbage collection, buffer lifetimes could accumulate to be a real problem on memory-constrained systems or systems under heavy workload. Allocation/deallocation overhead can compound, which costs performance, and repeated malloc/free cycles cost latency across a long chain.
 		
-		This routine implies a nested loop of computation. $A$ and $B$ are matrices with rows and columns, and this routine iterates over the rows of $A$, the columns of $B$, and the shared inner dimension. The routine can be expressed as a nested loop:
-		
-		\begin{verbatim}
-			for i in 1..m:
-			for j in 1..n:
-			for p in 1..k:
-			C[i][j] += A[i][p] * B[p][j]
-		\end{verbatim}
-		
-		This tells us that memory scales quadratically ($N^2$) and compute scales cubically ($N^3$).
-		
-		Deep learning models perform numerous stacks of linear transformations, convolutions (where a kernel matrix slides over an input matrix to extract information), and other mechanisms, all of which are expressed through GEMM operations.
-		
-		During training, each matrix multiplication operation outputs a matrix which is then chained onto other matrix multiplication operations. As operations persist, buffers and intermediates accumulate and persist until garbage collection or freed by explicit rules. On systems utilizing garbage collection, buffer lifetimes could accumulate to be a real problem on memory-constrained systems or systems under heavy workload. Allocation/deallocation overhead can compound, which costs performance, and repeated malloc/free cycles cost latency across a long chain.
-		
-		As such, the primary design aims not to optimize the GEMM kernel, but to optimize the lifetime of intermediate tensor buffers and temporary-buffer allocation by ensuring buffers, pointers, and cache are freed as soon as possible, which could lower peak GPU memory usage.
-		
-		The project evaluates MemoLang against equivalent non-destructive implementations and optimized GPU-library baselines. Measurements include matrix multiplication time, end-to-end execution time, peak memory usage, buffer allocation behavior, and numerical correctness. These measurements will then be factored in and evaluated to answer the main question: Can destructive-read semantics optimize tensor and temporary buffers for large GEMM chain workloads?
+		As such, the primary design aims not to optimize the GEMM kernel, but to optimize the lifetime of intermediate tensor buffers and temporary-buffer allocation by ensuring buffers, pointers, and cache are freed as soon as possible.
 	\end{abstract}
-	
-	\begin{IEEEkeywords}
-		matrix multiplication, LLVM, destructive-read, memory efficient, Python-like syntax, C++, CUTLASS
-	\end{IEEEkeywords}
+
 	
 	\section{Novelty}
 	
-	Our main goal is to directly link the precompiled cuBLAS runtime library for a specific application, evaluated with a specific methodology, under an enforcement model resembling a strictly linear type system. Other languages have pursued related consumption-tracking semantics: Rust's ownership system~\cite{rust} enforces a comparable use-once discipline through its affine type system, and Futhark~\cite{futhark} is a purely functional array language that uses uniqueness types to support safe in-place updates. Futhark, however, generates its own GPU kernels from source rather than integrating with external, independently maintained high-performance libraries such as cuBLAS or CUTLASS -- a limitation that has been noted as one of the practical hurdles of the language. MemoLang instead separates compile-time consumption analysis from kernel execution, delegating the arithmetic itself to an externally linked, production-grade GEMM library.
+	Our main goal is to directly link the precompiled cuBLAS runtime library for a specific application, evaluated with a specific methodology, under an enforcement model resembling a strictly linear type system. Other languages have pursued related consumption-tracking semantics: Rust's ownership system~\cite{rust} enforces a comparable use-once discipline through its affine type system, and Futhark~\cite{futhark} is a purely functional array language that uses uniqueness types to support safe in-place updates. Futhark, however, generates its own GPU kernels from source rather than integrating with external, independently maintained high-performance libraries such as cuBLAS or CUTLASS, a limitation that has been noted as one of the practical hurdles of the language. MemoLang instead separates compile-time consumption analysis from kernel execution, delegating the arithmetic itself to an externally linked, production-grade GEMM library.
 	
 	\begin{equation}
 		T_1 = A B,\qquad
@@ -108,7 +100,7 @@
 	
 	In modern software, this practice is rarely used directly, owing to its implementation complexity. Contemporary programming languages instead use ownership and immutability to implement move semantics, aiming for similar safety and memory-reuse guarantees without the sharp edges of unsynchronized destructive reads. Related work on linear type systems takes a similar approach at the language level, requiring that a variable be used exactly once.
 	
-	Destructive-read has, historically, been more common in hardware and circuit design than in software. Dybdahl et al.~\cite{DybdahlKGN06} studied destructive-read behavior in embedded DRAM and found that removing the write-back buffer and instead relying on the cache -- reading data into the cache without immediately restoring it to DRAM, and writing it back only when the cache line is replaced -- offered measurable power and performance benefits. While that result is specific to a hardware memory system, it motivates the broader question this project investigates: whether a comparable consume-on-read discipline, applied at the software/interpreter level for GEMM-heavy workloads, can yield analogous benefits in memory pressure and allocation overhead.
+	Destructive-read is more commonly practiced in hardware and circuit design than in software. Dybdahl et al.~\cite{DybdahlKGN06} studied destructive-read behavior in embedded DRAM and found that by removing the write-back buffer without using the cache for reading dataand not  immediately restoring it to DRAM, writing it back only when the cache line has been replaced, there was found to be an immense power and performance benefit.  While specific to a hardware memory system, it motivated this project to investigate wether the DRAM on GPU's will exibit the same behaviour while implemented similarly.
 	
 	% TODO: Describe MemoLang's syntax and semantics. Suggested subsections:
 	% - Surface syntax and Python-like conventions
@@ -137,11 +129,11 @@
 		\item Compare MemoLang against optimized GPU-library baselines where appropriate.
 		\item Preserve benchmark logs, correctness results, compiler output, and build artifacts to make the experimental results reproducible.
 	\end{itemize}
-	
+	########################################################
 	The evaluation will not assume that destructive reads provide a performance improvement. A reduction in peak memory usage without a reduction in runtime will be treated as a meaningful result, while an observed runtime improvement will be analyzed to determine whether it originates from reduced memory-management overhead rather than from changes to the underlying matrix multiplication kernel.
 	
 	\subsection{Destructive-Read Semantics}
-	
+
 	A destructive read treats a value as consumed when an operation has exclusive use of that value. After consumption, the original value is no longer available to subsequent operations unless the programmer explicitly creates a copy or otherwise preserves it.
 	
 	For matrix operations, this provides an opportunity for storage reuse. For example,
@@ -160,6 +152,7 @@
 	The language therefore treats destructive reads as an explicit ownership mechanism rather than assuming that consuming every operand will necessarily improve performance.
 	
 	\section{Compiler and Runtime Architecture}
+	
 	
 	% TODO: Describe the pipeline: source -> lexer -> parser -> ExprAST ->
 	% LLVM IR -> JIT/AOT compilation -> cuBLAS call for MatMul kernels.
@@ -227,7 +220,7 @@
 	\end{table}
 	
 	\section{Benchmarks}
-	
+	#######################################
 	The benchmark evaluation is designed to distinguish improvements in memory management from improvements in matrix multiplication itself.
 	
 	Three primary implementations will be compared:
@@ -282,7 +275,7 @@
 	Consequently, a successful result does not require MemoLang to make an individual matrix multiplication faster. A reduction in peak memory usage, allocation activity, or end-to-end overhead can constitute a meaningful result even when kernel execution time remains approximately unchanged.
 	
 	
-	
+	##################################################################
 		
 	\section{Evidence and Reproducibility}
 	\label{sec:evidence}
