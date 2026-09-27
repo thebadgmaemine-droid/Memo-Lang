@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "ExprAST.h"
+#include "AST.h"
 // Target 16/9/2026: Reformat comments this way
 // <summary>
 //
@@ -161,7 +161,7 @@ inline std::unique_ptr<FunctionAST> ParseTopLevelExpr() { // Don't have this as 
 // Block parser
 inline std::unique_ptr<ExprAST> ParseBlock() {
     std::vector<std::unique_ptr<ExprAST>> Body;
-    while (Curtok != static_castA<int>(Token::tok_else)) {
+    while (Curtok != static_cast<int>(Token::tok_else)) {
         auto Expr = ParseExpression();
         if (!Expr) {
             Body.push_back(std::move(Expr));
@@ -230,7 +230,7 @@ inline std::unique_ptr<ExprAST> ParsePrimary() {
     case static_cast<int>(Token::tok_identifier): return ParseIdentifierExpr();
     case static_cast<int>(Token::tok_number): return ParseNumberExpr();
     case '(': return ParseParenExpr();
-    case static_cast<int>(Token::tok_if): return ParseifAST();
+    case static_cast<int>(Token::tok_if): return ParseIfExpr();
     }
 }
 

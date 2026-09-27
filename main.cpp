@@ -1,12 +1,13 @@
 ﻿#include "AST.h"
 #include "parser.h"
-wusing namespace llvm_frontend;
+
+using namespace llvm_frontend;
 
 // Initialize globals
 inline void InitializeModule() {
-    TheContext = std::make_unique<LLVMContext>();
-    TheModule = std::make_unique<Module>("jit tripped", *TheContext);
-    Builder = std::make_unique<IRBuilder<>>(*TheContext);
+    TheContext = std::make_unique<llvm::LLVMContext>();
+    TheModule = std::make_unique<llvm::Module>("jit tripped", *TheContext);
+    Builder = std::make_unique<llvm::IRBuilder<>>(*TheContext);
 }
 
 static void HandleDefinition() {
