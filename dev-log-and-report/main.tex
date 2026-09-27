@@ -34,11 +34,28 @@
 \usepackage{url}
 \usepackage{listings}
 \graphicspath{{./}{paper/}{paper/figures/}}
-
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{gray!10},   
+    commentstyle=\color{green!60!black},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{gray},
+    stringstyle=\color{purple},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,                   % Automatically wrap long lines
+    captionpos=b,                      % Caption at the bottom
+    keepspaces=true,                   % Keeps spaces for indentation
+    numbers=left,                      % Line numbers on the left
+    numbersep=5pt,                     
+    showspaces=false,                  
+    showstringspaces=false,
+    showtabs=false,                    
+    tabsize=2
+}
+\lstset{style=mystyle}
 \begin{document}
 	
 	\title{Report on the Research's Findings \\
-		{\large MemoLang: Destructive-Read Semantics on GPU Matrix Workloads}}
+		{\large Destructive-Read Semantics on GPU Matrix Workloads}}
 	
 	\author{
 		Independent Interpreter Project\\
@@ -63,7 +80,7 @@
 	
 	\section{Novelty}
 	
-	Our main goal is to directly link the precompiled cuBLAS runtime library for a specific application, evaluated with a specific methodology, under an enforcement model resembling a strictly linear type system. Other languages have pursued related consumption-tracking semantics: Rust's ownership system~\cite{rust} enforces a comparable use-once discipline through its affine type system, and Futhark~\cite{futhark} is a purely functional array language that uses uniqueness types to support safe in-place updates. Futhark, however, generates its own GPU kernels from source rather than integrating with external, independently maintained high-performance libraries such as cuBLAS or CUTLASS, a limitation that has been noted as one of the practical hurdles of the language. MemoLang instead separates compile-time consumption analysis from kernel execution.
+	Our main goal is to directly link the precompiled \emph{cuBLAS runtime library}	 for a specific application, evaluated with a specific methodology, under an enforcement model resembling a \emph{ strictly linear type system}. Other languages have pursued related consumption-tracking semantics: Rust's ownership system~\cite{rust} enforces a comparable use-once discipline through its affine type system, and Futhark~\cite{futhark} is a purely functional array language that uses uniqueness types to support safe in-place updates. Futhark, however, generates its own GPU kernels from source rather than integrating with external, independently maintained high-performance libraries such as cuBLAS, a limitation that has been noted as one of the practical hurdles of the language. The language instead separates compile-time consumption analysis from kernel execution.
 	
 	\begin{equation}
 		T_1 = A B,\qquad
@@ -101,10 +118,6 @@
 	
 	\section{Background}
 	
-	% TODO: Motivate destructive-read semantics, explain why they help memory
-	% efficiency for matrix workloads, and give any relevant background on LLVM
-	% IR generation or cuBLAS's programming model.
-	
 	Matrix multiplication can be written as
 	
 	\begin{equation}
@@ -115,32 +128,31 @@
 	
 	Destructive-read is a memory read operation that inherently erases the value it reads: data is destroyed at the same time it is accessed. If a value must be preserved, a write-back operation must immediately restore it, or an external buffer/cache must hold a copy.
 	
-	In modern software, this practice is rarely used directly, owing to its implementation complexity. Contemporary programming languages instead use ownership and immutability to implement move semantics, aiming for similar safety and memory-reuse guarantees without the sharp edges of unsynchronized destructive reads. Related work on linear type systems takes a similar approach at the language level, requiring that a variable be used exactly once.
+	Related work on linear type systems takes a similar approach at the language level, requiring that a variable be used exactly once.
 	
-	Destructive-read has, historically, been more common in hardware and circuit design than in software. Dybdahl et al.~\cite{DybdahlKGN06} studied destructive-read behavior in embedded DRAM and found that removing the write-back buffer and instead relying on the cache -- reading data into the cache without immediately restoring it to DRAM, and writing it back only when the cache line is replaced -- offered measurable power and performance benefits. While that result is specific to a hardware memory system, it motivates the broader question this project investigates: whether a comparable consume-on-read discipline, applied at the software/interpreter level for GEMM-heavy workloads, can yield analogous benefits in memory pressure and allocation overhead.
+	Destructive-read has, historically, been more common in hardware and circuit design than in software. Dybdahl et al.~\cite{DybdahlKGN06} studied destructive-read behavior in embedded DRAM and found that removing the write-back buffer and instead relying on the cache by reading data into the cache without immediately restoring it to DRAM, and writing it back only when the cache line is replaced, offered measurable power and performance benefits. 
 	
-	Destructive-read semantics has only been practically implemented in hardware and circuit design rather than software. \cite{DybdahlKGN06} studied destructive-read behaviour in embedded DRAM in primary memory and yielded positive results including improved write-back buffer time for 6ns to 3ns from the follow implementation scheme:
-	". The data is ﬁrstread from DRAM and into the cache. At this time dataare not stored in DRAM, only in the cache. Data arewritten back to DRAM when the cache line is replaced" \cite{DybdahlKGN06}
+	While that result is specific to a hardware memory system, it motivates the broader question this project investigates: whether a comparable consume-on-read discipline, applied at the software/interpreter level for GEMM-heavy workloads, can yield similar results?
 	
 	
 	\section{Project Goal}
 	
-	The goal of MemoLang is to determine whether language-level destructive-read semantics can provide measurable memory-management benefits for matrix-oriented GPU programs while retaining the performance of optimized matrix multiplication kernels.
+	The goal of the language is to determine whether language-level destructive-read semantics can provide measurable memory-management benefits for matrix-oriented GPU programs while retaining the performance of optimized matrix multiplication kernels.
 	
 	The project will be implemented and evaluated through the following goals:
 	
 	\begin{itemize}
-		\item Define MemoLang's core Python-like syntax and destructive-read semantics.
+		\item Define language's core Python-like syntax and destructive-read semantics.
 		\item Implement a lexer, parser, AST, and LLVM-based code-generation pipeline.
 		\item Generate LLVM IR for arithmetic and matrix operations.
-		\item Integrate optimized GPU matrix multiplication through CUTLASS and/or cuBLAS.
+		\item Integrate optimized GPU matrix multiplication through CuBLAS.
 		\item Implement explicit ownership and consumption tracking for matrix operands.
 		\item Determine when consumed matrix buffers can safely be reused.
 		\item Verify generated results against an independent numerical reference.
 		\item Measure peak GPU memory usage and temporary-buffer allocation behavior.
 		\item Measure both GPU kernel execution time and end-to-end program runtime.
 		\item Compare destructive-read execution against an equivalent non-destructive implementation.
-		\item Compare MemoLang against optimized GPU-library baselines where appropriate.
+		\item Compare language against optimized GPU-library baselines where appropriate.
 		\item Preserve benchmark logs, correctness results, compiler output, and build artifacts to make the experimental results reproducible.
 	\end{itemize}
 	
@@ -166,12 +178,6 @@
 	The language therefore treats destructive reads as an explicit ownership mechanism rather than assuming that consuming every operand will necessarily improve performance.
 	
 	\section{Compiler and Runtime Architecture}
-	% TODO: Describe MemoLang's syntax and semantics. Suggested subsections:
-	% - Surface syntax and Python-like conventions
-	% - Type system (if any) for matrices/tensors
-	% - Destructive-read semantics: how a read consumes a value, what happens on
-	%   re-use, error/ownership model
-	% - How CUDA's programming model influenced the design
 	
 	\subsection{ Syntax Design }
 	
@@ -191,9 +197,35 @@
 		\item usage of braces instead of indentation for function scope
 	\end{itemize}
 	
+	\subsection{The Free-on-Consume Scheme and cuBLAS runtime}
+	The scheme referenced in \cite{DybdahlKGN06} will be used with a modified design philosophy to work at a software-level.
+	\begin{table}[h]
+		\centering
+		\caption{Scheme implementation choices in the design}
+		\label{tab:scheme-implementation}
+		\begin{tabular}{ll}
+			\toprule
+			Dybdahl et al's DRAM & Language design \\
+			\midrule
+			\texttt{Data is first read from DRAM and into the cache
+			} & No difference \\
+			\texttt{Data are written back to DRAM when the cache line is replaced instead of if data is modified} & Operands are freed unconditionally under the assumption that the cache is always modified \\
+			\texttt{Reuse the existing cache} & Uses scope-exit allocation for cache \\
+			\texttt{bank interleaving ( Hide write-back by using multi-bank overlap)} & Memory free is hid behind GPU kernel launches \\
+		\end{tabular}
+	\end{table}
+
+	for cuBLAS pre-compile linking:
+	\begin{itemize}
+		\item cuBLAS should be dynamically linked.
+		\item Driver should link and ship with compiled binaries from cuBLAS.
+		\item For convenience, distributed as a packaged file.
+	\end{itemize}
+
+	
+	\section{File structure}
+	
 	\subsection{ Pipeline } 
-	% TODO: Describe the pipeline: source -> lexer -> parser -> ExprAST ->
-	% LLVM IR -> JIT/AOT compilation -> cuBLAS call for MatMul kernels.
 	\begin{figure}[H]
 		\centering
 		\begin{tikzpicture}[
@@ -271,9 +303,9 @@
 			
 			\node[box] (link) at (0,-15) {
 				\centering\textbf{Linking}\\
-				\small Links MemoLang runtime to the precompiled cuBLAS runtime
+				\small Links language runtime to the precompiled cuBLAS runtime
 				library.\\
-				\small The linking process combines the compiled MemoLang code
+				\small The linking process combines the compiled language code
 				with the precompiled cuBLAS library to create an executable that
 				can be run on the GPU. The language cannot run the GPU kernel
 				natively.
@@ -302,26 +334,6 @@
 		\caption{The memory pipeline, which encompasses the process from source text to GPU execution. Shaded figures denote where destructive-read semantics are relevant.}
 		\label{fig:pipeline}
 	\end{figure}
-	\section{Maths and Algorithms}
-	\section{Maths and Algorithms}
-	
-	\subsection{Math Behind FP32, FP16 and AMP Matrix Multiplication}
-	\cite{Accuracy consideration} \cite{Mixed-precision training} This section is based off the NVIDIA's official documentation on mixed-precision training and accuracy considerations.
-	
-	% TODO: Elaborate on FP32 accumulation, tiling, and precision considerations
-	% for the GEMM kernel.
-	
-	\subsection{The Free-on-Consume Scheme}
-	
-	% TODO: Formal or informal description of destructive read: once a matrix
-	% value is read (e.g., consumed by @), it can no longer be used unless
-	% explicitly cloned. Explain how this reduces peak memory usage, and how
-	% consume_a/consume_b flags are computed and passed to the runtime.
-	
-	\section{CUTLASS Integration}
-	
-	% TODO: Describe the pipeline: source -> lexer -> parser -> ExprAST ->
-	% LLVM IR -> JIT/AOT compilation -> CUTLASS call for MatMul kernels.
 
 	\begin{table}[h]
 		\centering
@@ -331,7 +343,7 @@
 			\toprule
 			File & Purpose \\
 			\midrule
-			\texttt{Lexer.h/.cpp} & Tokenizes MemoLang source \\
+			\texttt{Lexer.h/.cpp} & Tokenizes language source \\
 			\texttt{Parser.h/.cpp} & Builds the AST \\
 			\texttt{ExprAST.h} & AST node definitions \\
 			\texttt{CodeGen.cpp} & LLVM IR generation \\
@@ -341,30 +353,28 @@
 		\end{tabular}
 	\end{table}
 	
-	% TODO: Describe how MatMul expressions lower to LLVM IR, and how/when
-	% control transfers to CUTLASS (e.g., via an external function call inserted
-	% during codegen). Discuss the destructive-read buffer handoff to CUTLASS.
-	
 	\section{Verification}
 	
-	% TODO: Describe how correctness was tested (e.g., comparing MemoLang
-	% MatMul output against NumPy or cuBLAS reference results for various
-	% matrix sizes). Replace with a results table once available.
 	
 	\begin{table}[h]
 		\centering
-		\caption{Correctness Test Results (Template)}
+		\caption{Correctness Test Results}
 		\label{tab:verification}
 		\begin{tabular}{ll}
 			\toprule
 			Test Case & Result \\
 			\midrule
-			$N \times N$ MatMul vs. reference & TBD \\
-			Destructive-read re-use error detection & TBD \\
+			$N \times N$ MatMul vs. reference (conventional) & TBD \\
+			Destructive-read re-use error detection (runtime) & TBD \\
 			Edge cases (empty, 1x1, non-square) & TBD \\
 			\bottomrule
 		\end{tabular}
 	\end{table}
+
+	$N \times $N MatMul vs. reference (conventional): Evaluating a chain of matrix multiplication operations to stress-test for evaluating end-to-end improvements.
+	Destructive-read re-use errordetection: Evaluates at run and compile time to sort for errors 
+	Edge cases: Evaluate edgecases to stress test compatability and thoroughness of the algorithm.
+	
 	
 	\section{Benchmarks}
 	
@@ -374,13 +384,13 @@
 	
 	\begin{enumerate}
 		\item An optimized GPU-library implementation used as a kernel-performance reference.
-		\item MemoLang using conventional non-destructive value semantics.
-		\item MemoLang using destructive-read semantics.
+		\item language using conventional non-destructive value semantics.
+		\item language using destructive-read semantics.
 	\end{enumerate}
 	
 	Where appropriate, a simple C++ or CUDA implementation will also be included as a baseline.
 	
-	The most important comparison is between the two MemoLang configurations. Both configurations perform the same mathematical operations and use the same underlying GPU matrix multiplication implementation. This comparison isolates the effect of destructive-read semantics more effectively than a comparison against an unrelated implementation.
+	The most important comparison is between the two languages configurations. Both configurations perform the same mathematical operations and use the same underlying GPU matrix multiplication implementation. This comparison isolates the effect of destructive-read semantics more effectively than a comparison against an unrelated implementation.
 	
 	The benchmark suite will include isolated matrix multiplications as well as chains of matrix operations. Matrix dimensions will include small, medium, large, and non-square matrices. This allows the evaluation to determine whether the effect of destructive reads depends on workload size.
 	
@@ -395,6 +405,7 @@
 		\item Host-to-device and device-to-host transfer time where applicable.
 		\item Compiler and runtime overhead.
 		\item Numerical error relative to a reference implementation.
+		\item GPU power draw.
 	\end{itemize}
 	
 	GPU measurements will use multiple repetitions and appropriate warm-up iterations. CUDA initialization and compilation overhead will be separated from steady-state execution measurements where possible.
@@ -425,17 +436,46 @@
 	\section{Evidence and Reproducibility}
 	\label{sec:evidence}
 	
-	% TODO: List where logs, benchmark results, and build artifacts are saved
-	% (mirroring the "Evidence and Reproducibility" approach in hardware
-	% projects) so claims in this paper are traceable to saved output.
-	
-	
+	Add an example build here: 
+	\begin{lstlisting}[caption = Example compilation]
+	def basicadd(int i, int k) {
+		return i + k;
+		}
+	# Basic compilation of source code, addition only. No showcase of GEMMs or cuBLAS integration.
+	\end{lstlisting}
 	\section{Conclusion}
-	
-	% TODO: Summarize what was built and verified, and what remains as future
-	% work, tying claims back to saved evidence as in Section~\ref{sec:evidence}
-	% above.
-	
+
+	\subsection{Progress}
+	The project has completed a portion of the planned work. This includes the lexer, the parser,
+	the AST, and a basic driver implementation. Design for the remaining pipeline has been finalized,
+	but implementation of the features further down the pipeline has not yet begun due to time constraints.
+
+\subsection{Future work}
+	Features further down the pipeline, including integration of the precompiled matmul runtime library,
+	remain to be implemented. The currently planned features are as follows:
+	\begin{itemize}
+		\item Vector and matrix types
+		\item A diagnostic driver and diagnostic engine
+		\item Static consumption analysis (destructive-read checking) and handling of GPU kernel buffers and intermediates
+		\item Linking against the precompiled matmul runtime to produce an executable capable of launching the GPU kernel
+		\item Separation of code generation from the AST for cleaner lowering
+		\item Optimization passes
+		\item A macro system ( link declarations, matmul-chain pattern abstraction)
+\end{itemize}
+
+	\subsection{Meaning}
+		This project serves both as an experiment to explore potential improvements to GEMM operations for
+		machine learning and AI algorithms, complementing the already highly-optimized cuBLAS library, and
+		as a response to a broader problem in the field. Current model training consumes massive amounts of
+		memory, and demand from AI infrastructure has outpaced global memory chip supply, contributing to a
+		sustained rise in DRAM and NAND prices that has placed financial pressure on IT firms, scientific
+		research institutions, and consumers alike [12]. 
+		 Computing algorithms for GEMM operations are already
+		optimized to \emph{near theoretical limits} in raw throughput; this research instead targets memory
+		efficiency, using a novel ownership system to reduce the memory footprint required per workload,
+		as one contribution toward easing the demand-side pressure driving the current memory shortage.
+		
+
 	\begin{thebibliography}{9}
 		\bibitem{DybdahlKGN06}
 		Haakon Dybdahl, Per Gunnar Kjeldsberg, Marius Grann{\ae}s, and Lasse Natvig,
@@ -460,7 +500,7 @@
 		\bibitem{futhark}
 		T.~Henriksen, N.~G.~W.~Serup, M.~Elsman, F.~Henglein, and C.~E.~Oancea, ``Futhark: purely functional GPU-programming with nested parallelism and in-place array updates,'' in \emph{Proc. 38th ACM SIGPLAN Conference on Programming Language Design and Implementation (PLDI)}, 2017. \url{https://futhark-lang.org}
 		
-		\bibitem{memolang}
+		\bibitem{the language}
 		Independent Interpreter Project, ``MemoLang: source and benchmark evidence,'' project repository, September 2026.
 		
 		\bibitem{cutlass}
@@ -469,10 +509,14 @@
 		\bibitem{Mixed-precision training}
 		NVIDIA, ''Mixed-precision training.'' \url{https://docs.nvidia.com/deeplearning/performance/mixed-precision-training/index.html}
 
-		\bibitem{Accuracy consideration}
-		NVIDIA, ''Accuracy consideration.'' \url{https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/accuracy-considerations.html}
+		\bibitem{nvidia_accuracy}
+		NVIDIA, ``Accuracy Considerations''
+		\url{https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/accuracy-considerations.html},
 
-		
+		\bibitem{DRAM_PRICE}
+		TrendForce, ``Memory Price Outlook for 1Q26 Sharply Upgraded,''
+		\url{https://www.trendforce.com/presscenter/news/20260202-12911.html},
+
 	\end{thebibliography}
 	
 \end{document}

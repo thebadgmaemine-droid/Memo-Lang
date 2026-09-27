@@ -29,3 +29,33 @@ to be passed on to the backend.
 -[] Added new corresponding source file to the header files above.
 Building IRGenerator and visior pattern.
 -[] Rebuilding AST.
+27/9/2026
+Ran a snippet:
+"	\subsection{progress}
+	Right now the project has only completed a part of the work. This includes the lexer, the parser,
+	the AST tree as well as basic driver implmentation. As planning goes, the design has been drawn and 
+	finalized, but the coding stage has not begun for features further down the pipeline because of time-constraint
+	\subsection{Future work}
+	Features futher down the pipeline, such as the main cuBLAS pre-compiled library integration, is set to be finished.
+	The current planned features to be added to the language is as followed:
+	\begin{itemize}
+		\item Implement vector and matrix types
+		\item Diagnostic driver and diagnostic engine implementation
+		\item Code consumption analysis and handles for GPU kernel buffers/intermediates
+		\item cuBLAS library linking to create an executable that can run the GPU kernel
+		\item Seperate code generation from main AST tree for cleaner generation
+		\item Implement optimizers.
+		\item Implement macros 
+	\end{itemize} 
+" through AI to improve wording.
+ran another snippet:
+"This project serves both as an experiment to explore potential improvements to GEMM operations for
+machine learning and AI algorithms, complementing the already highly-optimized cuBLAS library, and
+as a response to a broader problem in the field. Current model training consumes massive amounts of
+memory, and demand from AI infrastructure has outpaced global memory chip supply, contributing to a
+sustained rise in DRAM and NAND prices that has placed financial pressure on IT firms, scientific
+research institutions, and consumers alike. Computing algorithms for GEMM operations are already
+optimized to \emph{near theoretical limits} in raw throughput; this research instead targets memory
+efficiency, using a novel ownership system to reduce the memory footprint required per workload,
+as one contribution toward easing the demand-side pressure driving the current memory shortage."
+through claude AI to ask it to criticize the confidence of the conclusion and not to rewrite it.
