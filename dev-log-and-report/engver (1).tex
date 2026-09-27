@@ -44,26 +44,26 @@
 
 % =====================================================================
 % Formatting to match the Vietnamese science-fair report layout
-% (cover page, MỤC LỤC, DANH MỤC HÌNH VẼ, DANH MỤC BẢNG BIỂU)
+% (cover page, table of contents, list of figures, list of tables)
 % =====================================================================
 \usepackage{titlesec}
 \usepackage{tocloft}
 \usepackage[labelsep=period]{caption}
 
-% Section numbering: PHẦN I, PHẦN II, ... and subsections I.1, I.2, ...
+% Section numbering: PART I, PART II, ... and subsections I.1, I.2, ...
 \renewcommand{\thesection}{\Roman{section}}
 \renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
-\titleformat{\section}{\normalfont\Large\bfseries}{PHẦN \thesection:}{0.5em}{}
+\titleformat{\section}{\normalfont\Large\bfseries}{PART \thesection:}{0.5em}{}
 \titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection.}{0.5em}{}
 
 % Caption names
-\renewcommand{\figurename}{Hình}
-\renewcommand{\tablename}{Bảng}
+\renewcommand{\figurename}{Figure}
+\renewcommand{\tablename}{Table}
 
 % Headings of the front-matter lists
-\renewcommand{\contentsname}{MỤC LỤC}
-\renewcommand{\listfigurename}{DANH MỤC HÌNH VẼ, SƠ ĐỒ}
-\renewcommand{\listtablename}{DANH MỤC BẢNG BIỂU}
+\renewcommand{\contentsname}{TABLE OF CONTENTS}
+\renewcommand{\listfigurename}{LIST OF FIGURES}
+\renewcommand{\listtablename}{LIST OF TABLES}
 
 % Centered, bold list titles
 \renewcommand{\cfttoctitlefont}{\hfill\normalsize\bfseries}
@@ -79,10 +79,10 @@
 \setlength{\cftbeforelottitleskip}{18pt}
 \setlength{\cftafterlottitleskip}{6pt}
 
-% TOC entries: "PHẦN I: ...", bold, dotted leaders
+% TOC entries: "PART I: ...", bold, dotted leaders
 \renewcommand{\cftsecfont}{\bfseries}
 \renewcommand{\cftsecpagefont}{\bfseries}
-\renewcommand{\cftsecpresnum}{PHẦN~}
+\renewcommand{\cftsecpresnum}{PART~}
 \renewcommand{\cftsecaftersnum}{:}
 \renewcommand{\cftsecleader}{\bfseries\cftdotfill{\cftdotsep}}
 \setlength{\cftsecnumwidth}{6.5em}
@@ -94,17 +94,17 @@
 \setlength{\cftsubsecindent}{1em}
 \setlength{\cftsubsecnumwidth}{5.5em}
 
-% List of figures: "Hình 1. ..."
-\renewcommand{\cftfigpresnum}{Hình~}
+% List of figures: "Figure 1. ..."
+\renewcommand{\cftfigpresnum}{Figure~}
 \renewcommand{\cftfigaftersnum}{.}
 \setlength{\cftfigindent}{0pt}
-\setlength{\cftfignumwidth}{4em}
+\setlength{\cftfignumwidth}{4.8em}
 
-% List of tables: "Bảng 1. ..."
-\renewcommand{\cfttabpresnum}{Bảng~}
+% List of tables: "Table 1. ..."
+\renewcommand{\cfttabpresnum}{Table~}
 \renewcommand{\cfttabaftersnum}{.}
 \setlength{\cfttabindent}{0pt}
-\setlength{\cfttabnumwidth}{4em}
+\setlength{\cfttabnumwidth}{4.8em}
 
 \begin{document}
 	
@@ -119,35 +119,34 @@
 	\thispagestyle{plain}
 	\begin{center}
 		\bfseries
-		CUỘC THI KHOA HỌC, KỸ THUẬT DÀNH CHO HỌC SINH TRUNG HỌC CẤP TRƯỜNG NĂM HỌC 2026 -- 2027
+		SCHOOL-LEVEL SCIENCE AND ENGINEERING FAIR FOR SECONDARY SCHOOL STUDENTS, SCHOOL YEAR 2026 -- 2027
 	\end{center}
 	
 	\vspace{5cm}
 	
 	\begin{center}
 		\bfseries
-		BẢN BÁO CÁO TÓM TẮT KẾT QUẢ NGHIÊN CỨU\\[4pt]
-		{\normalfont (Report on the Research's Findings)}
+		REPORT ON THE RESEARCH'S FINDINGS
 	\end{center}
 	
 	\vspace{3cm}
 	
 	\begin{center}
-		{\Large\bfseries\itshape Tên đề tài:}\\[10pt]
+		{\Large\bfseries\itshape Project title:}\\[10pt]
 		{\Large\bfseries
-		\MakeUppercase{MemoLang: Nghiên cứu và chế tạo ứng dụng cơ chế giải phóng dữ liệu đệm trong phát triển AI}\par}
+		\MakeUppercase{MemoLang: Research and Development of a Buffer-Release Mechanism for AI Development}\par}
 	\end{center}
 	
 	\vspace{3cm}
 	
-	\noindent\textbf{\textit{Lĩnh vực:} Phần mềm hệ thống}
+	\noindent\textbf{\textit{Category:} Systems Software}
 	
 	\vspace{6pt}
 	
 	\vfill
 	
 	\begin{center}
-		\textbf{\textit{Hà Nội, tháng 9 năm 2026}}
+		\textbf{\textit{Hanoi, September 2026}}
 	\end{center}
 	
 	\newpage
@@ -158,36 +157,36 @@
 	\listoffigures
 	\listoftables
 	
-	% ----- DANH MỤC TỪ VIẾT TẮT -----
+	% ----- LIST OF ABBREVIATIONS -----
     \vspace{10cm}
 	\vspace{18pt}
 	\begin{center}
-		\textbf{DANH MỤC TỪ VIẾT TẮT}
+		\textbf{LIST OF ABBREVIATIONS}
 	\end{center}
 	\vspace{-6pt}
 	\begin{center}
 		\renewcommand{\arraystretch}{1.15}
-		\begin{tabular}{>{\bfseries}l p{6.2cm} p{6.2cm}}
+		\begin{tabular}{>{\bfseries}l >{\raggedright\arraybackslash}p{5.8cm} >{\raggedright\arraybackslash}p{5.8cm}}
 			\toprule
-			\textbf{Viết tắt} & \textbf{Tên đầy đủ} & \textbf{Ý nghĩa} \\
+			\textbf{Abbreviation} & \textbf{Full name} & \textbf{Description} \\
 			\midrule
-			AI      & Artificial Intelligence & Trí tuệ nhân tạo \\
-			AOT     & Ahead-Of-Time (compilation) & Biên dịch trước khi chạy \\
-			AST     & Abstract Syntax Tree & Cây cú pháp trừu tượng \\
-			cuBLAS  & CUDA Basic Linear Algebra Subprograms & Thư viện đại số tuyến tính cơ bản trên CUDA \\
-			CUDA    & Compute Unified Device Architecture & Nền tảng tính toán song song trên GPU của NVIDIA \\
-			CUTLASS & CUDA Templates for Linear Algebra Subroutines & Thư viện mẫu C++ cho đại số tuyến tính trên CUDA \\
-			DRAM    & Dynamic Random-Access Memory & Bộ nhớ truy cập ngẫu nhiên động \\
-			FFI     & Foreign Function Interface & Giao diện gọi hàm giữa các ngôn ngữ \\
-			FP32    & 32-bit Floating Point & Số thực dấu phẩy động 32 bit \\
-			GEMM    & General Matrix Multiplication & Phép nhân ma trận tổng quát \\
-			GPU     & Graphics Processing Unit & Bộ xử lý đồ họa \\
-			IR      & Intermediate Representation & Biểu diễn trung gian \\
-			JIT     & Just-In-Time (compilation) & Biên dịch tức thời khi chạy \\
-			LLM     & Large Language Model & Mô hình ngôn ngữ lớn \\
-			LLVM    & LLVM Compiler Infrastructure (originally ``Low Level Virtual Machine'') & Hạ tầng trình biên dịch LLVM \\
-			MatMul  & Matrix Multiplication & Phép nhân ma trận \\
-			REPL    & Read--Eval--Print Loop & Vòng lặp đọc -- thực thi -- in kết quả \\
+			AI      & Artificial Intelligence & Computer systems that perform tasks normally requiring human intelligence \\
+			AOT     & Ahead-Of-Time (compilation) & Compiling code to machine code before the program runs \\
+			AST     & Abstract Syntax Tree & Tree representation of the structure of source code \\
+			cuBLAS  & CUDA Basic Linear Algebra Subprograms & NVIDIA's GPU-accelerated linear algebra library \\
+			CUDA    & Compute Unified Device Architecture & NVIDIA's parallel computing platform for GPUs \\
+			CUTLASS & CUDA Templates for Linear Algebra Subroutines & NVIDIA's C++ template library for GPU linear algebra \\
+			DRAM    & Dynamic Random-Access Memory & Main memory that must be periodically refreshed \\
+			FFI     & Foreign Function Interface & Mechanism for calling functions written in another language \\
+			FP32    & 32-bit Floating Point & Single-precision floating-point number format \\
+			GEMM    & General Matrix Multiplication & Standard routine for multiplying two matrices \\
+			GPU     & Graphics Processing Unit & Processor specialized for highly parallel computation \\
+			IR      & Intermediate Representation & Code form used inside a compiler between source and machine code \\
+			JIT     & Just-In-Time (compilation) & Compiling code to machine code while the program runs \\
+			LLM     & Large Language Model & AI model trained on large amounts of text \\
+			LLVM    & LLVM Compiler Infrastructure (originally ``Low Level Virtual Machine'') & Toolkit for building compilers and code generators \\
+			MatMul  & Matrix Multiplication & Multiplication of two matrices \\
+			REPL    & Read--Eval--Print Loop & Interactive shell that evaluates input line by line \\
 			\bottomrule
 		\end{tabular}
 	\end{center}
@@ -196,24 +195,22 @@
 	\newpage
 	
 	% ================= MAIN CONTENT (unchanged) =================
-	\section{Tổng quan dự án}
-	\label{sec:tongquan}
+	\section{Project Overview}
+	\label{sec:overview}
 	
-	\subsection{Lý do chọn dự án}
+	\subsection{Rationale}
 	
-        Sự phát triển của AI trong thời gian gần đây đã dẫn đến sự bùng nổ của nhiều thuật toán máy học và mô hình học sâu. Do vậy, nhu 
-        cầu cho năng lực tính toán để học trên những bộ dữ liệu khổng lồ
-        cũng từ đó tăng.
-		
-		Hiện nay, một trong những phép toán được sử dụng rộng rãi cho thuật toán máy học là GEMM. Trong quá trình học, mỗi phép nhân ma trận sẽ tạo ra một ma trận khác và ma trận mới sẽ được nối với những phép nhân ma trận khác. Để xử lý nhiều thao tác, tác vụ và quá trình khác nhau, những mô hình máy học cần thực hiện hàng triệu phép tính ma trận. Do những phép tính ma trận này so với các phép tính thông thường khác có tính đặc thù về thời gian rất cao, vì vậy những phép tính tiếp theo dần bị dồn lên bộ nhớ đệm và các bước trung gian cho đến khi những chường trình quản lý bộ nhớ hoặc quy tắc của máy tính giải phóng bộ nhớ.
-        
-        Việc lặp lại quá trình này đối với mô hình máy học trở thành một vấn đề lớn trong việc hoạt động dưới một khối lượng công việc rất lớn, để lại hậu quá lớn cho hiệu suất và độ trễ của mô hình trên thiết bị và tài nguyên phần cứng nó đang sử dụng.
-
-        Bởi vậy, phần mềm đồng thời góp phần tối ưu hóa nhân của GEMM và tăng tuổi thọ của phần cứng được sử dụng, đảm bảo bộ đệm, dữ liệu đệm và con trỏ được giải phóng sớm nhất có thể và giảm phí tổn từ kết quả của việc dồn bộ nhớ đệm.
-
-	    Dự án được lấy cảm hứng từ những nghiên cứu về hệ thống bộ nhớ đọc tiêu diệt cho ngôn ngư Sere~\cite{sere}, ngôn ngữ Clean~\cite{clean} và thư viện tối ưu phép nhân ma trận ở GPU.
+	The recent development of AI has led to an explosion of machine learning algorithms and deep learning models. As a result, the demand for computing power to train on enormous datasets has also increased.
 	
-	\subsection{Câu hỏi nghiên cứu}
+	Currently, one of the most widely used operations in machine learning algorithms is GEMM. During training, each matrix multiplication produces another matrix, and this new matrix is in turn fed into further matrix multiplications. To handle many different operations, tasks and processes, machine learning models need to perform millions of matrix computations. Because these matrix computations are far more time-intensive than ordinary computations, subsequent computations gradually pile up in buffer memory and intermediate steps until memory-management programs or the system's rules free the memory.
+	
+	Repeating this process becomes a major problem for machine learning models operating under very large workloads, with serious consequences for the performance and latency of the model on the device and hardware resources it uses.
+	
+	Therefore, this software aims both to optimize GEMM kernels and to extend the lifespan of the hardware in use, ensuring that buffers, buffered data and pointers are freed as early as possible and reducing the overhead caused by buffer accumulation.
+	
+	This project was inspired by research into destructive-read memory systems, the Sere programming language~\cite{sere}, the Clean programming language~\cite{clean}, and optimized GPU matrix-multiplication libraries.
+	
+	\subsection{Research Questions}
 	
 	However, inherent overheads or overestimation of memory overhead or memory optimization's practicality is important to consider. Therefore, The project investigates the following hypotheses:
 	
@@ -223,11 +220,11 @@
 	\item For workloads in which memory management represents a significant portion of total execution time, buffer reuse may improve end-to-end performance.
 	\end{itemize}
 	
-	\subsection{Mục tiêu nghiên cứu}
+	\subsection{Research Objectives}
 	
-	% TODO: viết mục tiêu nghiên cứu
+	% TODO: write research objectives
 	
-	\subsection{Tính mới nghiên cứu}
+	\subsection{Novelty}
 	
 	Our main goal is to directly link the precompiled cuBLAS runtime library for a specific application, evaluated with a specific methodology, under an enforcement model resembling a strictly linear type system. Other languages have pursued related consumption-tracking semantics: Rust's ownership system~\cite{rust} enforces a comparable use-once discipline through its affine type system, and Futhark~\cite{futhark} is a purely functional array language that uses uniqueness types to support safe in-place updates. Futhark, however, generates its own GPU kernels from source rather than integrating with external, independently maintained high-performance libraries such as cuBLAS or CUTLASS, a limitation that has been noted as one of the practical hurdles of the language. MemoLang instead separates compile-time consumption analysis from kernel execution.
 	
