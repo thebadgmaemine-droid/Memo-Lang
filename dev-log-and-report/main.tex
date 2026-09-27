@@ -305,7 +305,8 @@
 	\section{Maths and Algorithms}
 	\section{Maths and Algorithms}
 	
-	\subsection{Math Behind FP32 Matrix Multiplication}
+	\subsection{Math Behind FP32, FP16 and AMP Matrix Multiplication}
+	\cite{Accuracy consideration} \cite{Mixed-precision training} This section is based off the NVIDIA's official documentation on mixed-precision training and accuracy considerations.
 	
 	% TODO: Elaborate on FP32 accumulation, tiling, and precision considerations
 	% for the GEMM kernel.
@@ -461,6 +462,16 @@
 		
 		\bibitem{memolang}
 		Independent Interpreter Project, ``MemoLang: source and benchmark evidence,'' project repository, September 2026.
+		
+		\bibitem{cutlass}
+		NVIDIA, ``CUTLASS Library.'' \url{https://github.com/nvidia/cutlass}
+
+		\bibitem{Mixed-precision training}
+		NVIDIA, ''Mixed-precision training.'' \url{https://docs.nvidia.com/deeplearning/performance/mixed-precision-training/index.html}
+
+		\bibitem{Accuracy consideration}
+		NVIDIA, ''Accuracy consideration.'' \url{https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/accuracy-considerations.html}
+
 		
 	\end{thebibliography}
 	
