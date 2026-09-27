@@ -1,6 +1,6 @@
 \documentclass[a4paper]{article}
 \usepackage[a4paper, left=3cm, right=2cm, top=2cm, bottom=2cm]{geometry}
-
+\usepackage{ragged2e}
 \usepackage{fontspec}
 \setmainfont{Times New Roman}
 \usepackage{float}
@@ -199,21 +199,29 @@
 	
 	\subsection{The Free-on-Consume Scheme and cuBLAS runtime}
 	The scheme referenced in \cite{DybdahlKGN06} will be used with a modified design philosophy to work at a software-level.
-	\begin{table}[h]
-		\centering
-		\caption{Scheme implementation choices in the design}
-		\label{tab:scheme-implementation}
-		\begin{tabular}{ll}
-			\toprule
-			Dybdahl et al's DRAM & Language design \\
-			\midrule
-			\texttt{Data is first read from DRAM and into the cache
-			} & No difference \\
-			\texttt{Data are written back to DRAM when the cache line is replaced instead of if data is modified} & Operands are freed unconditionally under the assumption that the cache is always modified \\
-			\texttt{Reuse the existing cache} & Uses scope-exit allocation for cache \\
-			\texttt{bank interleaving ( Hide write-back by using multi-bank overlap)} & Memory free is hid behind GPU kernel launches \\
-		\end{tabular}
-	\end{table}
+	\begin{table}[htbp]
+  \centering
+  \caption{Scheme implementation choices in the design.}
+  \label{tab:scheme_implementation}
+  \small
+  \begin{tabular}{@{}>{\RaggedRight}p{0.48\linewidth} >{\RaggedRight}p{0.48\linewidth}@{}}
+    \toprule
+    \textbf{Scheme} & \textbf{Implementation} \\
+    \midrule
+    Data is first read from DRAM into the cache. 
+      & No difference. \\ \addlinespace
+    
+    Data is written back to DRAM when the cache line is replaced, regardless of whether data was modified. 
+      & Operands are freed unconditionally under the assumption that the cache is always modified. \\ \addlinespace
+    
+    Reuses existing cache architecture. 
+      & Uses scope-exit allocation for cache management. \\ \addlinespace
+    
+    Hides write-back latency using multi-bank overlap (bank interleaving). 
+      & Hides memory free overhead behind GPU kernel launches. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 	for cuBLAS pre-compile linking:
 	\begin{itemize}
