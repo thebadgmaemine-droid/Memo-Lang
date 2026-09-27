@@ -83,24 +83,24 @@
   "buildPresets": [
     {
       "name": "x64-debug-build",
-      "displayName": "Build x64 Debug (LLVM-Frontend)",
+      "displayName": "Build x64 Debug (MemoLang)",
       "configurePreset": "x64-debug",
-      "description": "Build preset that targets the LLVM-Frontend executable",
-      "targets": [ "LLVM-Frontend" ]
+      "description": "Build preset that targets the MemoLang executable",
+      "targets": [ "MemoLang" ]
     },
     {
       "name": "x64-release-build",
-      "displayName": "Build x64 Release (LLVM-Frontend)",
+      "displayName": "Build x64 Release (MemoLang)",
       "configurePreset": "x64-release",
-      "description": "Build preset that targets the LLVM-Frontend executable",
-      "targets": [ "LLVM-Frontend" ]
+      "description": "Build preset that targets the MemoLang executable",
+      "targets": [ "MemoLang" ]
     },
     {
       "name": "x64-relwithdebinfo-build",
-      "displayName": "Build x64 RelWithDebInfo (LLVM-Frontend)",
+      "displayName": "Build x64 RelWithDebInfo (MemoLang)",
       "configurePreset": "x64-relwithdebinfo",
-      "description": "Build preset that targets the LLVM-Frontend executable",
-      "targets": [ "LLVM-Frontend" ]
+      "description": "Build preset that targets the MemoLang executable",
+      "targets": [ "MemoLang" ]
     }
   ]
 }
