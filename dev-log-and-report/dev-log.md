@@ -59,3 +59,35 @@ optimized to \emph{near theoretical limits} in raw throughput; this research ins
 efficiency, using a novel ownership system to reduce the memory footprint required per workload,
 as one contribution toward easing the demand-side pressure driving the current memory shortage."
 through claude AI to ask it to criticize the confidence of the conclusion and not to rewrite it.
+Ran this snippet through AI to fix errors that made the LaTeX file not compile correct:
+"
+\begin{table}[htbp]
+  \centering
+  \caption{Comparison between Dybdahl et al.'s DRAM design and the proposed language design.}
+  \label{tab:dram_vs_language}
+  \small % Fits better in standard double-column or single-column paper templates
+  \begin{tabular}{@{}>{\RaggedRight}p{6.5cm} >{\RaggedRight}p{6.5cm}@{}}
+    \toprule
+    \textbf{Dybdahl et al.'s DRAM} & \textbf{Language Design} \\
+    \midrule
+    Data is first read from DRAM into the cache. 
+      & No difference. \\ \addlinespace
+    
+    Data is written back to DRAM when the cache line is replaced, regardless of whether data was modified. 
+      & Operands are freed unconditionally under the assumption that the cache is always modified. \\ \addlinespace
+    
+    Reuses existing cache architecture. 
+      & Uses scope-exit allocation for cache management. \\ \addlinespace
+    
+    Hides write-back latency using multi-bank overlap (bank interleaving). 
+      & Hides memory free overhead behind GPU kernel launches. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+
+Asked AI to summarize the relevant topics detailed in the paper:
+Haakon Dybdahl, Per Gunnar Kjeldsberg, Marius Grann{\ae}s, and Lasse Natvig,
+		``Destructive-read in embedded DRAM, impact on power consumption,''
+		\emph{Journal of Embedded Computing}, vol.~2, no.~1, pp.~83--96, 2006.
+

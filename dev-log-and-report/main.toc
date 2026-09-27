@@ -1,0 +1,17 @@
+\contentsline {section}{\numberline {I}Novelty}{4}{}%
+\contentsline {section}{\numberline {II}Background}{5}{}%
+\contentsline {section}{\numberline {III}Project Goal}{6}{}%
+\contentsline {subsection}{\numberline {III.1}Destructive-Read Semantics}{7}{}%
+\contentsline {section}{\numberline {IV}Compiler and Runtime Architecture}{7}{}%
+\contentsline {subsection}{\numberline {IV.1} Syntax Design }{7}{}%
+\contentsline {subsection}{\numberline {IV.2}The Free-on-Consume Scheme and cuBLAS runtime}{8}{}%
+\contentsline {section}{\numberline {V}File structure}{9}{}%
+\contentsline {subsection}{\numberline {V.1} Pipeline }{9}{}%
+\contentsline {section}{\numberline {VI}Verification}{10}{}%
+\contentsline {section}{\numberline {VII}Benchmarks}{10}{}%
+\contentsline {subsection}{\numberline {VII.1}Expected Relationship Between Language and MatMul Performance}{11}{}%
+\contentsline {section}{\numberline {VIII}Evidence and Reproducibility}{11}{}%
+\contentsline {section}{\numberline {IX}Conclusion}{12}{}%
+\contentsline {subsection}{\numberline {IX.1}Progress}{12}{}%
+\contentsline {subsection}{\numberline {IX.2}Future work}{12}{}%
+\contentsline {subsection}{\numberline {IX.3}Meaning}{12}{}%

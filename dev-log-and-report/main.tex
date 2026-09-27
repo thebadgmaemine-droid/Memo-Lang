@@ -52,15 +52,154 @@
     tabsize=2
 }
 \lstset{style=mystyle}
+
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage[labelsep=period]{caption}
+
+% Section numbering: PART I, PART II, ... and subsections I.1, I.2, ...
+\renewcommand{\thesection}{\Roman{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+\titleformat{\section}{\normalfont\Large\bfseries}{PART \thesection:}{0.5em}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+
+% Caption names
+\renewcommand{\figurename}{Figure}
+\renewcommand{\tablename}{Table}
+
+% Headings of the front-matter lists
+\renewcommand{\contentsname}{TABLE OF CONTENTS}
+\renewcommand{\listfigurename}{LIST OF FIGURES}
+\renewcommand{\listtablename}{LIST OF TABLES}
+
+% Centered, bold list titles
+\renewcommand{\cfttoctitlefont}{\hfill\normalsize\bfseries}
+\renewcommand{\cftaftertoctitle}{\hfill\null}
+\renewcommand{\cftloftitlefont}{\hfill\normalsize\bfseries}
+\renewcommand{\cftafterloftitle}{\hfill\null}
+\renewcommand{\cftlottitlefont}{\hfill\normalsize\bfseries}
+\renewcommand{\cftafterlottitle}{\hfill\null}
+\setlength{\cftbeforetoctitleskip}{0pt}
+\setlength{\cftaftertoctitleskip}{6pt}
+\setlength{\cftbeforeloftitleskip}{18pt}
+\setlength{\cftafterloftitleskip}{6pt}
+\setlength{\cftbeforelottitleskip}{18pt}
+\setlength{\cftafterlottitleskip}{6pt}
+
+% TOC entries: "PART I: ...", bold, dotted leaders
+\renewcommand{\cftsecfont}{\bfseries}
+\renewcommand{\cftsecpagefont}{\bfseries}
+\renewcommand{\cftsecpresnum}{PART~}
+\renewcommand{\cftsecaftersnum}{:}
+\renewcommand{\cftsecleader}{\bfseries\cftdotfill{\cftdotsep}}
+\setlength{\cftsecnumwidth}{6.5em}
+\setlength{\cftbeforesecskip}{4pt}
+
+\renewcommand{\cftsubsecfont}{\bfseries}
+\renewcommand{\cftsubsecpagefont}{\normalfont}
+\renewcommand{\cftsubsecaftersnum}{.}
+\setlength{\cftsubsecindent}{1em}
+\setlength{\cftsubsecnumwidth}{5.5em}
+
+% List of figures: "Figure 1. ..."
+\renewcommand{\cftfigpresnum}{Figure~}
+\renewcommand{\cftfigaftersnum}{.}
+\setlength{\cftfigindent}{0pt}
+\setlength{\cftfignumwidth}{4.8em}
+
+% List of tables: "Table 1. ..."
+\renewcommand{\cfttabpresnum}{Table~}
+\renewcommand{\cfttabaftersnum}{.}
+\setlength{\cfttabindent}{0pt}
+\setlength{\cfttabnumwidth}{4.8em}
+
 \begin{document}
 	
 	\title{Report on the Research's Findings \\
-		{\large Destructive-Read Semantics on GPU Matrix Workloads}}
+		{\large Memo-Lang: Destructive-Read Semantics on GPU Matrix Workloads}}
 	
 	\author{
 		Independent Interpreter Project\\
 		September 2026, Hanoi}
 	
+	% ================= PAGE 1: COVER PAGE =================
+	\thispagestyle{plain}
+	\begin{center}
+		\bfseries
+		SCHOOL-LEVEL SCIENCE AND ENGINEERING FAIR FOR SECONDARY SCHOOL STUDENTS, SCHOOL YEAR 2026 -- 2027
+	\end{center}
+	
+	\vspace{5cm}
+	
+	\begin{center}
+		\bfseries
+		REPORT ON THE RESEARCH'S FINDINGS
+	\end{center}
+	
+	\vspace{3cm}
+	
+	\begin{center}
+		{\Large\bfseries\itshape Project title:}\\[10pt]
+		{\Large\bfseries
+		\MakeUppercase{MemoLang: Research and Development of a Buffer-Release Mechanism for AI Development}\par}
+	\end{center}
+	
+	\vspace{3cm}
+	
+	\noindent\textbf{\textit{Category:} Systems Software}
+	
+	\vspace{6pt}
+	
+	\vfill
+	
+	\begin{center}
+		\textbf{\textit{Hanoi, September 2026}}
+	\end{center}
+	
+	\newpage
+	
+	% ================= PAGES 2–3: TOC + LISTS =================
+	\tableofcontents
+	
+	\listoffigures
+	\listoftables
+	
+	% ----- LIST OF ABBREVIATIONS -----
+    \vspace{10cm}
+	\vspace{18pt}
+	\begin{center}
+		\textbf{LIST OF ABBREVIATIONS}
+	\end{center}
+	\vspace{-6pt}
+	\begin{center}
+		\renewcommand{\arraystretch}{1.15}
+		\begin{tabular}{>{\bfseries}l >{\raggedright\arraybackslash}p{5.8cm} >{\raggedright\arraybackslash}p{5.8cm}}
+			\toprule
+			\textbf{Abbreviation} & \textbf{Full name} & \textbf{Description} \\
+			\midrule
+			AI      & Artificial Intelligence & Computer systems that perform tasks normally requiring human intelligence \\
+			AOT     & Ahead-Of-Time (compilation) & Compiling code to machine code before the program runs \\
+			AST     & Abstract Syntax Tree & Tree representation of the structure of source code \\
+			cuBLAS  & CUDA Basic Linear Algebra Subprograms & NVIDIA's GPU-accelerated linear algebra library \\
+			CUDA    & Compute Unified Device Architecture & NVIDIA's parallel computing platform for GPUs \\
+			CUTLASS & CUDA Templates for Linear Algebra Subroutines & NVIDIA's C++ template library for GPU linear algebra \\
+			DRAM    & Dynamic Random-Access Memory & Main memory that must be periodically refreshed \\
+			FFI     & Foreign Function Interface & Mechanism for calling functions written in another language \\
+			FP32    & 32-bit Floating Point & Single-precision floating-point number format \\
+			GEMM    & General Matrix Multiplication & Standard routine for multiplying two matrices \\
+			GPU     & Graphics Processing Unit & Processor specialized for highly parallel computation \\
+			IR      & Intermediate Representation & Code form used inside a compiler between source and machine code \\
+			JIT     & Just-In-Time (compilation) & Compiling code to machine code while the program runs \\
+			LLM     & Large Language Model & AI model trained on large amounts of text \\
+			LLVM    & LLVM Compiler Infrastructure (originally ``Low Level Virtual Machine'') & Toolkit for building compilers and code generators \\
+			MatMul  & Matrix Multiplication & Multiplication of two matrices \\
+			REPL    & Read--Eval--Print Loop & Interactive shell that evaluates input line by line \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	
+	
+	\newpage
 	\maketitle
 	
 	\begin{abstract}
