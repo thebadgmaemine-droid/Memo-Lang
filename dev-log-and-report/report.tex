@@ -202,17 +202,15 @@ box/.style={rectangle, draw, rounded corners, minimum width=6.3cm, minimum heigh
 special/.style={box, fill=gray!20},
 arr/.style={-{Latex[length=1.5mm]}}
 ]
-\node[box]    (src) at (0,0)  {Source \\ \small Raw MemoLang text};
-\node[box]   (lex) at (10,0)  {Lexer \\ \small Produces token stream};
-\node[box]   (par) at (10,-5) {Parser \\ \small Builds AST via BinopPrecedence};
-\node[box]   (ast) at (0,-5) {AST \\ \small Node / Expr / Statement tree};
-\node[special] (con) at (0,-10)  {Consumption analysis [Destructive-read] \\ \small Marks consume\_a / consume\_b};
-\node[box]   (ir) at (10,-10)   {LLVM IR \\ \small Emits call with consume flags};
+\node[box]    (src) at (0,0)  {Source \\ \small Raw text \\ Text is written according to the syntax. \\ \small Any syntax error will be picked up by diagnostic engine to be shown.};
+\node[box]   (lex) at (10,0)  {Lexer \\ \small Produces token stream, each token is a tuple of (type, value, location), which will be used by the parser to build AST.};
+\node[box]   (par) at (10,-5) {Parser \\ \small Builds AST via BinopPrecedence parsing algorithm. \\ \small The parser will also perform semantic checks and report errors. The one set out by the language is recursive-descent parser};
+\node[box]   (ast) at (0,-5) {AST \\ \small Node / Expr / Statement tree} \\ \small The AST is a tree structure that represents the source code in a hierarchical manner. Each node in the tree corresponds to a construct in the source code, such as an expression or statement. The AST is used by the compiler to generate LLVM IR and perform optimizations.;
+\node[special] (con) at (0,-10)  {Consumption analysis [Destructive-read] \\ \small Marks consume\_a / consume\_b \\ \small Consumption analysis will be discussed in the next section.};
+\node[box]   (ir) at (10,-10)   {LLVM IR \\ \small Emits call with consume flags \\ \small The LLVM IR is a low-level intermediate representation of the source code that is used by the LLVM compiler to generate machine code. The IR is generated from the AST and includes information about the types and operations in the source code. The IR is then passed to the JIT/AOT compiler for further optimization and code generation.};
 \node[box]    (jit) at (10,-15)  {JIT / AOT \\ \small Compiles to machine code};
-\node[box]   (link) at (0,-15) {Linking \\ \small Links MemoLang runtime};
-\node[special] (gpu) at (0,-20)  {GPU kernel [Destructive-read] \\ \small frees consumed};
-\draw[arr] (src) -- (lex);
-\draw[arr] (lex) -- (par);
+\node[box]   (link) at (0,-15) {Linking \\ \small Links MemoLang runtime to the precompiled cuBLAS runtime library. \\ \small The linking process combines the compiled MemoLang code with the precompiled cuBLAS library to create an executable that can be run on the GPU. The language cannot run the GPU kernel natively.};
+\node[special] (gpu) at (0,-20)  {GPU kernel [Destructive-read] \\ \small frees consumed \\ \small The language handles end-to-end memory management, including the destruction of consumed buffers. While the GPU kernel will handle the matrix multiplication, the language will handle the memory management of the buffers used in the kernel.};
 \draw[arr] (par) -- (ast);
 \draw[arr] (ast) -- (con);
 \draw[arr] (con) -- (ir);
