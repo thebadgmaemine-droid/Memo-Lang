@@ -1,0 +1,22 @@
+\contentsline {section}{\numberline {I}Tổng quan dự án}{4}{}%
+\contentsline {subsection}{\numberline {I.1}Lý do chọn dự án}{4}{}%
+\contentsline {subsection}{\numberline {I.2}Câu hỏi nghiên cứu}{4}{}%
+\contentsline {subsection}{\numberline {I.3}Mục tiêu nghiên cứu}{5}{}%
+\contentsline {subsection}{\numberline {I.4}Tính mới nghiên cứu}{5}{}%
+\contentsline {section}{\numberline {II}Cơ sở lý thuyết}{5}{}%
+\contentsline {section}{\numberline {III}Mục tiêu dự án}{6}{}%
+\contentsline {subsection}{\numberline {III.1}Ngữ nghĩa đọc phá hủy}{7}{}%
+\contentsline {section}{\numberline {IV}Kiến trúc trình biên dịch và môi trường thực thi}{7}{}%
+\contentsline {subsection}{\numberline {IV.1}Thiết kế cú pháp}{7}{}%
+\contentsline {subsection}{\numberline {IV.2}Quy trình xử lý}{9}{}%
+\contentsline {section}{\numberline {V}Toán học và thuật toán}{10}{}%
+\contentsline {subsection}{\numberline {V.1}Cơ sở toán học của phép nhân ma trận FP32}{10}{}%
+\contentsline {subsection}{\numberline {V.2}Cơ chế giải phóng khi tiêu thụ}{10}{}%
+\contentsline {section}{\numberline {VI}Tích hợp CUTLASS}{10}{}%
+\contentsline {section}{\numberline {VII}Kiểm chứng}{10}{}%
+\contentsline {section}{\numberline {VIII}Đánh giá hiệu năng}{10}{}%
+\contentsline {subsection}{\numberline {VIII.1}Mối quan hệ kỳ vọng giữa ngôn ngữ và hiệu năng nhân ma trận}{11}{}%
+\contentsline {section}{\numberline {IX}Minh chứng và khả năng tái lập}{12}{}%
+\contentsline {section}{\numberline {X}Kết luận}{12}{}%
+\contentsline {subsection}{\numberline {X.1}Tiến độ}{12}{}%
+\contentsline {section}{TÀI LIỆU THAM KHẢO}{12}{}%

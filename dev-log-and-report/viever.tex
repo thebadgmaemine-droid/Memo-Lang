@@ -351,7 +351,7 @@
 	\node[box]   (par) at (10,-5) {Bộ phân tích cú pháp \\ \small Xây dựng AST theo BinopPrecedence};
 	\node[box]   (ast) at (0,-5) {AST \\ \small Cây nút / biểu thức / câu lệnh};
 	\node[special] (con) at (0,-10)  {Phân tích tiêu thụ [Đọc phá hủy] \\ \small Đánh dấu consume\_a / consume\_b};
-	\node[box]   (ir) at (10,-10)   {LLVM IR \\ \small Sinh lời gọi kèm cờ tiêu thụ};
+	\node[box]   (ir) at (10,-10)   {LLVM IR \\ \small Tạo ra các lệnh gọi khi chương trình chạy, kèm theo consume flags.};
 	\node[box]    (jit) at (10,-15)  {JIT / AOT \\ \small Biên dịch sang mã máy};
 	\node[box]   (link) at (0,-15) {Liên kết \\ \small Liên kết runtime của MemoLang};
 	\node[special] (gpu) at (0,-20)  {Kernel GPU [Đọc phá hủy] \\ \small Giải phóng vùng nhớ đã tiêu thụ};
