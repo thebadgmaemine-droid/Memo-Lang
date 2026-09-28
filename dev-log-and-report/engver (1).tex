@@ -1,30 +1,16 @@
 \documentclass[a4paper]{article}
-
 \usepackage[a4paper, left=3cm, right=2cm, top=2cm, bottom=2cm]{geometry}
-
-% Times New Roman
+\usepackage{ragged2e}
 \usepackage{fontspec}
 \setmainfont{Times New Roman}
-
-% Single line spacing + 3pt paragraph spacing
+\usepackage{float}
 \usepackage{setspace}
 \singlespacing
 \setlength{\parskip}{3pt}
-\setlength{\parindent}{1cm}
-
-% Font size
-\renewcommand{\normalsize}{\fontsize{13pt}{15.6pt}\selectfont}
-\normalsize
-
-\usepackage{cite}
-\usepackage{amsmath}
-\usepackage{graphicx}
-\usepackage{booktabs}
-\usepackage{array}
+\setlength{\parindent}{0pt}
+\usepackage[fontsize=13pt]{fontsize}
 \usepackage{url}
-\usepackage{listings}
-\usepackage{indentfirst}
-\usepackage{float}
+
 \usepackage{tikz}
 \usetikzlibrary{
 	arrows.meta,
@@ -40,12 +26,33 @@
 	shadows
 }
 
+\usepackage{cite}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{url}
+\usepackage{listings}
 \graphicspath{{./}{paper/}{paper/figures/}}
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{gray!10},   
+    commentstyle=\color{green!60!black},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{gray},
+    stringstyle=\color{purple},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,                   % Automatically wrap long lines
+    captionpos=b,                      % Caption at the bottom
+    keepspaces=true,                   % Keeps spaces for indentation
+    numbers=left,                      % Line numbers on the left
+    numbersep=5pt,                     
+    showspaces=false,                  
+    showstringspaces=false,
+    showtabs=false,                    
+    tabsize=2
+}
+\lstset{style=mystyle}
 
-% =====================================================================
-% Formatting to match the Vietnamese science-fair report layout
-% (cover page, table of contents, list of figures, list of tables)
-% =====================================================================
 \usepackage{titlesec}
 \usepackage{tocloft}
 \usepackage[labelsep=period]{caption}
@@ -108,45 +115,45 @@
 
 \begin{document}
 	
-	\title{Report on the Research's Findings \\
-		{\large Memo-Lang: Destructive-Read Semantics on GPU Matrix Workloads}}
+	\title{Báo cáo kết quả nghiên cứu \\
+		{\large Memo-Lang: Ngữ nghĩa đọc hủy trên các khối lượng công việc ma trận GPU}}
 	
 	\author{
-		Independent Interpreter Project\\
-		September 2026, Hanoi}
+		Dự án trình thông dịch độc lập\\
+		Tháng 9 năm 2026, Hà Nội}
 	
 	% ================= PAGE 1: COVER PAGE =================
 	\thispagestyle{plain}
 	\begin{center}
 		\bfseries
-		SCHOOL-LEVEL SCIENCE AND ENGINEERING FAIR FOR SECONDARY SCHOOL STUDENTS, SCHOOL YEAR 2026 -- 2027
+		CUỘC THI KHOA HỌC KỸ THUẬT CẤP TRƯỜNG DÀNH CHO HỌC SINH TRUNG HỌC, NĂM HỌC 2026 -- 2027
 	\end{center}
 	
 	\vspace{5cm}
 	
 	\begin{center}
 		\bfseries
-		REPORT ON THE RESEARCH'S FINDINGS
+		BÁO CÁO KẾT QUẢ NGHIÊN CỨU
 	\end{center}
 	
 	\vspace{3cm}
 	
 	\begin{center}
-		{\Large\bfseries\itshape Project title:}\\[10pt]
+		{\Large\bfseries\itshape Tên dự án:}\\[10pt]
 		{\Large\bfseries
-		\MakeUppercase{MemoLang: Research and Development of a Buffer-Release Mechanism for AI Development}\par}
+		\MakeUppercase{MEMOLANG: NGHIÊN CỨU VÀ PHÁT TRIỂN CƠ CHẾ GIẢI PHÓNG VÙNG ĐỆM CHO PHÁT TRIỂN AI}\par}
 	\end{center}
 	
 	\vspace{3cm}
 	
-	\noindent\textbf{\textit{Category:} Systems Software}
+	\noindent\textbf{\textit{Lĩnh vực:} Phần mềm hệ thống}
 	
 	\vspace{6pt}
 	
 	\vfill
 	
 	\begin{center}
-		\textbf{\textit{Hanoi, September 2026}}
+		\textbf{\textit{Hà Nội, tháng 9 năm 2026}}
 	\end{center}
 	
 	\newpage
@@ -161,314 +168,344 @@
     \vspace{10cm}
 	\vspace{18pt}
 	\begin{center}
-		\textbf{LIST OF ABBREVIATIONS}
+		\textbf{DANH MỤC TỪ VIẾT TẮT}
 	\end{center}
 	\vspace{-6pt}
 	\begin{center}
 		\renewcommand{\arraystretch}{1.15}
 		\begin{tabular}{>{\bfseries}l >{\raggedright\arraybackslash}p{5.8cm} >{\raggedright\arraybackslash}p{5.8cm}}
 			\toprule
-			\textbf{Abbreviation} & \textbf{Full name} & \textbf{Description} \\
+			\textbf{Từ viết tắt} & \textbf{Tên đầy đủ} & \textbf{Mô tả} \\
 			\midrule
-			AI      & Artificial Intelligence & Computer systems that perform tasks normally requiring human intelligence \\
-			AOT     & Ahead-Of-Time (compilation) & Compiling code to machine code before the program runs \\
-			AST     & Abstract Syntax Tree & Tree representation of the structure of source code \\
-			cuBLAS  & CUDA Basic Linear Algebra Subprograms & NVIDIA's GPU-accelerated linear algebra library \\
-			CUDA    & Compute Unified Device Architecture & NVIDIA's parallel computing platform for GPUs \\
-			CUTLASS & CUDA Templates for Linear Algebra Subroutines & NVIDIA's C++ template library for GPU linear algebra \\
-			DRAM    & Dynamic Random-Access Memory & Main memory that must be periodically refreshed \\
-			FFI     & Foreign Function Interface & Mechanism for calling functions written in another language \\
-			FP32    & 32-bit Floating Point & Single-precision floating-point number format \\
-			GEMM    & General Matrix Multiplication & Standard routine for multiplying two matrices \\
-			GPU     & Graphics Processing Unit & Processor specialized for highly parallel computation \\
-			IR      & Intermediate Representation & Code form used inside a compiler between source and machine code \\
-			JIT     & Just-In-Time (compilation) & Compiling code to machine code while the program runs \\
-			LLM     & Large Language Model & AI model trained on large amounts of text \\
-			LLVM    & LLVM Compiler Infrastructure (originally ``Low Level Virtual Machine'') & Toolkit for building compilers and code generators \\
-			MatMul  & Matrix Multiplication & Multiplication of two matrices \\
-			REPL    & Read--Eval--Print Loop & Interactive shell that evaluates input line by line \\
+			AI      & Artificial Intelligence & Hệ thống máy tính thực hiện các tác vụ thường đòi hỏi trí tuệ con người \\
+			AOT     & Ahead-Of-Time (compilation) & Biên dịch thành mã máy trước khi chương trình chạy \\
+			AST     & Abstract Syntax Tree & Cây biểu diễn cấu trúc của mã nguồn \\
+			cuBLAS  & CUDA Basic Linear Algebra Subprograms & Thư viện đại số tuyến tính tăng tốc bằng GPU của NVIDIA \\
+			CUDA    & Compute Unified Device Architecture & Nền tảng tính toán song song của NVIDIA cho GPU \\
+			CUTLASS & CUDA Templates for Linear Algebra Subroutines & Thư viện mẫu C++ của NVIDIA cho đại số tuyến tính trên GPU \\
+			DRAM    & Dynamic Random-Access Memory & Bộ nhớ chính cần được làm tươi định kỳ \\
+			FFI     & Foreign Function Interface & Cơ chế gọi hàm được viết bằng ngôn ngữ khác \\
+			FP32    & 32-bit Floating Point & Định dạng số dấu phẩy động độ chính xác đơn \\
+			GEMM    & General Matrix Multiplication & Quy trình chuẩn để nhân hai ma trận \\
+			GPU     & Graphics Processing Unit & Bộ xử lý chuyên dụng cho tính toán song song cao \\
+			IR      & Intermediate Representation & Dạng mã trung gian trong trình biên dịch, nằm giữa mã nguồn và mã máy \\
+			JIT     & Just-In-Time (compilation) & Biên dịch thành mã máy trong khi chương trình đang chạy \\
+			LLM     & Large Language Model & Mô hình AI được huấn luyện trên lượng lớn văn bản \\
+			LLVM    & LLVM Compiler Infrastructure (originally ``Low Level Virtual Machine'') & Bộ công cụ để xây dựng trình biên dịch và bộ sinh mã \\
+			MatMul  & Matrix Multiplication & Phép nhân hai ma trận \\
+			REPL    & Read--Eval--Print Loop & Vỏ tương tác thực thi từng dòng lệnh được nhập vào \\
 			\bottomrule
 		\end{tabular}
 	\end{center}
 	
 	
 	\newpage
+	\maketitle
 	
-	% ================= MAIN CONTENT (unchanged) =================
-	\section{Project Overview}
-	\label{sec:overview}
+	\begin{abstract}
+		\normalsize
+		Sự phát triển của AI trong thời gian gần đây đã dẫn đến sự bùng nổ của nhiều thuật toán máy học và mô hình học sâu. Do vậy, nhu 
+		cầu cho năng lực tính toán để học trên những bộ dữ liệu khổng lồ
+		cũng từ đó tăng.
+		
+		Hiện nay, phép toán được sử dụng rộng rãi cho thuật toán máy học là GEMM (General Matrix Multiplication - Phép nhân ma trận tổng 
+		quát). Trong quá trình học, mỗi phép nhân ma trận sẽ tạo ra một ma trận khác và ma trận mới sẽ được nối với những phép nhân ma trận khác. Để xử lý nhiều thao tác, tác vụ và quá trình khác nhau, những mô hình máy học cần thực hiện hàng triệu phép tính ma trận. Do những phép tính ma trận này so với các phép tính thông thường khác có tính đặc thù về thời gian rất cao, vì vậy những phép tính tiếp theo dần bị dồn lên bộ nhớ đệm và các bước trung gian cho đến khi những chường trình quản lý bộ nhớ hoặc quy tắc của máy tính giải phóng bộ nhớ.
+		
+		Việc lặp lại quá trình này đối với mô hình máy học trở thành một vấn đề lớn trong việc hoạt động dưới một khối lượng công việc rất lớn, để lại hậu quá lớn cho hiệu suất và độ trễ của mô hình trên thiết bị và tài nguyên phần cứng nó đang sử dụng.
+		
+		Bởi vậy, phần mềm đồng thời góp phần tối ưu hóa nhân của GEMM và tăng tuổi thọ của phần cứng được sử dụng, đảm bảo bộ đệm, dữ liệu đệm và con trỏ được giải phóng sớm nhất có thể và giảm phí tổn từ kết quả của việc dồn bộ nhớ đệm.
+	\end{abstract}
 	
-	\subsection{Rationale}
 	
-	The recent development of AI has led to an explosion of machine learning algorithms and deep learning models. As a result, the demand for computing power to train on enormous datasets has also increased.
+	\section{Câu hỏi nghiên cứu}
 	
-	Currently, one of the most widely used operations in machine learning algorithms is GEMM. During training, each matrix multiplication produces another matrix, and this new matrix is in turn fed into further matrix multiplications. To handle many different operations, tasks and processes, machine learning models need to perform millions of matrix computations. Because these matrix computations are far more time-intensive than ordinary computations, subsequent computations gradually pile up in buffer memory and intermediate steps until memory-management programs or the system's rules free the memory.
+	Mục tiêu chính của chúng tôi là liên kết trực tiếp \emph{thư viện chạy cuBLAS} đã biên dịch sẵn cho một ứng dụng cụ thể, được đánh giá bằng một phương pháp cụ thể, dưới một mô hình thực thi tương tự \emph{hệ thống kiểu tuyến tính chặt chẽ}. Một số ngôn ngữ khác cũng theo đuổi ngữ nghĩa theo dõi việc tiêu thụ giá trị: hệ thống quyền sở hữu của Rust~\cite{rust} áp đặt nguyên tắc dùng một lần tương tự thông qua hệ thống kiểu affine, còn Futhark~\cite{futhark} là ngôn ngữ mảng hàm thuần túy dùng kiểu duy nhất (uniqueness types) để cập nhật tại chỗ một cách an toàn. Tuy nhiên, Futhark tự sinh kernel GPU từ mã nguồn thay vì tích hợp với các thư viện hiệu năng cao bên ngoài do bên thứ ba duy trì như cuBLAS, và đây được xem là một trong những trở ngại thực tế của ngôn ngữ này. Ngôn ngữ của chúng tôi thay vào đó tách việc phân tích tiêu thụ lúc biên dịch khỏi việc thực thi kernel.
 	
-	Repeating this process becomes a major problem for machine learning models operating under very large workloads, with serious consequences for the performance and latency of the model on the device and hardware resources it uses.
+	\begin{equation}
+		T_1 = A B,\qquad
+		T_2 = T_1 C,\qquad
+		T_3 = T_2 D,
+	\end{equation}
 	
-	Therefore, this software aims both to optimize GEMM kernels and to extend the lifespan of the hardware in use, ensuring that buffers, buffered data and pointers are freed as early as possible and reducing the overhead caused by buffer accumulation.
+	Trong triển khai thực tế, nhiều vùng đệm trung gian tồn tại đồng thời. Tốt nhất là vùng lưu trữ của các vùng đệm này được xóa và tái sử dụng ngay khi phép toán tương ứng đã hoàn tất hoặc khi vòng đời của đối tượng kết thúc.
 	
-	This project was inspired by research into destructive-read memory systems, the Sere programming language~\cite{sere}, the Clean programming language~\cite{clean}, and optimized GPU matrix-multiplication libraries.
+	Có thể kỳ vọng lợi ích về quản lý bộ nhớ từ một ngôn ngữ có ngữ nghĩa đọc hủy. Các phép toán số học như phép nhân ma trận có thể được giao cho kernel CUTLASS/cuBLAS đã tối ưu để vượt qua các hạn chế của Futhark~\cite{futhark}. Việc triển khai này được kỳ vọng không ảnh hưởng đến hiệu năng tính toán so với triển khai trên các ngôn ngữ khác. Tuy nhiên, cải thiện toàn trình được kỳ vọng xuất hiện nhờ các tối ưu hóa của ngôn ngữ, bao gồm:
+	\begin{itemize} 
+		\item Giảm cấp phát tạm thời
+		\item Rút ngắn vòng đời vùng đệm
+		\item Giảm áp lực bộ nhớ GPU
+	\end{itemize}
+	Về lý thuyết, hiệu quả của cách triển khai này tăng theo khối lượng công việc, vì các tensor trung gian hoặc các phép toán ma trận nhỏ không chịu ảnh hưởng đáng kể từ việc quản lý bộ nhớ so với các chuỗi phép toán lớn.
 	
-	\subsection{Research Questions}
-	
-	However, inherent overheads or overestimation of memory overhead or memory optimization's practicality is important to consider. Therefore, The project investigates the following hypotheses:
+	Tuy nhiên, cần cân nhắc chi phí phát sinh vốn có, cũng như khả năng đánh giá quá cao chi phí bộ nhớ hoặc tính thực tiễn của việc tối ưu bộ nhớ. Do đó, dự án khảo sát các giả thuyết sau:
 	
 	\begin{itemize}
-	\item Destructive-read semantics can reduce peak memory usage for workloads containing short-lived intermediate matrices.
-	\item Destructive reads can reduce the number or cost of temporary-buffer allocations when consumed buffers can safely be reused.
-	\item For workloads in which memory management represents a significant portion of total execution time, buffer reuse may improve end-to-end performance.
+		\item Ngữ nghĩa đọc hủy có thể giảm mức sử dụng bộ nhớ đỉnh đối với các khối lượng công việc chứa các ma trận trung gian tồn tại ngắn.
+		\item Đọc hủy có thể giảm số lần hoặc chi phí cấp phát vùng đệm tạm khi các vùng đệm đã tiêu thụ có thể được tái sử dụng một cách an toàn.
+		\item Với các khối lượng công việc mà quản lý bộ nhớ chiếm phần đáng kể trong tổng thời gian thực thi, việc tái sử dụng vùng đệm có thể cải thiện hiệu năng toàn trình.
 	\end{itemize}
 	
-	\subsection{Research Objectives}
+	Các lợi ích thực tiễn tiềm năng gồm:
 	
-	% TODO: write research objectives
+	\begin{itemize}
+		\item Cải thiện hiệu năng của phép nhân ma trận, hỗ trợ huấn luyện và suy luận nhanh hơn cho các mô hình học máy.
+		\item Tái sử dụng vùng đệm tensor trung gian hiệu quả hơn nhờ trình biên dịch.
+		\item Giảm chi phí cấp phát vùng đệm và bộ nhớ đệm khi chạy.
+	\end{itemize}
 	
-	\subsection{Novelty}
+	\subsection{Thuật toán}
 	
-	Our main goal is to directly link the precompiled cuBLAS runtime library for a specific application, evaluated with a specific methodology, under an enforcement model resembling a strictly linear type system. Other languages have pursued related consumption-tracking semantics: Rust's ownership system~\cite{rust} enforces a comparable use-once discipline through its affine type system, and Futhark~\cite{futhark} is a purely functional array language that uses uniqueness types to support safe in-place updates. Futhark, however, generates its own GPU kernels from source rather than integrating with external, independently maintained high-performance libraries such as cuBLAS or CUTLASS, a limitation that has been noted as one of the practical hurdles of the language. MemoLang instead separates compile-time consumption analysis from kernel execution.
-	
-	\section{Background}
-	
-	% TODO: Motivate destructive-read semantics, explain why they help memory
-	% efficiency for matrix workloads, and give any relevant background on LLVM
-	% IR generation or cuBLAS's programming model.
-	
-	Matrix multiplication can be written as
+	Phép nhân ma trận được viết như sau
 	
 	\begin{equation}
 		C_{i,j} = \sum_{k=0}^{N-1} A_{i,k}B_{k,j}
 	\end{equation}
 	
-	Each value in the output matrix $C$ is produced by multiplying one row of $A$ with one column of $B$ and summing the products. Efficient implementations must manage data movement, memory reuse, and, in a destructive-read scheme, the lifetime of operand buffers once they are consumed.
+	Mỗi giá trị của ma trận kết quả $C$ được tạo ra bằng cách nhân một hàng của $A$ với một cột của $B$ rồi cộng các tích. Các triển khai hiệu quả phải quản lý việc di chuyển dữ liệu, tái sử dụng bộ nhớ và, trong sơ đồ đọc hủy, vòng đời của các vùng đệm toán hạng sau khi chúng bị tiêu thụ.
 	
-	\begin{equation}
-	T_1 = A B,\qquad
-	T_2 = T_1 C,\qquad
-	T_3 = T_2 D,
-	\end{equation}
+	Đọc hủy là thao tác đọc bộ nhớ vốn xóa giá trị vừa đọc: dữ liệu bị hủy cùng lúc với khi được truy cập. Nếu một giá trị cần được giữ lại, phải có thao tác ghi lại khôi phục nó ngay lập tức, hoặc một vùng đệm/bộ nhớ đệm bên ngoài phải giữ một bản sao.
 	
-	In implementation, numerous intermediate buffers are live at the same time. These buffers are best have their storage be erased and reused after their respective operations has run out or lifetime of the objet has ran out.
+	Các nghiên cứu liên quan về hệ thống kiểu tuyến tính có cách tiếp cận tương tự ở cấp độ ngôn ngữ, yêu cầu mỗi biến được dùng đúng một lần.
+	
+	Về mặt lịch sử, đọc hủy phổ biến trong thiết kế phần cứng và mạch điện hơn là trong phần mềm. Dybdahl và cộng sự~\cite{DybdahlKGN06} đã nghiên cứu hành vi đọc hủy trong DRAM nhúng và phát hiện rằng việc bỏ bộ đệm ghi lại, thay vào đó dựa vào bộ nhớ đệm (đọc dữ liệu vào bộ nhớ đệm mà không khôi phục ngay về DRAM, và chỉ ghi lại khi dòng bộ nhớ đệm bị thay thế), mang lại lợi ích đo được về điện năng và hiệu năng. 
+	
+	Dù kết quả này riêng cho hệ thống bộ nhớ phần cứng, nó gợi ra câu hỏi rộng hơn mà dự án nghiên cứu: liệu một nguyên tắc tiêu thụ-khi-đọc tương tự, áp dụng ở cấp phần mềm/trình thông dịch cho các khối lượng công việc nặng về GEMM, có thể mang lại kết quả tương tự hay không?
 	
 	
-	Destructive-read is a memory read operation that inherently erases the value it reads: data is destroyed at the same time it is accessed. If a value must be preserved, a write-back operation must immediately restore it, or an external buffer/cache must hold a copy.
+	\section{Thiết kế và phương pháp}
 	
-	In modern software, this practice is rarely used directly, owing to its implementation complexity. Contemporary programming languages instead use ownership and immutability to implement move semantics, aiming for similar safety and memory-reuse guarantees without the sharp edges of unsynchronized destructive reads. Related work on linear type systems takes a similar approach at the language level, requiring that a variable be used exactly once.
+	Mục tiêu của ngôn ngữ là xác định liệu ngữ nghĩa đọc hủy ở cấp ngôn ngữ có thể mang lại lợi ích quản lý bộ nhớ đo được cho các chương trình GPU thiên về ma trận, đồng thời vẫn giữ được hiệu năng của các kernel nhân ma trận đã tối ưu hay không.
 	
-	Destructive-read has, historically, been more common in hardware and circuit design than in software. Dybdahl et al.~\cite{DybdahlKGN06} studied destructive-read behaviour in embedded DRAM used as primary memory, based on the following scheme: ``The data is first read from DRAM and into the cache. At this time data are not stored in DRAM, only in the cache. Data are written back to DRAM when the cache line is replaced''~\cite{DybdahlKGN06}. Removing the immediate write-back in this way offered measurable power and performance benefits, including an improvement in write-back buffer time from 6~ns to 3~ns. While that result is specific to a hardware memory system, it motivates the broader question this project investigates: whether a comparable consume-on-read discipline, applied at the software/interpreter level for GEMM-heavy workloads, can yield analogous benefits in memory pressure and allocation overhead.
-	
-	\section{Project Goal}
-	
-	The goal of MemoLang is to determine whether language-level destructive-read semantics can provide measurable memory-management benefits for matrix-oriented GPU programs while retaining the performance of optimized matrix multiplication kernels.
-	
-	The project will be implemented and evaluated through the following goals:
+	Dự án sẽ được triển khai và đánh giá thông qua các mục tiêu sau:
 	
 	\begin{itemize}
-		\item Define MemoLang's core Python-like syntax and destructive-read semantics.
-		\item Implement a lexer, parser, AST, and LLVM-based code-generation pipeline.
-		\item Generate LLVM IR for arithmetic and matrix operations.
-		\item Integrate optimized GPU matrix multiplication through CUTLASS and/or cuBLAS.
-		\item Implement explicit ownership and consumption tracking for matrix operands.
-		\item Determine when consumed matrix buffers can safely be reused.
-		\item Verify generated results against an independent numerical reference.
-		\item Measure peak GPU memory usage and temporary-buffer allocation behavior.
-		\item Measure both GPU kernel execution time and end-to-end program runtime.
-		\item Compare destructive-read execution against an equivalent non-destructive implementation.
-		\item Compare MemoLang against optimized GPU-library baselines where appropriate.
-		\item Preserve benchmark logs, correctness results, compiler output, and build artifacts to make the experimental results reproducible.
+		\item Định nghĩa cú pháp lõi giống Python và ngữ nghĩa đọc hủy của ngôn ngữ.
+		\item Xây dựng bộ phân tích từ vựng, bộ phân tích cú pháp, AST và quy trình sinh mã dựa trên LLVM.
+		\item Sinh LLVM IR cho các phép toán số học và ma trận.
+		\item Tích hợp phép nhân ma trận GPU đã tối ưu thông qua CuBLAS.
+		\item Xây dựng cơ chế theo dõi quyền sở hữu và sự tiêu thụ tường minh cho các toán hạng ma trận.
+		\item Xác định khi nào các vùng đệm ma trận đã tiêu thụ có thể được tái sử dụng một cách an toàn.
+		\item Kiểm chứng kết quả sinh ra với một tham chiếu số học độc lập.
+		\item Đo mức sử dụng bộ nhớ GPU đỉnh và hành vi cấp phát vùng đệm tạm.
+		\item Đo cả thời gian thực thi kernel GPU và thời gian chạy toàn chương trình.
+		\item So sánh thực thi đọc hủy với một triển khai tương đương không đọc hủy.
+		\item So sánh ngôn ngữ với các mốc cơ sở là thư viện GPU đã tối ưu khi phù hợp.
+		\item Lưu giữ nhật ký benchmark, kết quả kiểm tra tính đúng đắn, đầu ra của trình biên dịch và các sản phẩm build để kết quả thực nghiệm có thể tái lập.
 	\end{itemize}
 	
-	The evaluation will not assume that destructive reads provide a performance improvement. A reduction in peak memory usage without a reduction in runtime will be treated as a meaningful result, while an observed runtime improvement will be analyzed to determine whether it originates from reduced memory-management overhead rather than from changes to the underlying matrix multiplication kernel.
+	Đánh giá sẽ không mặc định rằng đọc hủy mang lại cải thiện hiệu năng. Việc giảm mức sử dụng bộ nhớ đỉnh mà không giảm thời gian chạy sẽ được coi là một kết quả có ý nghĩa; còn nếu quan sát thấy thời gian chạy được cải thiện, sẽ phân tích xem nó xuất phát từ việc giảm chi phí quản lý bộ nhớ hay từ thay đổi ở chính kernel nhân ma trận.
 	
-	\subsection{Destructive-Read Semantics}
+	\subsection{Ngữ nghĩa đọc hủy}
 	
-	A destructive read treats a value as consumed when an operation has exclusive use of that value. After consumption, the original value is no longer available to subsequent operations unless the programmer explicitly creates a copy or otherwise preserves it.
+	Đọc hủy coi một giá trị là đã bị tiêu thụ khi một phép toán có quyền sử dụng độc quyền giá trị đó. Sau khi bị tiêu thụ, giá trị gốc không còn khả dụng cho các phép toán tiếp theo, trừ khi lập trình viên chủ động tạo bản sao hoặc bảo toàn nó bằng cách khác.
 	
-	For matrix operations, this provides an opportunity for storage reuse. For example,
+	Với các phép toán ma trận, điều này tạo cơ hội tái sử dụng vùng lưu trữ. Ví dụ,
 	
 	\begin{lstlisting}
 		C = A @ B
 		D = C @ W
 	\end{lstlisting}
 	
-	may permit the storage associated with $A$ or $C$ to become eligible for reuse once the compiler establishes that the corresponding value has no remaining consumers.
+	có thể cho phép vùng lưu trữ gắn với $A$ hoặc $C$ được tái sử dụng khi trình biên dịch xác định rằng giá trị tương ứng không còn nơi tiêu thụ nào nữa.
 	
-	The purpose of this mechanism is not to alter the mathematical computation performed by matrix multiplication. Instead, it changes the lifetime of buffers associated with the computation. If a buffer can be reused without copying its contents, the implementation may reduce peak memory consumption and allocation activity.
+	Mục đích của cơ chế này không phải là thay đổi phép tính toán học mà phép nhân ma trận thực hiện. Thay vào đó, nó thay đổi vòng đời của các vùng đệm gắn với phép tính. Nếu một vùng đệm có thể được tái sử dụng mà không cần sao chép nội dung, việc triển khai có thể giảm mức tiêu thụ bộ nhớ đỉnh và hoạt động cấp phát.
 	
-	This optimization is inherently workload-dependent. A matrix with multiple future consumers cannot safely be destroyed after its first use. In such cases, the implementation may require a copy, borrow, or other mechanism to preserve the value. Consequently, destructive-read semantics can introduce a tradeoff between memory efficiency and the flexibility to reuse values.
+	Việc tối ưu này vốn phụ thuộc vào khối lượng công việc. Một ma trận còn nhiều nơi tiêu thụ trong tương lai thì không thể bị hủy một cách an toàn sau lần dùng đầu tiên. Trong trường hợp đó, việc triển khai có thể cần sao chép, mượn hoặc một cơ chế khác để bảo toàn giá trị. Do đó, ngữ nghĩa đọc hủy có thể tạo ra sự đánh đổi giữa hiệu quả bộ nhớ và tính linh hoạt khi tái sử dụng giá trị.
 	
-	The language therefore treats destructive reads as an explicit ownership mechanism rather than assuming that consuming every operand will necessarily improve performance.
+	Vì vậy, ngôn ngữ coi đọc hủy là một cơ chế sở hữu tường minh, thay vì giả định rằng việc tiêu thụ mọi toán hạng chắc chắn cải thiện hiệu năng.
 	
-	\section{Compiler and Runtime Architecture}
+	\subsection{Kiến trúc trình biên dịch và thư viện chạy}
 	
-	% TODO: Describe MemoLang's syntax and semantics. Suggested subsections:
-	% - Surface syntax and Python-like conventions
-	% - Type system (if any) for matrices/tensors
-	% - Destructive-read semantics: how a read consumes a value, what happens on
-	%   re-use, error/ownership model
-	% - How CUDA's programming model influenced the design
+	\subsection{ Thiết kế cú pháp }
 	
-	\subsection{Syntax Design}
-	
-	We've decided on a Python-like syntax convention for the programming language:
+	Chúng tôi chọn quy ước cú pháp giống Python cho ngôn ngữ lập trình:
 	\begin{itemize}
-		\item Comments using hashtag.
-		\item Primitive Types: Integer, Float, Boolean and String.
-		\item Variable declarations .
-		\item Functions using 'def'.
-		\item extern for runtime/FFI(cross-language) linkage.
-		\item operator precendence.
-		\item control flow.
+		\item Chú thích dùng dấu thăng.
+		\item Kiểu nguyên thủy: số nguyên, số thực, luận lý và chuỗi.
+		\item Khai báo biến.
+		\item Hàm dùng 'def'.
+		\item extern cho liên kết runtime/FFI (giữa các ngôn ngữ).
+		\item Độ ưu tiên toán tử.
+		\item Cấu trúc điều khiển.
 	\end{itemize}
-	However, due to implementation practicality and further design decision, we've decided to make adjustments to the core Python syntax:
+	Tuy nhiên, vì tính khả thi khi triển khai và các quyết định thiết kế tiếp theo, chúng tôi điều chỉnh một số điểm của cú pháp Python gốc:
 	\begin{itemize}
-		\item special precendence of clone() for cloning memory
-		\item usage of braces instead of indentation for function scope
+		\item độ ưu tiên đặc biệt của clone() để sao chép bộ nhớ
+		\item dùng dấu ngoặc nhọn thay cho thụt lề để xác định phạm vi hàm
 	\end{itemize}
 	
-	\subsection{Pipeline}
-	% TODO: Describe the pipeline: source -> lexer -> parser -> ExprAST ->
-	% LLVM IR -> JIT/AOT compilation -> cuBLAS call for MatMul kernels.
+	\subsection{Sơ đồ Free-on-Consume và thư viện chạy cuBLAS}
+	Sơ đồ được nêu trong \cite{DybdahlKGN06} sẽ được sử dụng với triết lý thiết kế đã điều chỉnh để hoạt động ở cấp phần mềm.
+	\begin{table}[htbp]
+  \centering
+  \caption{Các lựa chọn triển khai sơ đồ trong thiết kế.}
+  \label{tab:scheme_implementation}
+  \small
+  \begin{tabular}{@{}>{\RaggedRight}p{0.48\linewidth} >{\RaggedRight}p{0.48\linewidth}@{}}
+    \toprule
+    \textbf{Sơ đồ} & \textbf{Triển khai} \\
+    \midrule
+    Dữ liệu trước hết được đọc từ DRAM vào bộ nhớ đệm. 
+      & Không khác biệt. \\ \addlinespace
+    
+    Dữ liệu được ghi lại vào DRAM khi dòng bộ nhớ đệm bị thay thế, bất kể dữ liệu có bị sửa đổi hay không. 
+      & Các toán hạng được giải phóng vô điều kiện, với giả định bộ nhớ đệm luôn bị sửa đổi. \\ \addlinespace
+    
+    Tái sử dụng kiến trúc bộ nhớ đệm hiện có. 
+      & Dùng cấp phát theo thoát phạm vi để quản lý bộ nhớ đệm. \\ \addlinespace
+    
+    Che giấu độ trễ ghi lại bằng chồng lấp nhiều bank (xen kẽ bank). 
+      & Che giấu chi phí giải phóng bộ nhớ sau các lần khởi chạy kernel GPU. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+	Về việc liên kết cuBLAS đã biên dịch sẵn:
+	\begin{itemize}
+		\item cuBLAS nên được liên kết động.
+		\item Trình điều khiển nên liên kết và đóng gói cùng các tệp nhị phân đã biên dịch của cuBLAS.
+		\item Để thuận tiện, được phân phối dưới dạng một tệp đóng gói.
+	\end{itemize}
+
+	
+	\subsection{ Đường ống xử lý } 
 	\begin{figure}[H]
 	\centering
 	\begin{tikzpicture}[
-	node distance=5cm,
-	box/.style={rectangle, draw, rounded corners, minimum width=6cm, text width=5.6cm, minimum height=3cm, align=center, font=\normalsize},
-	special/.style={box, fill=gray!20},
-	arr/.style={-{Latex[length=1.5mm]}}
-	]
-	\node[box]    (src) at (0,0)  {Source \\ \small Raw MemoLang text};
-	\node[box]   (lex) at (10,0)  {Lexer \\ \small Produces token stream};
-	\node[box]   (par) at (10,-5) {Parser \\ \small Builds AST via BinopPrecedence};
-	\node[box]   (ast) at (0,-5) {AST \\ \small Node / Expr / Statement tree};
-	\node[special] (con) at (0,-10)  {Consumption analysis [Destructive-read] \\ \small Marks consume\_a / consume\_b};
-	\node[box]   (ir) at (10,-10)   {LLVM IR \\ \small Emits call with consume flags};
-	\node[box]    (jit) at (10,-15)  {JIT / AOT \\ \small Compiles to machine code};
-	\node[box]   (link) at (0,-15) {Linking \\ \small Links MemoLang runtime};
-	\node[special] (gpu) at (0,-20)  {GPU kernel [Destructive-read] \\ \small frees consumed};
-	\draw[arr] (src) -- (lex);
-	\draw[arr] (lex) -- (par);
-	\draw[arr] (par) -- (ast);
-	\draw[arr] (ast) -- (con);
-	\draw[arr] (con) -- (ir);
-	\draw[arr] (ir) -- (jit);
-	\draw[arr] (jit) -- (link);
-	\draw[arr] (link) -- (gpu);
+		node distance=1.1cm and 1.3cm,   % vertical and horizontal gap between box borders
+		box/.style={
+			rectangle, draw, rounded corners,
+			text width=6.6cm,
+			minimum height=2.8cm,
+			inner sep=5pt,
+			align=center,
+			font=\normalsize
+		},
+		special/.style={box, fill=gray!20},
+		arr/.style={-{Latex[length=2mm]}, thick}
+		]
+		
+		\node[box] (src) {\textbf{Mã nguồn}\\
+			Văn bản thô viết theo cú pháp của ngôn ngữ; lỗi cú pháp được chuyển đến bộ chẩn đoán.};
+		\node[box, right=of src] (lex) {\textbf{Bộ phân tích từ vựng}\\
+			Tạo luồng token gồm các bộ (loại, giá trị, vị trí).};
+		\node[box, below=of lex] (par) {\textbf{Bộ phân tích cú pháp}\\
+			Phân tích đệ quy xuống kết hợp độ ưu tiên toán tử để xây dựng AST và báo lỗi.};
+		\node[box, left=of par] (ast) {\textbf{AST}\\
+			Cây các nút biểu thức và câu lệnh biểu diễn cấu trúc chương trình.};
+		\node[special, below=of ast] (con) {\textbf{Phân tích tiêu thụ [Đọc hủy]}\\
+			Đặt \texttt{consume\_a}/\texttt{consume\_b}; xem phần sau.};
+		\node[box, right=of con] (ir) {\textbf{LLVM IR}\\
+			Sinh các lời gọi thư viện chạy kèm cờ tiêu thụ.};
+		\node[box, below=of ir] (jit) {\textbf{JIT / AOT}\\
+			Biên dịch IR thành mã máy bằng bộ công cụ LLVM.};
+		\node[box, left=of jit] (link) {\textbf{Liên kết}\\
+			Liên kết mã đã biên dịch với thư viện chạy nhân ma trận đã biên dịch sẵn thành tệp thực thi có thể chạy trên GPU.};
+		\node[special, below=of link] (gpu) {\textbf{Kernel GPU [Đọc hủy]}\\
+			Thực hiện nhân ma trận và giải phóng các vùng đệm đã tiêu thụ.};
+		
+		\draw[arr] (src) -- (lex);
+		\draw[arr] (lex) -- (par);
+		\draw[arr] (par) -- (ast);
+		\draw[arr] (ast) -- (con);
+		\draw[arr] (con) -- (ir);
+		\draw[arr] (ir) -- (jit);
+		\draw[arr] (jit) -- (link);
+		\draw[arr] (link) -- (gpu);
 	\end{tikzpicture}
-	\caption{The memory pipeline, which encompasses the process from source text to GPU execution. Shaded figures denote where destructive-read semantics are relevant.}
+	\caption{Đường ống biên dịch của ngôn ngữ.}
 	\label{fig:pipeline}
-	\end{figure}
-	
-	\section{Maths and Algorithms}
-	
-	\subsection{Math Behind FP32 Matrix Multiplication}
-	
-	% TODO: Elaborate on FP32 accumulation, tiling, and precision considerations
-	% for the GEMM kernel.
-	
-	\subsection{The Free-on-Consume Scheme}
-	
-	% TODO: Formal or informal description of destructive read: once a matrix
-	% value is read (e.g., consumed by @), it can no longer be used unless
-	% explicitly cloned. Explain how this reduces peak memory usage, and how
-	% consume_a/consume_b flags are computed and passed to the runtime.
-	
-	\section{CUTLASS Integration}
-	
-	% TODO: Describe the pipeline: source -> lexer -> parser -> ExprAST ->
-	% LLVM IR -> JIT/AOT compilation -> CUTLASS call for MatMul kernels.
-	
-	\begin{table}[h]
+\end{figure}
+			
+
+	Phần front-end của trình biên dịch được viết bằng C++; mỗi giai đoạn được thiết kế trước, sau đó lập trình, rồi gỡ lỗi độc lập để tìm lỗi, cuối cùng mới lắp ráp theo từng mô-đun.
+	\section{Quá trình, xây dựng và kiểm thử}
+	\subsection{Quá trình}
+
+		\begin{table}[h]
 		\centering
-		\caption{Main Source Files}
+		\caption{Các tệp mã nguồn chính}
 		\label{tab:modules}
 		\begin{tabular}{ll}
 			\toprule
-			File & Purpose \\
+			Tệp & Mục đích \\
 			\midrule
-			\texttt{Lexer.h/.cpp} & Tokenizes MemoLang source \\
-			\texttt{Parser.h/.cpp} & Builds the AST \\
-			\texttt{ExprAST.h} & AST node definitions \\
-			\texttt{CodeGen.cpp} & LLVM IR generation \\
-			\texttt{CuBLASRuntime.cpp} & cuBLAS MatMul bindings \\
-			\texttt{main.cpp} & Driver / REPL \\
+			\texttt{Lexer.h/.cpp} & Tách token mã nguồn của ngôn ngữ \\
+			\texttt{Parser.h/.cpp} & Xây dựng AST \\
+			\texttt{ExprAST.h} & Định nghĩa các nút AST \\
+			\texttt{CodeGen.cpp} & Sinh LLVM IR \\
+			\texttt{CuBLASRuntime.cpp} & Liên kết (binding) MatMul của cuBLAS \\
+			\texttt{main.cpp} & Trình điều khiển / REPL \\
 			\bottomrule
 		\end{tabular}
 	\end{table}
 	
-	% TODO: Describe how MatMul expressions lower to LLVM IR, and how/when
-	% control transfers to CUTLASS (e.g., via an external function call inserted
-	% during codegen). Discuss the destructive-read buffer handoff to CUTLASS.
 	
-	\section{Verification}
 	
-	% TODO: Describe how correctness was tested (e.g., comparing MemoLang
-	% MatMul output against NumPy or cuBLAS reference results for various
-	% matrix sizes). Replace with a results table once available.
+	
+	\subsection{Kiểm thử}
 	
 	\begin{table}[h]
 		\centering
-		\caption{Correctness Test Results (Template)}
+		\caption{Kết quả kiểm thử tính đúng đắn}
 		\label{tab:verification}
 		\begin{tabular}{ll}
 			\toprule
-			Test Case & Result \\
+			Trường hợp kiểm thử & Kết quả \\
 			\midrule
-			$N \times N$ MatMul vs. reference & TBD \\
-			Destructive-read re-use error detection & TBD \\
-			Edge cases (empty, 1x1, non-square) & TBD \\
+			MatMul $N \times N$ so với tham chiếu (thông thường) & Chưa có \\
+			Phát hiện lỗi dùng lại giá trị đã đọc hủy (khi chạy) & Chưa có \\
+			Trường hợp biên (rỗng, 1x1, không vuông) & Chưa có \\
 			\bottomrule
 		\end{tabular}
 	\end{table}
+
+	MatMul $N \times $N so với tham chiếu (thông thường): Đánh giá một chuỗi phép nhân ma trận để kiểm tra chịu tải nhằm đánh giá cải thiện toàn trình.
+	Phát hiện lỗi dùng lại giá trị đã đọc hủy: Đánh giá khi chạy và khi biên dịch để phân loại lỗi.
+	Trường hợp biên: Đánh giá các trường hợp biên để kiểm tra chịu tải về tính tương thích và độ toàn diện của thuật toán.
 	
-	\section{Benchmarks}
 	
-	The benchmark evaluation is designed to distinguish improvements in memory management from improvements in matrix multiplication itself.
+	\subsection{Đánh giá hiệu năng (Benchmark)}
 	
-	Three primary implementations will be compared:
+	Việc đánh giá hiệu năng được thiết kế để phân biệt cải thiện về quản lý bộ nhớ với cải thiện của chính phép nhân ma trận.
+	
+	Ba triển khai chính sẽ được so sánh:
 	
 	\begin{enumerate}
-		\item An optimized GPU-library implementation used as a kernel-performance reference.
-		\item MemoLang using conventional non-destructive value semantics.
-		\item MemoLang using destructive-read semantics.
+		\item Một triển khai thư viện GPU đã tối ưu, dùng làm tham chiếu hiệu năng kernel.
+		\item Ngôn ngữ dùng ngữ nghĩa giá trị thông thường (không đọc hủy).
+		\item Ngôn ngữ dùng ngữ nghĩa đọc hủy.
 	\end{enumerate}
 	
-	Where appropriate, a simple C++ or CUDA implementation will also be included as a baseline.
+	Khi phù hợp, một triển khai C++ hoặc CUDA đơn giản cũng sẽ được đưa vào làm mốc cơ sở.
 	
-	The most important comparison is between the two MemoLang configurations. Both configurations perform the same mathematical operations and use the same underlying GPU matrix multiplication implementation. This comparison isolates the effect of destructive-read semantics more effectively than a comparison against an unrelated implementation.
+	Phép so sánh quan trọng nhất là giữa hai cấu hình của ngôn ngữ. Cả hai cấu hình thực hiện cùng các phép toán toán học và dùng cùng một triển khai nhân ma trận GPU bên dưới. Phép so sánh này cô lập ảnh hưởng của ngữ nghĩa đọc hủy tốt hơn so với việc so sánh với một triển khai không liên quan.
 	
-	The benchmark suite will include isolated matrix multiplications as well as chains of matrix operations. Matrix dimensions will include small, medium, large, and non-square matrices. This allows the evaluation to determine whether the effect of destructive reads depends on workload size.
+	Bộ benchmark sẽ gồm các phép nhân ma trận đơn lẻ cũng như các chuỗi phép toán ma trận. Kích thước ma trận sẽ gồm nhỏ, vừa, lớn và không vuông. Điều này cho phép đánh giá xem ảnh hưởng của đọc hủy có phụ thuộc vào quy mô khối lượng công việc hay không.
 	
-	The following measurements will be collected:
+	Các phép đo sau sẽ được thu thập:
 	
 	\begin{itemize}
-		\item GPU kernel execution time.
-		\item End-to-end execution time.
-		\item Peak GPU memory consumption.
-		\item Number of temporary-buffer allocations.
-		\item Number of buffer reuse events.
-		\item Host-to-device and device-to-host transfer time where applicable.
-		\item Compiler and runtime overhead.
-		\item Numerical error relative to a reference implementation.
+		\item Thời gian thực thi kernel GPU.
+		\item Thời gian thực thi toàn trình.
+		\item Mức tiêu thụ bộ nhớ GPU đỉnh.
+		\item Số lần cấp phát vùng đệm tạm.
+		\item Số lần tái sử dụng vùng đệm.
+		\item Thời gian truyền từ máy chủ sang thiết bị và ngược lại, khi có áp dụng.
+		\item Chi phí phát sinh của trình biên dịch và thư viện chạy.
+		\item Sai số số học so với triển khai tham chiếu.
+		\item Công suất tiêu thụ của GPU.
 	\end{itemize}
 	
-	GPU measurements will use multiple repetitions and appropriate warm-up iterations. CUDA initialization and compilation overhead will be separated from steady-state execution measurements where possible.
+	Các phép đo GPU sẽ dùng nhiều lần lặp và các vòng khởi động phù hợp. Chi phí khởi tạo CUDA \cite{CUDA} và biên dịch sẽ được tách khỏi các phép đo thực thi ở trạng thái ổn định khi có thể.
 	
-	The benchmark will report both absolute measurements and relative changes. No performance improvement will be attributed to destructive-read semantics unless the corresponding measurements support that interpretation.
+	Benchmark sẽ báo cáo cả số đo tuyệt đối và mức thay đổi tương đối. Không có cải thiện hiệu năng nào được quy cho ngữ nghĩa đọc hủy trừ khi các số đo tương ứng ủng hộ cách diễn giải đó.
 	
-
-
-	\subsection{Expected Relationship Between Language and MatMul Performance}
 	
-	Memory management benefits can be expected from a destructive-read semantics language. While arithmetic operations such as the Matrix Multiplication routine can be delegated to an optimized CUTLASS/cuBLAS kernel to circumvent \cite{futhark} Futhark's limitations. Implementation is expected to have no effect on the computational performance compared to implementation on other languages. End-end improvements, however, is expected to be present due to the optimization of the language including:
-	\begin{itemize} 
-		\item Reduced temporary allocation
-		\item Reduced buffer lifetime
-		\item Reduced GPU memory pressure
-	\end{itemize}
-	In theory, this implementation's effectiveness scales with the workloads, as immediate tensors or smaller matrix operations do not observe a significant impact from memory management compared to larger chained workloads.
 	
-	The expected execution time can be approximately decomposed as
+	\subsection{Mối quan hệ kỳ vọng giữa ngôn ngữ và hiệu năng MatMul}
+	
+	Thời gian thực thi kỳ vọng có thể được phân tách gần đúng như sau
 	
 	\begin{equation}
 		T_{\mathrm{total}} =
@@ -478,43 +515,54 @@
 		T_{\mathrm{kernel}}.
 	\end{equation}
 	
-	Destructive-read semantics primarily target $T_{\mathrm{memory}}$. They are not expected to substantially reduce $T_{\mathrm{kernel}}$ when the same optimized GPU kernel is used.
+	Ngữ nghĩa đọc hủy chủ yếu nhắm vào $T_{\mathrm{memory}}$. Chúng không được kỳ vọng làm giảm đáng kể $T_{\mathrm{kernel}}$ khi dùng cùng một kernel GPU đã tối ưu.
 	
-	For a large matrix multiplication, $T_{\mathrm{kernel}}$ may dominate the total execution time, resulting in little observable end-to-end improvement. For workloads containing many intermediate tensors or small matrix operations, however, $T_{\mathrm{memory}}$ and other runtime costs may become more significant.
+	Với một phép nhân ma trận lớn, $T_{\mathrm{kernel}}$ có thể chiếm phần lớn tổng thời gian thực thi, dẫn đến cải thiện toàn trình rất ít quan sát được. Tuy nhiên, với các khối lượng công việc chứa nhiều tensor trung gian hoặc các phép toán ma trận nhỏ, $T_{\mathrm{memory}}$ và các chi phí chạy khác có thể trở nên đáng kể hơn. 
+
+	Việc đánh giá hiệu quả của ngôn ngữ chủ yếu dựa vào việc đo $T_{\mathrm{memory}}$.
 	
-	Consequently, a successful result does not require MemoLang to make an individual matrix multiplication faster. A reduction in peak memory usage, allocation activity, or end-to-end overhead can constitute a meaningful result even when kernel execution time remains approximately unchanged.
 	
 	
 	
-		
-	\section{Evidence and Reproducibility}
+	\subsection{Bằng chứng và khả năng tái lập}
 	\label{sec:evidence}
 	
-	% TODO: List where logs, benchmark results, and build artifacts are saved
-	% (mirroring the "Evidence and Reproducibility" approach in hardware
-	% projects) so claims in this paper are traceable to saved output.
-	
-	
-	\section{Conclusion}
-	
-	% TODO: Summarize what was built and verified, and what remains as future
-	% work, tying claims back to saved evidence as in Section~\ref{sec:evidence}
-	% above.
-	
-	Potential real-world benefits include:
-	
+	Ví dụ biên dịch: 
+	\begin{lstlisting}[caption = Ví dụ biên dịch]
+	def basicadd(int i, int k) {
+		return i + k;
+		}
+	# Basic compilation of source code, addition only. No showcase of GEMMs or cuBLAS integration.
+	\end{lstlisting}
+	\section{Kết luận}
+
+	\subsection{Tiến độ}
+	Dự án đã hoàn thành một phần công việc đã lên kế hoạch, bao gồm bộ phân tích từ vựng, bộ phân tích cú pháp, AST và một trình điều khiển cơ bản. Thiết kế cho phần còn lại của đường ống đã được chốt, nhưng việc triển khai các tính năng ở phía sau của đường ống chưa bắt đầu do hạn chế về thời gian.
+
+\subsection{Công việc tương lai}
+	Các tính năng ở phía sau của đường ống, bao gồm việc tích hợp thư viện chạy nhân ma trận đã biên dịch sẵn, vẫn cần được triển khai. Các tính năng đang được lên kế hoạch như sau:
 	\begin{itemize}
-		\item Improved performance for matrix multiplication operations, supporting faster training and inference for machine learning models.
-		\item More effective compiler-driven reuse of intermediate tensor buffers.
-		\item Reduced run-time buffer and cache allocation overhead.
-	\end{itemize}
-	
-	
-	\subsection{Progress}
-	
-	% TODO: describe current progress of the project
-	
-	\addcontentsline{toc}{section}{\refname}
+		\item Kiểu vector và ma trận
+		\item Trình điều khiển chẩn đoán và bộ máy chẩn đoán
+		\item Phân tích tiêu thụ tĩnh (kiểm tra đọc hủy) và xử lý các vùng đệm và giá trị trung gian của kernel GPU
+		\item Liên kết với thư viện chạy nhân ma trận đã biên dịch sẵn để tạo tệp thực thi có khả năng khởi chạy kernel GPU
+		\item Tách phần sinh mã khỏi AST để việc hạ cấp mã sạch hơn
+		\item Các bước tối ưu hóa
+		\item Hệ thống macro (khai báo liên kết, trừu tượng hóa mẫu chuỗi nhân ma trận)
+\end{itemize}
+
+	\subsection{Ý nghĩa}
+		Dự án này vừa là một thí nghiệm nhằm khám phá các cải tiến tiềm năng cho phép toán GEMM trong các thuật toán học máy và AI, bổ sung cho thư viện cuBLAS \cite{cublas} vốn đã được tối ưu cao, vừa là một phản hồi trước một vấn đề rộng hơn của lĩnh vực này. Việc huấn luyện mô hình hiện nay tiêu tốn lượng bộ nhớ khổng lồ, và nhu cầu từ hạ tầng AI đã vượt quá nguồn cung chip nhớ toàn cầu, góp phần khiến giá DRAM và NAND tăng kéo dài, gây áp lực tài chính lên các công ty CNTT, các tổ chức nghiên cứu khoa học và người tiêu dùng \cite{DRAM_PRICE}. 
+		 Các thuật toán tính toán GEMM đã được tối ưu đến \emph{gần giới hạn lý thuyết} về thông lượng thô; nghiên cứu này thay vào đó nhắm vào hiệu quả bộ nhớ, dùng một hệ thống sở hữu mới để giảm dung lượng bộ nhớ cần thiết cho mỗi khối lượng công việc, như một đóng góp nhằm giảm bớt áp lực từ phía cầu vốn đang gây ra tình trạng thiếu hụt bộ nhớ hiện nay.
+
+	\subsection{Tính mới}
+		\begin{enumerate}
+			\item Sản phẩm được xây dựng dựa trên những ý tưởng đã có như kiểu tuyến tính và quyền sở hữu. Tính mới của dự án nằm ở việc áp dụng các ý tưởng đó để giải phóng và quản lý vùng đệm GPU, bằng cơ chế đọc hủy được kiểm tra tĩnh khi biên dịch. 
+			\item Dự án tiếp cận đề tài theo hướng vừa thử nghiệm với \emph{hệ thống kiểu tuyến tính chặt chẽ} vừa để chế tạo.
+		\end{enumerate}
+
+		
+
 	\begin{thebibliography}{9}
 		\bibitem{DybdahlKGN06}
 		Haakon Dybdahl, Per Gunnar Kjeldsberg, Marius Grann{\ae}s, and Lasse Natvig,
@@ -526,22 +574,28 @@
 		
 		\bibitem{llvm}
 		LLVM Project, ``The LLVM Compiler Infrastructure.'' \url{https://llvm.org}
-		
-		\bibitem{clean}
-		Clean Language Team, ``The Clean Programming Language.'' \url{https://clean.cs.ru.nl}
-		
-		\bibitem{sere}
-		Sere Language Project, ``Sere Programming Language.'' \url{https://clean-lang.org}
-		
+
 		\bibitem{rust}
 		N.~D.~Matsakis and F.~S.~Klock, ``The Rust language,'' in \emph{Proc. ACM SIGAda Ada Letters}, 2014. \url{https://www.rust-lang.org}
 		
 		\bibitem{futhark}
 		T.~Henriksen, N.~G.~W.~Serup, M.~Elsman, F.~Henglein, and C.~E.~Oancea, ``Futhark: purely functional GPU-programming with nested parallelism and in-place array updates,'' in \emph{Proc. 38th ACM SIGPLAN Conference on Programming Language Design and Implementation (PLDI)}, 2017. \url{https://futhark-lang.org}
-		
-		\bibitem{memolang}
-		Independent Interpreter Project, ``MemoLang: source and benchmark evidence,'' project repository, September 2026.
-		
+
+		\bibitem{Mixed-precision training}
+		NVIDIA, ''Mixed-precision training.'' \url{https://docs.nvidia.com/deeplearning/performance/mixed-precision-training/index.html}
+
+		\bibitem{nvidia_accuracy}
+		NVIDIA, ``Accuracy Considerations''
+		\url{https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/accuracy-considerations.html},
+
+		\bibitem{DRAM_PRICE}
+		TrendForce, ``Memory Price Outlook for 1Q26 Sharply Upgraded,''
+		\url{https://www.trendforce.com/presscenter/news/20260202-12911.html},
+
+		\bibitem{CUDA}
+		NVIDIA, ``CUDA ''
+		\url{https://developer.nvidia.com/cuda/toolkit}
+
 	\end{thebibliography}
 	
 \end{document}

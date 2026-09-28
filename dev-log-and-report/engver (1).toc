@@ -16,3 +16,4 @@
 \contentsline {subsection}{\numberline {IV.1}Tiến độ}{12}{}%
 \contentsline {subsection}{\numberline {IV.2}Công việc tương lai}{12}{}%
 \contentsline {subsection}{\numberline {IV.3}Ý nghĩa}{12}{}%
+\contentsline {subsection}{\numberline {IV.4}Tính mới}{13}{}%
