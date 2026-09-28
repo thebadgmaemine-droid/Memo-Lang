@@ -1,0 +1,18 @@
+\contentsline {section}{\numberline {I}Question}{4}{}%
+\contentsline {subsection}{\numberline {I.1}Algorithm}{6}{}%
+\contentsline {section}{\numberline {II}Design and methodology}{6}{}%
+\contentsline {subsection}{\numberline {II.1}Destructive-Read Semantics}{7}{}%
+\contentsline {subsection}{\numberline {II.2}Compiler and Runtime Architecture}{7}{}%
+\contentsline {subsection}{\numberline {II.3} Syntax Design }{7}{}%
+\contentsline {subsection}{\numberline {II.4}The Free-on-Consume Scheme and cuBLAS runtime}{8}{}%
+\contentsline {subsection}{\numberline {II.5} Pipeline }{9}{}%
+\contentsline {section}{\numberline {III}Process, creation and testing}{10}{}%
+\contentsline {subsection}{\numberline {III.1}Process}{10}{}%
+\contentsline {subsection}{\numberline {III.2}Testing}{10}{}%
+\contentsline {subsection}{\numberline {III.3}Benchmarks}{10}{}%
+\contentsline {subsection}{\numberline {III.4}Expected Relationship Between Language and MatMul Performance}{11}{}%
+\contentsline {subsection}{\numberline {III.5}Evidence and Reproducibility}{12}{}%
+\contentsline {section}{\numberline {IV}Conclusion}{12}{}%
+\contentsline {subsection}{\numberline {IV.1}Progress}{12}{}%
+\contentsline {subsection}{\numberline {IV.2}Future work}{12}{}%
+\contentsline {subsection}{\numberline {IV.3}Meaning}{12}{}%
