@@ -8,8 +8,8 @@
 \singlespacing
 \setlength{\parskip}{3pt}
 \setlength{\parindent}{0pt}
-\renewcommand{\normalsize}{\fontsize{13pt}{15.6pt}\selectfont}
-\normalsize
+\usepackage[fontsize=13pt]{fontsize}
+\usepackage{url}
 
 \usepackage{tikz}
 \usetikzlibrary{
@@ -217,7 +217,7 @@
 	\end{abstract}
 	
 	
-	\section{Novelty}
+	\section{Question}
 	
 	Our main goal is to directly link the precompiled \emph{cuBLAS runtime library}	 for a specific application, evaluated with a specific methodology, under an enforcement model resembling a \emph{ strictly linear type system}. Other languages have pursued related consumption-tracking semantics: Rust's ownership system~\cite{rust} enforces a comparable use-once discipline through its affine type system, and Futhark~\cite{futhark} is a purely functional array language that uses uniqueness types to support safe in-place updates. Futhark, however, generates its own GPU kernels from source rather than integrating with external, independently maintained high-performance libraries such as cuBLAS, a limitation that has been noted as one of the practical hurdles of the language. The language instead separates compile-time consumption analysis from kernel execution.
 	
@@ -255,7 +255,7 @@
 		\item Reduced run-time buffer and cache allocation overhead.
 	\end{itemize}
 	
-	\section{Background}
+	\subsection{Algorithm}
 	
 	Matrix multiplication can be written as
 	
@@ -274,7 +274,7 @@
 	While that result is specific to a hardware memory system, it motivates the broader question this project investigates: whether a comparable consume-on-read discipline, applied at the software/interpreter level for GEMM-heavy workloads, can yield similar results?
 	
 	
-	\section{Project Goal}
+	\section{Design and methodology}
 	
 	The goal of the language is to determine whether language-level destructive-read semantics can provide measurable memory-management benefits for matrix-oriented GPU programs while retaining the performance of optimized matrix multiplication kernels.
 	
@@ -316,7 +316,7 @@
 	
 	The language therefore treats destructive reads as an explicit ownership mechanism rather than assuming that consuming every operand will necessarily improve performance.
 	
-	\section{Compiler and Runtime Architecture}
+	\subsection{Compiler and Runtime Architecture}
 	
 	\subsection{ Syntax Design }
 	
@@ -370,119 +370,61 @@
 	\end{itemize}
 
 	
-	\section{File structure}
-	
 	\subsection{ Pipeline } 
 	\begin{figure}[H]
-		\centering
-		\begin{tikzpicture}[
-			node distance=5cm,
-			box/.style={
-				rectangle,
-				draw,
-				rounded corners,
-				minimum width=6.3cm,
-				text width=6.3cm,
-				minimum height=3cm,
-				align=left,
-				font=\normalsize
-			},
-			special/.style={
-				box,
-				fill=gray!20
-			},
-			arr/.style={
-				-{Latex[length=1.5mm]}
-			}
-			]
-			
-			\node[box] (src) at (0,0) {
-				\centering\textbf{Source}\\
-				\small Raw text\\
-				Text is written according to the syntax.\\
-				\small Any syntax error will be picked up by the diagnostic engine to be shown.
-			};
-			
-			\node[box] (lex) at (10,0) {
-				\centering\textbf{Lexer}\\
-				\small Produces token stream. Each token is a tuple of
-				(type, value, location), which will be used by the parser
-				to build the AST.
-			};
-			
-			\node[box] (par) at (10,-5) {
-				\centering\textbf{Parser}\\
-				\small Builds AST via BinopPrecedence parsing algorithm.\\
-				\small The parser also performs semantic checks and reports errors.
-				The language uses a recursive-descent parser.
-			};
-			
-			\node[box] (ast) at (0,-5) {
-				\centering\textbf{AST}\\
-				\small Node / Expr / Statement tree\\[2mm]
-				\small The AST is a tree structure that represents the source code
-				in a hierarchical manner. Each node in the tree corresponds to a
-				construct in the source code, such as an expression or statement.\\
-				\small The AST is used by the compiler to generate LLVM IR and
-				perform optimizations.
-			};
-			
-			\node[special] (con) at (0,-10) {
-				\centering\textbf{Consumption analysis [Destructive-read]}\\
-				\small Marks \texttt{consume\_a} / \texttt{consume\_b}.\\
-				\small Consumption analysis will be discussed in the next section.
-			};
-			
-			\node[box] (ir) at (10,-10) {
-				\centering\textbf{LLVM IR}\\
-				\small Emits calls with consume flags.\\
-				\small LLVM IR is a low-level intermediate representation of the
-				source code used by LLVM to generate machine code. The IR is
-				generated from the AST and includes information about types and
-				operations. It is then passed to the JIT/AOT compiler for further
-				optimization and code generation.
-			};
-			
-			\node[box] (jit) at (10,-15) {
-				\centering\textbf{JIT / AOT}\\
-				\small Compiles to machine code using LLVM toolchain.
-			};
-			
-			\node[box] (link) at (0,-15) {
-				\centering\textbf{Linking}\\
-				\small Links language runtime to the precompiled cuBLAS runtime
-				library.\\
-				\small The linking process combines the compiled language code
-				with the precompiled cuBLAS library to create an executable that
-				can be run on the GPU. The language cannot run the GPU kernel
-				natively.
-			};
-			
-			\node[special] (gpu) at (0,-20) {
-				\centering\textbf{GPU kernel [Destructive-read]}\\
-				\small Frees consumed buffers.\\
-				\small The language handles end-to-end memory management,
-				including the destruction of consumed buffers. The GPU kernel
-				handles matrix multiplication while the language handles memory
-				management of the buffers used by the kernel.
-			};
-			
-			\draw[arr] (src) -- (lex);
-			\draw[arr] (lex) -- (par);
-			\draw[arr] (par) -- (ast);
-			\draw[arr] (ast) -- (con);
-			\draw[arr] (con) -- (ir);
-			\draw[arr] (ir) -- (jit);
-			\draw[arr] (jit) -- (link);
-			\draw[arr] (link) -- (gpu);
-			
-		\end{tikzpicture}
+	\centering
+	\begin{tikzpicture}[
+		node distance=1.1cm and 1.3cm,   % vertical and horizontal gap between box borders
+		box/.style={
+			rectangle, draw, rounded corners,
+			text width=6.6cm,
+			minimum height=2.8cm,
+			inner sep=5pt,
+			align=center,
+			font=\normalsize
+		},
+		special/.style={box, fill=gray!20},
+		arr/.style={-{Latex[length=2mm]}, thick}
+		]
 		
-		\caption{The memory pipeline, which encompasses the process from source text to GPU execution. Shaded figures denote where destructive-read semantics are relevant.}
-		\label{fig:pipeline}
-	\end{figure}
+		\node[box] (src) {\textbf{Source}\\
+			Raw text written in the language's syntax; syntax errors go to the diagnostic engine.};
+		\node[box, right=of src] (lex) {\textbf{Lexer}\\
+			Produces a token stream of (type, value, location) tuples.};
+		\node[box, below=of lex] (par) {\textbf{Parser}\\
+			Recursive descent with operator-precedence parsing builds the AST and reports errors.};
+		\node[box, left=of par] (ast) {\textbf{AST}\\
+			Tree of expression and statement nodes representing the program's structure.};
+		\node[special, below=of ast] (con) {\textbf{Consumption analysis [Destructive-read]}\\
+			Sets \texttt{consume\_a}/\texttt{consume\_b}; see next section.};
+		\node[box, right=of con] (ir) {\textbf{LLVM IR}\\
+			Emits runtime calls carrying the consume flags.};
+		\node[box, below=of ir] (jit) {\textbf{JIT / AOT}\\
+			Compiles the IR to machine code with the LLVM toolchain.};
+		\node[box, left=of jit] (link) {\textbf{Linking}\\
+			Links compiled code with the precompiled matmul runtime library into a GPU-capable executable.};
+		\node[special, below=of link] (gpu) {\textbf{GPU kernel [Destructive-read]}\\
+			Runs matmul and frees consumed buffers.};
+		
+		\draw[arr] (src) -- (lex);
+		\draw[arr] (lex) -- (par);
+		\draw[arr] (par) -- (ast);
+		\draw[arr] (ast) -- (con);
+		\draw[arr] (con) -- (ir);
+		\draw[arr] (ir) -- (jit);
+		\draw[arr] (jit) -- (link);
+		\draw[arr] (link) -- (gpu);
+	\end{tikzpicture}
+	\caption{Compilation pipeline of the language.}
+	\label{fig:pipeline}
+\end{figure}
+			
 
-	\begin{table}[h]
+	The compiler front-end is written in C++, each stage is first designed, then coded, then debugged independantly to look for errors and the assembled modularly.
+	\section{Process, creation and testing}
+	\subsection{Process}
+
+		\begin{table}[h]
 		\centering
 		\caption{Main Source Files}
 		\label{tab:modules}
@@ -500,8 +442,10 @@
 		\end{tabular}
 	\end{table}
 	
-	\section{Verification}
 	
+	
+	
+	\subsection{Testing}
 	
 	\begin{table}[h]
 		\centering
@@ -523,7 +467,7 @@
 	Edge cases: Evaluate edgecases to stress test compatability and thoroughness of the algorithm.
 	
 	
-	\section{Benchmarks}
+	\subsection{Benchmarks}
 	
 	The benchmark evaluation is designed to distinguish improvements in memory management from improvements in matrix multiplication itself.
 	
@@ -555,7 +499,7 @@
 		\item GPU power draw.
 	\end{itemize}
 	
-	GPU measurements will use multiple repetitions and appropriate warm-up iterations. CUDA initialization and compilation overhead will be separated from steady-state execution measurements where possible.
+	GPU measurements will use multiple repetitions and appropriate warm-up iterations. CUDA \cite{} initialization and compilation overhead will be separated from steady-state execution measurements where possible.
 	
 	The benchmark will report both absolute measurements and relative changes. No performance improvement will be attributed to destructive-read semantics unless the corresponding measurements support that interpretation.
 	
@@ -576,14 +520,16 @@
 	Destructive-read semantics primarily target $T_{\mathrm{memory}}$. They are not expected to substantially reduce $T_{\mathrm{kernel}}$ when the same optimized GPU kernel is used.
 	
 	For a large matrix multiplication, $T_{\mathrm{kernel}}$ may dominate the total execution time, resulting in little observable end-to-end improvement. For workloads containing many intermediate tensors or small matrix operations, however, $T_{\mathrm{memory}}$ and other runtime costs may become more significant. 
+
+	Deducing the language's effectiveness primarily relies on measuring $T_{\mathrm{memory}}$.
 	
 	
 	
 	
-	\section{Evidence and Reproducibility}
+	\subsection{Evidence and Reproducibility}
 	\label{sec:evidence}
 	
-	Add an example build here: 
+	Example build: 
 	\begin{lstlisting}[caption = Example compilation]
 	def basicadd(int i, int k) {
 		return i + k;
@@ -612,11 +558,11 @@
 
 	\subsection{Meaning}
 		This project serves both as an experiment to explore potential improvements to GEMM operations for
-		machine learning and AI algorithms, complementing the already highly-optimized cuBLAS library, and
+		machine learning and AI algorithms, complementing the already highly-optimized cuBLAS \cite{cublas} library, and
 		as a response to a broader problem in the field. Current model training consumes massive amounts of
 		memory, and demand from AI infrastructure has outpaced global memory chip supply, contributing to a
 		sustained rise in DRAM and NAND prices that has placed financial pressure on IT firms, scientific
-		research institutions, and consumers alike [12]. 
+		research institutions, and consumers alike \cite{DRAM_PRICE}. 
 		 Computing algorithms for GEMM operations are already
 		optimized to \emph{near theoretical limits} in raw throughput; this research instead targets memory
 		efficiency, using a novel ownership system to reduce the memory footprint required per workload,
@@ -663,6 +609,10 @@
 		\bibitem{DRAM_PRICE}
 		TrendForce, ``Memory Price Outlook for 1Q26 Sharply Upgraded,''
 		\url{https://www.trendforce.com/presscenter/news/20260202-12911.html},
+
+		\bibitem{CUDA}
+		NVIDIA, ``CUDA ''
+		\url{https://developer.nvidia.com/cuda/toolkit}
 
 	\end{thebibliography}
 	

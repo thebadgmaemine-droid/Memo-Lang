@@ -1,1 +1,0 @@
-\contentsline {figure}{\numberline {1}{\ignorespaces The memory pipeline, which encompasses the process from source text to GPU execution. Shaded figures denote where destructive-read semantics are relevant.}}{9}{}%

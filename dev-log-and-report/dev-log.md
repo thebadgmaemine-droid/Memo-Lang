@@ -91,3 +91,107 @@ Haakon Dybdahl, Per Gunnar Kjeldsberg, Marius Grann{\ae}s, and Lasse Natvig,
 		``Destructive-read in embedded DRAM, impact on power consumption,''
 		\emph{Journal of Embedded Computing}, vol.~2, no.~1, pp.~83--96, 2006.
 
+```latex
+\begin{figure}[H]
+		\centering
+		\begin{tikzpicture}[
+			node distance=5cm,
+			box/.style={
+				rectangle,
+				draw,
+				rounded corners,
+				minimum width=6.3cm,
+				text width=6.3cm,
+				minimum height=2.6cm,
+				align=left,
+				font=\normalsize
+			},
+			special/.style={
+				box,
+				fill=gray!20
+			},
+			arr/.style={
+				-{Latex[length=1.5mm]}
+			}
+			]
+			
+			\node[box] (src) at (0,0) {
+				\centering\textbf{Source}\\
+				\small Raw text\\
+				Text is written according to the syntax.\\
+				\small Any syntax error will be picked up by the diagnostic engine to be shown.
+			};
+			
+			\node[box] (lex) at (10,0) {
+				\centering\textbf{Lexer}\\
+				\small Produces token stream. Each token is a tuple of
+				(type, value, location), which will be used by the parser
+				to build the AST.
+			};
+			
+			\node[box] (par) at (10,-5) {
+				\centering\textbf{Parser}\\
+				\small Builds AST via BinopPrecedence parsing algorithm.\\
+				\small The parser also performs semantic checks and reports errors.
+				The language uses a recursive-descent parser.
+			};
+			
+			\node[box] (ast) at (0,-5) {
+				\centering\textbf{AST}\\
+				\small Node / Expr / Statement tree\\[2mm]
+				\small The AST is a tree structure that represents the source code
+				in a hierarchical manner. Each node in the tree corresponds to a
+				construct in the source code, such as an expression or statement.\\
+				\small The AST is used by the compiler to generate LLVM IR and
+				perform optimizations.
+			};
+			
+			\node[special] (con) at (0,-10) {
+				\centering\textbf{Consumption analysis [Destructive-read]}\\
+				\small Marks \texttt{consume\_a} / \texttt{consume\_b}.\\
+				\small Consumption analysis will be discussed in the next section.
+			};
+			
+			\node[box] (ir) at (10,-10) {
+				\centering\textbf{LLVM IR}\\
+				\small Emits calls with consume flags.\\
+				\small LLVM IR is a low-level intermediate representation of the
+				source code used by LLVM to generate machine code. The IR is
+				generated from the AST and includes information about types and
+				operations. It is then passed to the JIT/AOT compiler for further
+				optimization and code generation.
+			};
+			
+			\node[box] (jit) at (10,-15) {
+				\centering\textbf{JIT / AOT}\\
+				\small Compiles to machine code using LLVM toolchain.
+			};
+			
+			\node[box] (link) at (0,-15) {
+				\centering\textbf{Linking}\\
+				\small Links language runtime to the precompiled cuBLAS runtime
+				library.The linking process combines the compiled language code
+				with the precompiled cuBLAS library to create an executable that
+				can be run on the GPU. 
+			};
+			
+			\node[special] (gpu) at (0,-20) {
+				\centering\textbf{GPU kernel [Destructive-read]}\\
+				\small Frees consumed buffers.\\
+				\small The language handles end-to-end memory management,
+				including the destruction of consumed buffers. The GPU kernel
+				handles matrix multiplication while the language handles memory
+				management of the buffers used by the kernel.
+			};
+			
+			\draw[arr] (src) -- (lex);
+			\draw[arr] (lex) -- (par);
+			\draw[arr] (par) -- (ast);
+			\draw[arr] (ast) -- (con);
+			\draw[arr] (con) -- (ir);
+			\draw[arr] (ir) -- (jit);
+			\draw[arr] (jit) -- (link);
+			\draw[arr] (link) -- (gpu);
+
+aDJUST THE SPACING
+Prompt to claude 28/9/2026
