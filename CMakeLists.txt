@@ -30,7 +30,7 @@ if(MEMOLANG_USE_LLVM)
     llvm_map_components_to_libnames(llvm_libs support core irreader)
 endif()
 
-add_executable(MemoLang main.cpp)
+add_executable(MemoLang main.cpp Include/Source/AST.cpp)
 
 set(MEMOLANG_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/Include

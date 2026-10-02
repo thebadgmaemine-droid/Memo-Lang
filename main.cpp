@@ -1,6 +1,16 @@
 ﻿#include "AST.h"
 #include "parser.h"
 
+#include "llvm/ADT/APFloat.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Support/raw_ostream.h"
+
 using namespace llvm_frontend;
 
 // Initialize globals
