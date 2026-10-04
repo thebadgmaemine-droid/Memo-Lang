@@ -580,7 +580,7 @@ public:
     void accept(Visitor& v) const override { v.visit(*this); }
 
 private:
-    std::string name_;
+    static std::string name_; // name_ is here bro wdym?
     std::vector<Param> params_;
     std::unique_ptr<TypeExpr> returnType_;
     std::vector<std::unique_ptr<Statement>> body_;
