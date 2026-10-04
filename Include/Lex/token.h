@@ -16,6 +16,9 @@ class Token {
     [[nodiscard]] SourceRange range() const;
     [[nodiscard]] SourceLocation location() const;
     [[nodiscard]] std::string_view spelling() const;
+
+    private:
+    
 }
 }
 #endif // TOKEN_H_
