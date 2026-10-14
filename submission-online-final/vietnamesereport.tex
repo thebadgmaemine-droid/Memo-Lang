@@ -189,6 +189,7 @@
 			AST     & Abstract Syntax Tree & Cây cú pháp trừu tượng \\
 			cuBLAS  & CUDA Basic Linear Algebra Subprograms & Thư viện đại số tuyến tính cơ bản trên CUDA \\
 			CUDA    & Compute Unified Device Architecture & Nền tảng tính toán song song trên GPU của NVIDIA \\
+			CUTLASS & CUDA Templates for Linear Algebra Subroutines & Thư viện mẫu C++ mã nguồn mở của NVIDIA cho các kernel GEMM \\
 			DRAM    & Dynamic Random-Access Memory & Bộ nhớ truy cập ngẫu nhiên động \\
 			FFI     & Foreign Function Interface & Giao diện gọi hàm giữa các ngôn ngữ \\
 			GEMM    & General Matrix Multiplication & Phép nhân ma trận tổng quát \\
@@ -258,6 +259,8 @@
 	Điểm mới của dự án là liên kết trực tiếp \emph{thư viện runtime cuBLAS}~\cite{cublas} đã được biên dịch sẵn cho một ứng dụng cụ thể, được đánh giá bằng một phương pháp cụ thể, theo một mô hình ràng buộc tương tự \emph{hệ thống kiểu tuyến tính nghiêm ngặt}. Một số ngôn ngữ khác cũng đã sử dụng các ngữ nghĩa để theo dõi việc tiêu thụ tương tự: hệ thống sở hữu (ownership) của Rust~\cite{rust} áp đặt nguyên tắc chỉ sử dụng một lần thông qua hệ thống kiểu affine (biến thể nới lỏng của hệ thống kiểu tuyến tính, chỉ sử dụng biến số một lần duy nhất), và Futhark~\cite{futhark} -- một ngôn ngữ mảng thuần hàm sử dụng kiểu duy nhất (uniqueness types) để hỗ trợ cập nhật tại chỗ một cách an toàn.
 	
 	Tuy nhiên, một hạn chế của Futhark trong quá trình vận hành là việc hệ thống tự sinh các kernel (nhân) GPU từ mã nguồn thay vì tích hợp với các thư viện hiệu năng cao bên ngoài được duy trì độc lập như cuBLAS, bởi vậy nó được xem là một trong những trở ngại thực tiễn của ngôn ngữ này. Ngược lại, ngôn ngữ của chúng em tách biệt quá trình phân tích tiêu thụ tại thời điểm biên dịch khỏi quá trình thực thi kernel.
+
+	Bên cạnh cuBLAS, một kernel GEMM riêng sẽ được tích hợp trực tiếp bằng \emph{CUTLASS}~\cite{cutlass} -- thư viện mẫu (template) mã nguồn mở của NVIDIA cho phép toán GEMM. Do các kernel CUTLASS được khởi tạo tại thời điểm biên dịch thay vì được gọi như các hàm biên dịch sẵn không thể can thiệp, hướng tiếp cận này cho phép runtime kiểm soát trực tiếp các bộ đệm toán hạng và bộ đệm làm việc (workspace), nhờ đó các bộ đệm đã bị tiêu thụ có thể được giải phóng hoặc tái sử dụng ở mức chi tiết hơn so với giao diện của cuBLAS. Cũng như cuBLAS, CUTLASS là một thư viện bên ngoài được duy trì độc lập, vì vậy ngôn ngữ vẫn không cần tự sinh kernel từ mã nguồn.
 	
 	\section{Cơ sở lý thuyết}
 	
@@ -359,7 +362,7 @@
 			\node[box, below=of ir] (jit) {\textbf{JIT / AOT}\\
 				Biên dịch IR sang mã máy bằng bộ công cụ LLVM.};
 			\node[box, left=of jit] (link) {\textbf{Liên kết}\\
-				Liên kết mã đã biên dịch với thư viện runtime nhân ma trận biên dịch sẵn thành tệp thực thi chạy được trên GPU.};
+				Liên kết mã đã biên dịch với thư viện runtime nhân ma trận biên dịch sẵn (cuBLAS) và kernel GEMM CUTLASS thành tệp thực thi chạy được trên GPU.};
 			\node[special, below=of link] (gpu) {\textbf{Kernel GPU [Đọc phá hủy]}\\
 				Thực hiện nhân ma trận và giải phóng các bộ đệm đã tiêu thụ.};
 			
@@ -384,6 +387,13 @@
 		\item cuBLAS cần được liên kết động.
 		\item Chương trình điều khiển (driver) cần liên kết và được phân phối kèm các tệp nhị phân đã biên dịch của cuBLAS.
 		\item Để thuận tiện, chương trình được phân phối dưới dạng một tệp đóng gói.
+	\end{itemize}
+
+	Đối với kernel GEMM riêng sử dụng CUTLASS:
+	\begin{itemize}
+		\item Kernel được xây dựng từ các mẫu CUTLASS và biên dịch cùng với runtime, thay vì được liên kết dưới dạng tệp nhị phân dựng sẵn.
+		\item Runtime truyền các cờ tiêu thụ vào hàm bao (wrapper) của kernel để các toán hạng đã bị tiêu thụ có thể được giải phóng hoặc tái sử dụng làm bộ đệm đầu ra hay bộ đệm làm việc.
+		\item cuBLAS và kernel CUTLASS được đo đạc, so sánh với nhau trên cùng các khối lượng công việc.
 	\end{itemize}
 	
 	\begin{table}[H]
@@ -548,6 +558,7 @@
 		\item Chương trình điều khiển chẩn đoán và bộ chẩn đoán (diagnostic engine)
 		\item Phân tích tiêu thụ tĩnh (kiểm tra đọc phá hủy) và xử lý các bộ đệm cũng như giá trị trung gian của kernel GPU
 		\item Liên kết với runtime nhân ma trận đã biên dịch sẵn để tạo ra tệp thực thi có khả năng khởi chạy kernel GPU
+		\item Tích hợp trực tiếp một kernel GEMM riêng sử dụng CUTLASS, có tái sử dụng bộ đệm dựa trên phân tích tiêu thụ
 		\item Tách quá trình sinh mã khỏi AST để việc hạ cấp mã (lowering) rõ ràng hơn
 		\item Các lượt tối ưu (optimization passes)
 		\item Hệ thống macro (khai báo liên kết, trừu tượng hóa mẫu chuỗi nhân ma trận)
@@ -569,6 +580,9 @@
 		\bibitem{cublas}
 		NVIDIA, ``cuBLAS Library.'' \url{https://developer.nvidia.com/cublas}
 		
+		\bibitem{cutlass}
+		NVIDIA, ``CUTLASS: CUDA Templates for Linear Algebra Subroutines.'' \url{https://github.com/NVIDIA/cutlass}
+
 		\bibitem{llvm}
 		LLVM Project, ``The LLVM Compiler Infrastructure.'' \url{https://llvm.org}
 		

@@ -187,6 +187,7 @@
 			AST     & Abstract Syntax Tree & Tree representation of the structure of source code \\
 			cuBLAS  & CUDA Basic Linear Algebra Subprograms & NVIDIA's GPU-accelerated linear algebra library \\
 			CUDA    & Compute Unified Device Architecture & NVIDIA's parallel computing platform for GPUs \\
+			CUTLASS & CUDA Templates for Linear Algebra Subroutines & NVIDIA's open-source C++ template library for GEMM kernels \\
 			DRAM    & Dynamic Random-Access Memory & Main memory that must be periodically refreshed \\
 			FFI     & Foreign Function Interface & Mechanism for calling functions written in another language \\
 			GEMM    & General Matrix Multiplication & Standard routine for multiplying two matrices \\
@@ -253,6 +254,8 @@
 	\subsection{Novelty}
 	
 	The novelty of the project lies in directly linking the precompiled \emph{cuBLAS runtime library}~\cite{cublas} for a specific application, evaluated with a specific methodology, under an enforcement model resembling a \emph{strictly linear type system}. Other languages have pursued related consumption-tracking semantics: Rust's ownership system~\cite{rust} enforces a comparable use-once discipline through its affine type system, and Futhark~\cite{futhark} is a purely functional array language that uses uniqueness types to support safe in-place updates. Futhark, however, generates its own GPU kernels from source rather than integrating with external, independently maintained high-performance libraries such as cuBLAS, a limitation that has been noted as one of the practical hurdles of the language. The language instead separates compile-time consumption analysis from kernel execution.
+
+	In addition to cuBLAS, a separate GEMM kernel will be integrated directly using \emph{CUTLASS}~\cite{cutlass}, NVIDIA's open-source template library for GEMM. Because CUTLASS kernels are instantiated at compile time rather than called as opaque precompiled routines, this path gives the runtime direct control over operand and workspace buffers, allowing consumed buffers to be released or reused at a finer granularity than the cuBLAS interface permits. Like cuBLAS, CUTLASS is an external, independently maintained library, so the language still avoids generating its own kernels from source.
 	
 	\section{Background}
 	
@@ -354,7 +357,7 @@
 			\node[box, below=of ir] (jit) {\textbf{JIT / AOT}\\
 				Compiles the IR to machine code with the LLVM toolchain.};
 			\node[box, left=of jit] (link) {\textbf{Linking}\\
-				Links compiled code with the precompiled matmul runtime library into a GPU-capable executable.};
+				Links compiled code with the precompiled matmul runtime library (cuBLAS) and the CUTLASS GEMM kernel into a GPU-capable executable.};
 			\node[special, below=of link] (gpu) {\textbf{GPU kernel [Destructive-read]}\\
 				Runs matmul and frees consumed buffers.};
 			
@@ -379,6 +382,13 @@
 		\item cuBLAS should be dynamically linked.
 		\item Driver should link and ship with compiled binaries from cuBLAS.
 		\item For convenience, distributed as a packaged file.
+	\end{itemize}
+
+	For the separate CUTLASS GEMM kernel:
+	\begin{itemize}
+		\item The kernel is built from CUTLASS templates and compiled together with the runtime, rather than linked as a prebuilt binary.
+		\item The runtime passes consume flags to the kernel wrapper so that consumed operands can be freed or reused as the output or workspace buffer.
+		\item cuBLAS and the CUTLASS kernel are benchmarked against each other on the same workloads.
 	\end{itemize}
 	
 	\begin{table}[H]
@@ -546,6 +556,7 @@
 		\item A diagnostic driver and diagnostic engine
 		\item Static consumption analysis (destructive-read checking) and handling of GPU kernel buffers and intermediates
 		\item Linking against the precompiled matmul runtime to produce an executable capable of launching the GPU kernel
+		\item Direct integration of a separate GEMM kernel using CUTLASS, with consumption-aware buffer reuse
 		\item Separation of code generation from the AST for cleaner lowering
 		\item Optimization passes
 		\item A macro system (link declarations, matmul-chain pattern abstraction)
@@ -578,6 +589,9 @@
 		\bibitem{cublas}
 		NVIDIA, ``cuBLAS Library.'' \url{https://developer.nvidia.com/cublas}
 		
+		\bibitem{cutlass}
+		NVIDIA, ``CUTLASS: CUDA Templates for Linear Algebra Subroutines.'' \url{https://github.com/NVIDIA/cutlass}
+
 		\bibitem{llvm}
 		LLVM Project, ``The LLVM Compiler Infrastructure.'' \url{https://llvm.org}
 		
