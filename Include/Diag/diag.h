@@ -19,6 +19,14 @@ enum class Severity { Note, Warning, Error };
     return "error";
 }
 
+// Quotes source text for a message, e.g. "'foo'". Text longer than maxLength
+// (a 1000-digit literal, a 1 MB identifier) is cut to its start plus "...",
+// so the diagnostic stays one readable line.
+[[nodiscard]] inline std::string quoteForMessage(std::string_view text, std::size_t maxLength = 32) {
+    if (text.size() <= maxLength) return "'" + std::string(text) + "'";
+    return "'" + std::string(text.substr(0, maxLength)) + "...'";
+}
+
 // One message from any compiler stage, attached to a range of source text.
 struct Diagnostic {
     Severity severity = Severity::Error;

@@ -240,3 +240,24 @@ Stress cases that passed before the crash: empty file, only whitespace, only com
 Bug found by the stress test: Debug builds use about 4 KB of stack per nesting level, and Windows gives a program 1 MB, so the parser crashed before reaching its own 256-level nesting limit. Fix: link with an 8 MB stack (/STACK:8388608, the Linux default). The new limit also stops parsing after one "nesting is too deep" error instead of crashing.
 
 Not re-run yet: Windows Smart App Control (enforce mode) blocked the rebuilt MemoLang.exe and MemoLangTests.exe ("An Application Control policy has blocked this file"). The stress test after the fix, the expected-output tests, and the Release throughput numbers still need a run where the binaries are allowed.
+
+### CI runs (GitHub Actions, branch before-commit-main)
+
+Smart App Control blocks local runs, so the tests now run on GitHub Actions: Windows (MSVC) and Linux (GCC 13), Debug and Release.
+
+Run 1 (commit 4c49666): Linux test step killed (exit code 143). Cause: the stress cases with 100000 errors on one 200 KB line made the diagnostics engine print the whole line under every error, which is tens of GB of output. Fix (commit 82b9c8f): show at most 120 characters of the line around the error, like clang. The stress test now also checks that each error prints at most 512 bytes.
+
+Run 2 (commit 82b9c8f), ubuntu-latest / Debug: 15 of 16 tests passed.
+
+| Test | Result |
+|---|---|
+| ast/* (5), tokens/* (3) | PASS |
+| errors/lexer, errors/limits, errors/syntax | PASS |
+| fuzz (9000 inputs) | PASS, 10.3 s |
+| examples/basicadd, examples/matmul_chain, examples/errors | PASS |
+| stress | 30 of 31 cases PASS. 100000-deep nesting of every kind now gives 1 error and no crash; the 10000-term sum/matmul chain, 1 MB identifier/string/line and 100000-error cases all pass. |
+| stress: 1000-digit integer | FAIL: the error message quoted all 1000 digits (1322 bytes for one error) |
+
+Debug (unoptimized) throughput on Linux: 3.8 MB, 112000 lines, 16000 functions parsed in 1.1 s = 3.4 MB/s.
+
+Fix: source text quoted in an error message (literals, identifiers) is cut to 32 characters plus "...".

@@ -121,8 +121,8 @@ Token Lexer::lexNumber(std::uint32_t start) {
     }
     if (isIdentChar(peek())) {  // e.g. `12abc`
         while (isIdentChar(peek())) ++pos_;
-        diags_.error(rangeFrom(start), "invalid suffix on numeric literal '" +
-                                           std::string(text_.substr(start, pos_ - start)) + "'");
+        diags_.error(rangeFrom(start),
+                     "invalid suffix on numeric literal " + quoteForMessage(text_.substr(start, pos_ - start)));
         return makeToken(TokenKind::UNKNOWN_TOKEN_SYNTAX_ERROR, start);
     }
     return makeToken(isFloat ? TokenKind::TOK_FLOAT : TokenKind::TOK_INTEGER, start);

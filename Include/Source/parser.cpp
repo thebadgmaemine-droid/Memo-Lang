@@ -373,7 +373,7 @@ std::unique_ptr<TypeExpr> Parser::parseType() {
     if (tooDeep()) return nullptr;
     if (!check(TokenKind::TOK_KEYWORDTYPE)) {
         if (check(TokenKind::TOK_IDENTIFIER))
-            error(tok_.range(), "unknown type name '" + std::string(tok_.spelling()) + "'");
+            error(tok_.range(), "unknown type name " + quoteForMessage(tok_.spelling()));
         else
             error(tok_.range(), "expected a type name");
         return nullptr;
@@ -428,7 +428,7 @@ std::unique_ptr<Statement> Parser::parseVarDecl(SourceLocation loc, DeclFlags fl
         if (!init) return nullptr;
     }
     if (!type && !init) {
-        error(nameTok.range(), "variable '" + std::string(nameTok.spelling()) + "' needs a type or an initial value");
+        error(nameTok.range(), "variable " + quoteForMessage(nameTok.spelling()) + " needs a type or an initial value");
         return nullptr;
     }
     if (!expect(TokenKind::TOK_SEMICOLON, "after variable declaration")) return nullptr;
@@ -723,7 +723,7 @@ std::unique_ptr<Expr> Parser::parseIntegerLiteral(const Token& tok) {
     auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value, base);
     if (ec != std::errc() || end != text.data() + text.size() ||
         value > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
-        error(tok.range(), "integer literal '" + std::string(tok.spelling()) + "' is too large for int64");
+        error(tok.range(), "integer literal " + quoteForMessage(tok.spelling()) + " is too large for int64");
         return nullptr;
     }
     return make<IntegerLiteral>(tok.location(), static_cast<std::int64_t>(value));
@@ -736,7 +736,7 @@ std::unique_ptr<Expr> Parser::parseFloatLiteral(const Token& tok) {
     char* end = nullptr;
     double value = std::strtod(text.c_str(), &end);
     if (end != text.c_str() + text.size() || std::isinf(value)) {
-        error(tok.range(), "floating-point literal '" + std::string(tok.spelling()) + "' is out of range");
+        error(tok.range(), "floating-point literal " + quoteForMessage(tok.spelling()) + " is out of range");
         return nullptr;
     }
     return make<FloatLiteral>(tok.location(), value, isF32);
