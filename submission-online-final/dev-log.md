@@ -261,3 +261,5 @@ Run 2 (commit 82b9c8f), ubuntu-latest / Debug: 15 of 16 tests passed.
 Debug (unoptimized) throughput on Linux: 3.8 MB, 112000 lines, 16000 functions parsed in 1.1 s = 3.4 MB/s.
 
 Fix: source text quoted in an error message (literals, identifiers) is cut to 32 characters plus "...".
+
+Run 3 (commit ee38ffc): all 4 jobs PASS (windows-latest Debug and Release, ubuntu-latest Debug and Release). All 16 tests pass on both compilers, including every stress and fuzz case.
