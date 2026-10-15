@@ -1,0 +1,10 @@
+# Type syntax, including `>>` and `>>>` closing nested type arguments.
+def types(matrix<float> a, matrix<matrix<float>> b, matrix<f32, i64> c) -> matrix<float> {
+    matrix<matrix<matrix<int>>> deep;
+    bool flag = a as bool;
+    byte small = byte(1);
+    str text = "t";
+    i32 narrow = 1 as i32;
+    f64 wide = 1.0;
+    return a;
+}

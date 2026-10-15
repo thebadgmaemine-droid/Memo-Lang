@@ -1,0 +1,83 @@
+# Parser errors. Each mistake must be reported exactly once: no follow-on
+# errors, and the code after it must still be checked.
+
+def missing_semicolon() {
+    int a = 1                   # expect-error: 14: expected ';' after variable declaration
+    int b = 2;
+}
+
+def missing_paren() {
+    int a = (1 + 2;             # expect-error: 19: expected ')' to close the parenthesized expression
+}
+
+def missing_operand() {
+    int a = 1 + ;               # expect-error: 17: expected an expression
+}
+
+def unknown_type(number x) {    # expect-error: 18: unknown type name 'number'
+    return x;
+}
+
+def bad_assign() {
+    f() = 3;                    # expect-error: 9: left side of '=' must be a variable name
+}
+
+def named_then_positional() {
+    f(x = 1, 2);                # expect-error: 14: positional argument can't follow a named argument
+}
+
+def not_after_compare(bool a, bool b) {
+    a == not b;                 # expect-error: 10: expected an expression
+}
+
+def missing_variable_name() {
+    int = 4;                    # expect-error: 9: expected variable name
+}
+
+def needs_type_or_value() {
+    const x;                    # expect-error: 11: variable 'x' needs a type or an initial value
+}
+
+def 123() {                     # expect-error: 5: expected function name after 'def'
+}
+
+extern foo();                   # expect-error: 8: expected 'def' after 'extern'
+
+def unclosed_type() {
+    matrix<float x;             # expect-error: 18: expected '>' to close the type arguments
+}
+
+def stray_else() {
+    else {                      # expect-error: 5: 'else' without a matching 'if'
+        return;
+    }
+}
+
+def standalone_block() {
+    {                           # expect-error: 5: a block can't stand on its own
+    }
+}
+
+def unsupported() {
+    for (int i = 0; i < 3; i++) {   # expect-error: 5: 'for' is not supported yet
+        i;
+    }
+    import foo;                 # expect-error: 5: 'import' is not supported yet
+    int n = none;               # expect-error: 13: 'none' is not supported yet
+}
+
+def no_closing_paren_in_if(int x) {
+    if (x > 1 {                 # expect-error: 15: expected ')' to close the parenthesized expression
+        x = 2;
+    }
+}
+
+}                               # expect-error: 1: unexpected '}' with no matching '{'
+
+def still_checked_after_all_that() {
+    int ok = 1;
+    ok == ;                     # expect-error: 11: expected an expression
+}
+
+def unclosed_function() {
+    return;                     # expect-error: 12: expected '}' to close the block

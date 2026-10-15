@@ -195,3 +195,48 @@ Haakon Dybdahl, Per Gunnar Kjeldsberg, Marius Grann{\ae}s, and Lasse Natvig,
 
 aDJUST THE SPACING
 Prompt to claude 28/9/2026
+
+---
+
+# Dev Log - October 14, 2026
+
+Prompt to Claude 14/10/2026:
+"Can you add the requirements up above (lexer, parser and diagsengine) and suggested ideas I'd think it will be good later on: version control of the code, example program and missing parts of code/files that exists/non-exists"
+
+
+---
+
+# Dev Log - October 15, 2026
+
+## Build and test results
+
+Toolchain: Visual Studio 2026 Community (18), MSVC 19.51 (14.51.36231), Windows SDK 10.0.26100, CMake 4.3.1, C++20, warning level /W4.
+
+Build:
+```
+cmake -S . -B build -DMEMOLANG_BUILD_TESTS=ON
+cmake --build build --config Debug
+cmake --build build --config Release
+```
+- Debug: 0 errors, 0 warnings on the first build.
+- Release: 0 errors, 5 warnings (unused loop variables in assert-only loops in AST.h). Fixed with [[maybe_unused]]; now 0 warnings in both configurations.
+
+Test run (ctest -C Debug, 16 tests):
+
+| Test | Result |
+|---|---|
+| errors/lexer (10 expected errors) | PASS |
+| errors/syntax (21 expected errors, each reported exactly once) | PASS |
+| errors/limits (5 expected errors) | PASS |
+| fuzz (9000 random / token-soup / mutated inputs) | PASS, 96 s, no crash or hang |
+| examples/matmul_chain | PASS |
+| examples/errors (must be rejected) | PASS |
+| examples/basicadd | not started (Windows blocked the new .exe) |
+| ast/* (5) and tokens/* (3) | expected-output files created on first run, then checked by hand line by line: all correct |
+| stress | FAILED: stack overflow (0xC00000FD) on "100000 nested parentheses" |
+
+Stress cases that passed before the crash: empty file, only whitespace, only comments, no trailing newline, CRLF line endings, NUL byte, 124 nested parentheses.
+
+Bug found by the stress test: Debug builds use about 4 KB of stack per nesting level, and Windows gives a program 1 MB, so the parser crashed before reaching its own 256-level nesting limit. Fix: link with an 8 MB stack (/STACK:8388608, the Linux default). The new limit also stops parsing after one "nesting is too deep" error instead of crashing.
+
+Not re-run yet: Windows Smart App Control (enforce mode) blocked the rebuilt MemoLang.exe and MemoLangTests.exe ("An Application Control policy has blocked this file"). The stress test after the fix, the expected-output tests, and the Release throughput numbers still need a run where the binaries are allowed.

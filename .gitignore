@@ -64,3 +64,14 @@ Desktop.ini
 *~
 *.swp
 *.tmp
+
+# LaTeX build files
+*.aux
+*.lof
+*.lot
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.xdv

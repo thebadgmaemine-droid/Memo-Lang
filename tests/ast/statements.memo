@@ -1,0 +1,47 @@
+# Every statement form.
+extern def external(int x);
+extern def external_ret(float x) -> float;
+
+static int counter = 0;
+static const int limit = 10;
+const inferred = 1.5;
+float uninitialized;
+
+def no_params() {
+    return;
+}
+
+def all_statements(int x) -> int {
+    ;
+    int y = x;
+    y = 1;
+    y += 2;
+    y -= 3;
+    y *= 4;
+    y /= 5;
+    y %= 6;
+    if y > 0 {
+        y = 0;
+    } else if y < 0 {
+        y = 1;
+    } else {
+        y = 2;
+    }
+    if (x == 1) {
+    }
+    while true {
+        if y >= 10 {
+            break;
+        }
+        y++;
+    }
+    no_params();
+    return y;
+}
+
+# Nested functions parse; semantic analysis decides whether they're allowed.
+def outer() {
+    def inner() {
+        return;
+    }
+}

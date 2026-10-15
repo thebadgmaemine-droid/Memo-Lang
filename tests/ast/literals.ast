@@ -1,0 +1,44 @@
+Module literals
+  FunctionDef literals() -> auto
+    ExprStmt
+      Integer 0
+    ExprStmt
+      Integer 42
+    ExprStmt
+      Integer 9223372036854775807
+    ExprStmt
+      Integer -9223372036854775808
+    ExprStmt
+      Integer 31
+    ExprStmt
+      Integer 255
+    ExprStmt
+      Integer 10
+    ExprStmt
+      Integer 0
+    ExprStmt
+      Float 3.14
+    ExprStmt
+      Float 0.5
+    ExprStmt
+      Float 1000
+    ExprStmt
+      Float 1000
+    ExprStmt
+      Float 0.0025
+    ExprStmt
+      Float 2 (f32)
+    ExprStmt
+      Float 3 (f32)
+    ExprStmt
+      Boolean true
+    ExprStmt
+      Boolean false
+    ExprStmt
+      String ""
+    ExprStmt
+      String "plain"
+    ExprStmt
+      String "escapes: \n \t \r \\ \" end"
+    ExprStmt
+      String "# not a comment"

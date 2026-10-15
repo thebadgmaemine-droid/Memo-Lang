@@ -1,0 +1,48 @@
+2:1	def
+2:5	extern
+2:12	return
+2:19	if
+2:22	else
+2:27	while
+2:33	for
+2:37	break
+2:43	const
+2:49	static
+2:56	true
+2:61	false
+2:67	none
+2:72	import
+3:1	not
+3:5	and
+3:9	or
+3:12	in
+3:15	is
+3:18	as
+3:21	try
+3:25	catch
+3:31	throw
+3:37	case
+4:1	type name	'int'
+4:5	type name	'i32'
+4:9	type name	'i64'
+4:13	type name	'float'
+4:19	type name	'f32'
+4:23	type name	'f64'
+4:27	type name	'bool'
+4:32	type name	'str'
+4:36	type name	'byte'
+4:41	type name	'void'
+4:46	type name	'matrix'
+5:1	identifier	'define'
+5:8	identifier	'iff'
+5:12	identifier	'int32'
+5:18	identifier	'_x'
+5:21	identifier	'x1'
+5:24	identifier	'matrixx'
+5:32	identifier	'Int'
+5:36	identifier	'DEF'
+5:40	identifier	'__'
+5:43	identifier	'_'
+6:1	string literal	'string with def inside'
+7:2	identifier	'tab_indented'
+8:1	end of file

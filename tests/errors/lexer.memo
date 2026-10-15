@@ -1,0 +1,15 @@
+# Lexer errors. The comment on each line names the error that line must produce.
+def lexer_errors() {
+    int a = 3 $ 4;              # expect-error: 15: unexpected character '$'
+    int b = 1 ! 2;              # expect-error: 15: unexpected '!'; use 'not'
+    int c = 0x;                 # expect-error: 13: invalid hexadecimal literal
+    int d = 0b102;              # expect-error: 13: invalid binary literal
+    int e = 12abc;              # expect-error: 13: invalid suffix on numeric literal '12abc'
+    float f = 2e;               # expect-error: 15: invalid suffix on numeric literal '2e'
+    str g = "bad \q escape";    # expect-error: 18: unknown escape sequence '\q'
+    str h = é;                  # expect-error: 13: unexpected character 'é'
+    int biến = 1;               # expect-error: 11: unexpected character 'ế'
+    # expect-error@+1: 13: unterminated string literal
+    str i = "never closed;
+    int fine = 1;
+}

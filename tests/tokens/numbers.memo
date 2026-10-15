@@ -1,0 +1,4 @@
+# Number forms, and places where a '.' is not part of a number.
+0 7 123 0x0 0xDEADbeef 0b1 0b0101
+1.0 .25 10.5 1e10 1E-2 6.02e+23 1.5f 2f 0.0f
+1.foo 1..2 x.5 1.e

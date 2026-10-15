@@ -1,0 +1,135 @@
+Module precedence
+  FunctionDef precedence(int a, int b, int c, int d) -> auto
+    ExprStmt
+      Binary +
+        Name a
+        Binary *
+          Name b
+          Name c
+    ExprStmt
+      Binary -
+        Binary -
+          Name a
+          Name b
+        Name c
+    ExprStmt
+      Binary **
+        Name a
+        Binary **
+          Name b
+          Name c
+    ExprStmt
+      Unary -
+        Binary **
+          Name a
+          Name b
+    ExprStmt
+      Binary **
+        Name a
+        Unary -
+          Name b
+    ExprStmt
+      Binary or
+        Binary and
+          Unary not
+            Binary ==
+              Name a
+              Name b
+          Name c
+        Name d
+    ExprStmt
+      Unary not
+        Unary not
+          Name a
+    ExprStmt
+      Binary is not
+        Name a
+        Name b
+    ExprStmt
+      Binary not in
+        Name a
+        Name b
+    ExprStmt
+      Binary ==
+        Binary in
+          Name a
+          Name b
+        Name c
+    ExprStmt
+      Binary <<
+        Name a
+        Binary +
+          Name b
+          Name c
+    ExprStmt
+      Binary |
+        Binary &
+          Name a
+          Name b
+        Binary ^
+          Name c
+          Name d
+    ExprStmt
+      Binary @
+        Binary @
+          Name a
+          Name b
+        Name c
+    ExprStmt
+      Binary *
+        Binary @
+          Name a
+          Name b
+        Name c
+    ExprStmt
+      Binary +
+        Name a
+        Cast to float
+          Name b
+    ExprStmt
+      Binary *
+        Cast to float
+          Name a
+        Integer 2
+    ExprStmt
+      Binary *
+        Binary +
+          Name a
+          Name b
+        Name c
+    ExprStmt
+      Binary %
+        Binary //
+          Name a
+          Name b
+        Name c
+    ExprStmt
+      Binary +
+        Unary ~
+          Name a
+        Unary -
+          Name b
+    ExprStmt
+      Name a
+    ExprStmt
+      Unary ++ (prefix)
+        Name a
+    ExprStmt
+      Unary -- (postfix)
+        Name a
+    ExprStmt
+      Call
+        Call
+          Name f
+          Name a
+        Name b
+    ExprStmt
+      Call
+        Name f
+        Name a
+        Name b
+        key =
+          Name c
+    ExprStmt
+      Call
+        Name f

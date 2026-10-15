@@ -1,0 +1,18 @@
+# The example from the report ("Evidence and Reproducibility"), plus a small
+# main that uses it.
+#
+#   MemoLang --dump-ast examples/basicadd.memo
+
+def basicadd(int i, int k) {
+    return i + k;
+}
+
+def main() -> int {
+    int total = basicadd(2, 3);
+    if total > 4 {
+        total -= 1;
+    } else {
+        total += 1;
+    }
+    return total;
+}

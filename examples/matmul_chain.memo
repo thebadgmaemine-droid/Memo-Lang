@@ -1,0 +1,28 @@
+# Chains of matrix multiplications: the workload destructive reads target.
+# This only parses today. There is no matrix runtime or code generation yet.
+#
+#   MemoLang --dump-ast examples/matmul_chain.memo
+
+# The precompiled runtime (cuBLAS, or the CUTLASS kernel) will provide this.
+extern def memo_matmul(matrix<float> a, matrix<float> b) -> matrix<float>;
+
+def chain(matrix<float> a, matrix<float> b, matrix<float> c) -> matrix<float> {
+    # `a @ b` is a short-lived intermediate. Once consumption analysis exists,
+    # its buffer can be freed as soon as `@ c` has read it.
+    matrix<float> result = a @ b @ c;
+    return result;
+}
+
+def power_iteration(matrix<float> m, matrix<float> v, int steps) -> matrix<float> {
+    int i = 0;
+    while i < steps {
+        v = m @ v;    # The old `v` is consumed by this multiplication.
+        i++;
+    }
+    return v;
+}
+
+def scale(matrix<float> m, float factor) -> matrix<float> {
+    const half = factor / 2.0;
+    return m * half;
+}

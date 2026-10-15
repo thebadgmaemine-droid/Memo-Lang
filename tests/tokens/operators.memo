@@ -1,0 +1,5 @@
+# Every operator and punctuation token, then maximal-munch cases.
++ ++ += - -- -= -> * ** *= / // /= % %= @ = == != < <= << > >= >> & | ^ ~
+( ) { } [ ] , : ; .
++++ --- >>= <<= ->> **= //=
+a--b x+=-1 a@b f(x)

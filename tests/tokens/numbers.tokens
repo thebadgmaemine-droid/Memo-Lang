@@ -1,0 +1,28 @@
+2:1	integer literal	'0'
+2:3	integer literal	'7'
+2:5	integer literal	'123'
+2:9	integer literal	'0x0'
+2:13	integer literal	'0xDEADbeef'
+2:24	integer literal	'0b1'
+2:28	integer literal	'0b0101'
+3:1	float literal	'1.0'
+3:5	float literal	'.25'
+3:9	float literal	'10.5'
+3:14	float literal	'1e10'
+3:19	float literal	'1E-2'
+3:24	float literal	'6.02e+23'
+3:33	float literal	'1.5f'
+3:38	float literal	'2f'
+3:41	float literal	'0.0f'
+4:1	integer literal	'1'
+4:2	.
+4:3	identifier	'foo'
+4:7	integer literal	'1'
+4:8	.
+4:9	float literal	'.2'
+4:12	identifier	'x'
+4:13	float literal	'.5'
+4:16	integer literal	'1'
+4:17	.
+4:18	identifier	'e'
+5:1	end of file

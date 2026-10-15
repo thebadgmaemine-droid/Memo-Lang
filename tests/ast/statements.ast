@@ -1,0 +1,79 @@
+Module statements
+  ExternFunction external(int x) -> void
+  ExternFunction external_ret(float x) -> float
+  DeclareVar counter : int static
+    Integer 0
+  DeclareVar limit : int static const
+    Integer 10
+  DeclareVar inferred const
+    Float 1.5
+  DeclareVar uninitialized : float
+  FunctionDef no_params() -> auto
+    Return
+  FunctionDef all_statements(int x) -> int
+    DeclareVar y : int
+      Name x
+    Assign =
+      Name y
+      Integer 1
+    Assign +=
+      Name y
+      Integer 2
+    Assign -=
+      Name y
+      Integer 3
+    Assign *=
+      Name y
+      Integer 4
+    Assign /=
+      Name y
+      Integer 5
+    Assign %=
+      Name y
+      Integer 6
+    If
+      Binary >
+        Name y
+        Integer 0
+      Then
+        Assign =
+          Name y
+          Integer 0
+      Else
+        If
+          Binary <
+            Name y
+            Integer 0
+          Then
+            Assign =
+              Name y
+              Integer 1
+          Else
+            Assign =
+              Name y
+              Integer 2
+    If
+      Binary ==
+        Name x
+        Integer 1
+      Then
+    While
+      Boolean true
+      Body
+        If
+          Binary >=
+            Name y
+            Integer 10
+          Then
+            Break
+        ExprStmt
+          Unary ++ (postfix)
+            Name y
+    ExprStmt
+      Call
+        Name no_params
+    Return
+      Name y
+  FunctionDef outer() -> auto
+    FunctionDef inner() -> auto
+      Return

@@ -22,6 +22,7 @@ class Type; // Semantic type
 
 class Visitor;
 class TypeExpr;
+class NameExpr;
 class IntegerLiteral;
 class FloatLiteral;
 class StringLiteral;
@@ -34,6 +35,11 @@ class CastExpr;
 class ExprStmt;
 class DeclareVar;
 class FunctionDef;
+class AssignStmt;
+class ReturnStmt;
+class IfStmt;
+class WhileStmt;
+class BreakStmt;
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -41,6 +47,7 @@ class FunctionDef;
 // TODO (not implemented yet): LambdaExpr, MacroDef.
 enum class NodeKind {
     // Expressions
+    NameExpr,
     IntegerLiteral,
     FloatLiteral,
     StringLiteral,
@@ -50,15 +57,20 @@ enum class NodeKind {
     BinaryExpr,
     CallExpr,
     CastExpr,
-    FirstExpr = IntegerLiteral,
+    FirstExpr = NameExpr,
     LastExpr = CastExpr,
 
     // Statements
     ExprStmt,
     DeclareVar,
     FunctionDef,
+    AssignStmt,
+    ReturnStmt,
+    IfStmt,
+    WhileStmt,
+    BreakStmt,
     FirstStmt = ExprStmt,
-    LastStmt = FunctionDef,
+    LastStmt = BreakStmt,
 
     // Type expressions
     TypeExpr,
@@ -68,6 +80,7 @@ enum class State { Live, Consumed, MaybeConsumed };  // There is no "maybe live"
 
 enum class BinaryOp {
     Add, Sub, Mul, Div, FloorDiv, Mod, Pow,
+    MatMul,  // `a @ b`: the operation destructive reads are designed around.
     Eq, Ne, Lt, Le, Gt, Ge,
     BitAnd, BitOr, BitXor, Shl, Shr,
     And, Or,
@@ -80,9 +93,10 @@ enum class UnaryOp {
     PreDec, PostDec,
     Neg,
     Inv,
+    Not,
 };
 
-enum class AssignOp { Assign, Add, Sub, Mul, Div };
+enum class AssignOp { Assign, Add, Sub, Mul, Div, Mod };
 
 
 // Flags for DeclareVar (instead of two easily-swapped bools).
@@ -115,7 +129,8 @@ struct BinaryDunderNames {
     case BinaryOp::FloorDiv: return {"__floordiv__", "__rfloordiv__"};
     case BinaryOp::Mod:      return {"__mod__", "__rmod__"};
     case BinaryOp::Pow:      return {"__pow__", "__rpow__"};
-    case BinaryOp::Eq:       return {"__eq__", "__eq__"};
+    case BinaryOp::MatMul:   return {"__matmul__", "__rmatmul__"};
+    case BinaryOp::Eq:      return {"__eq__", "__eq__"};
     case BinaryOp::Ne:       return {"__ne__", "__ne__"};
     case BinaryOp::Lt:       return {"__lt__", "__gt__"};
     case BinaryOp::Le:       return {"__le__", "__ge__"};
@@ -146,6 +161,7 @@ public:
     virtual ~Visitor() = default;
 
     virtual void visit(const TypeExpr&) = 0;
+    virtual void visit(const NameExpr&) = 0;
     virtual void visit(const IntegerLiteral&) = 0;
     virtual void visit(const FloatLiteral&) = 0;
     virtual void visit(const StringLiteral&) = 0;
@@ -158,6 +174,11 @@ public:
     virtual void visit(const ExprStmt&) = 0;
     virtual void visit(const DeclareVar&) = 0;
     virtual void visit(const FunctionDef&) = 0;
+    virtual void visit(const AssignStmt&) = 0;
+    virtual void visit(const ReturnStmt&) = 0;
+    virtual void visit(const IfStmt&) = 0;
+    virtual void visit(const WhileStmt&) = 0;
+    virtual void visit(const BreakStmt&) = 0;
     enum class State { // State is along with visitors, then revisited in analysis for consume flags
         Live,
         Consumed,
@@ -205,7 +226,7 @@ class TypeExpr final : public Node {
 public:
     explicit TypeExpr(std::string name, std::vector<std::unique_ptr<TypeExpr>> args = {})
         : Node(NodeKind::TypeExpr), name_(std::move(name)), args_(std::move(args)) {
-        for (const auto& a : args_) assert(a && "TypeExpr argument must not be null");
+        for ([[maybe_unused]] const auto& a : args_) assert(a && "TypeExpr argument must not be null");
     }
 
     [[nodiscard]] const std::string& name() const noexcept { return name_; }
@@ -251,6 +272,26 @@ struct StringPart {
         copy.spec = spec;
         return copy;
     }
+};
+
+// A reference to a variable or function by name, e.g. `x` in `x + 1`.
+class NameExpr final : public Expr {
+public:
+    explicit NameExpr(std::string name) : Expr(NodeKind::NameExpr), name_(std::move(name)) {
+        assert(!name_.empty() && "name must not be empty");
+    }
+
+    [[nodiscard]] const std::string& name() const noexcept { return name_; }
+
+    [[nodiscard]] std::unique_ptr<Expr> clone() const override {
+        auto c = std::make_unique<NameExpr>(name_);
+        c->setLoc(loc());
+        return c;
+    }
+    void accept(Visitor& v) const override { v.visit(*this); }
+
+private:
+    std::string name_;
 };
 
 // ---------------------------------------------------------------------------
@@ -447,8 +488,8 @@ public:
           typeArgs_(std::move(typeArgs)),
           paramNames_(std::move(paramNames)) {
         assert(callee_ && "CallExpr callee must not be null");
-        for (const auto& a : args_) assert(a && "CallExpr argument must not be null");
-        for (const auto& t : typeArgs_) assert(t && "CallExpr type argument must not be null");
+        for ([[maybe_unused]] const auto& a : args_) assert(a && "CallExpr argument must not be null");
+        for ([[maybe_unused]] const auto& t : typeArgs_) assert(t && "CallExpr type argument must not be null");
         assert((paramNames_.empty() || paramNames_.size() == args_.size()) &&
                "paramNames must be empty or match args one-to-one");
     }
@@ -564,8 +605,8 @@ public:
           externName_(std::move(externName)) {
         assert(!name_.empty() && "function name must not be empty");
         assert(returnType_ && "return type must not be null");
-        for (const auto& p : params_) assert(p.type && "parameter type must not be null");
-        for (const auto& s : body_) assert(s && "body statement must not be null");
+        for ([[maybe_unused]] const auto& p : params_) assert(p.type && "parameter type must not be null");
+        for ([[maybe_unused]] const auto& s : body_) assert(s && "body statement must not be null");
         assert((externName_.empty() || body_.empty()) && "extern function must not have a body");
     }
 
@@ -580,13 +621,104 @@ public:
     void accept(Visitor& v) const override { v.visit(*this); }
 
 private:
-    static std::string name_; // name_ is here bro wdym?
+    std::string name_;
     std::vector<Param> params_;
     std::unique_ptr<TypeExpr> returnType_;
     std::vector<std::unique_ptr<Statement>> body_;
     std::string externName_;
 };
 
-}  // namespace Memolang
+// `target = value;` and the compound forms `+=`, `-=`, `*=`, `/=`, `%=`.
+class AssignStmt final : public Statement {
+public:
+    AssignStmt(AssignOp op, std::unique_ptr<Expr> target, std::unique_ptr<Expr> value)
+        : Statement(NodeKind::AssignStmt), op_(op), target_(std::move(target)), value_(std::move(value)) {
+        assert(target_ && value_ && "AssignStmt target and value must not be null");
+    }
+
+    [[nodiscard]] AssignOp op() const noexcept { return op_; }
+    [[nodiscard]] const Expr& target() const noexcept { return *target_; }
+    [[nodiscard]] const Expr& value() const noexcept { return *value_; }
+
+    void accept(Visitor& v) const override { v.visit(*this); }
+
+private:
+    AssignOp op_;
+    std::unique_ptr<Expr> target_;
+    std::unique_ptr<Expr> value_;
+};
+
+// `return;` or `return value;`
+class ReturnStmt final : public Statement {
+public:
+    explicit ReturnStmt(std::unique_ptr<Expr> value)  // value is nullable.
+        : Statement(NodeKind::ReturnStmt), value_(std::move(value)) {}
+
+    [[nodiscard]] const Expr* value() const noexcept { return value_.get(); }  // May be null.
+
+    void accept(Visitor& v) const override { v.visit(*this); }
+
+private:
+    std::unique_ptr<Expr> value_;
+};
+
+// `if cond { ... } else { ... }`. An `else if` chain is stored as an else body
+// holding a single IfStmt.
+class IfStmt final : public Statement {
+public:
+    IfStmt(std::unique_ptr<Expr> condition,
+           std::vector<std::unique_ptr<Statement>> thenBody,
+           std::vector<std::unique_ptr<Statement>> elseBody = {})
+        : Statement(NodeKind::IfStmt),
+          condition_(std::move(condition)),
+          thenBody_(std::move(thenBody)),
+          elseBody_(std::move(elseBody)) {
+        assert(condition_ && "IfStmt condition must not be null");
+    }
+
+    [[nodiscard]] const Expr& condition() const noexcept { return *condition_; }
+    [[nodiscard]] std::span<const std::unique_ptr<Statement>> thenBody() const noexcept { return thenBody_; }
+    [[nodiscard]] std::span<const std::unique_ptr<Statement>> elseBody() const noexcept { return elseBody_; }
+
+    void accept(Visitor& v) const override { v.visit(*this); }
+
+private:
+    std::unique_ptr<Expr> condition_;
+    std::vector<std::unique_ptr<Statement>> thenBody_;
+    std::vector<std::unique_ptr<Statement>> elseBody_;
+};
+
+// `while cond { ... }`
+class WhileStmt final : public Statement {
+public:
+    WhileStmt(std::unique_ptr<Expr> condition, std::vector<std::unique_ptr<Statement>> body)
+        : Statement(NodeKind::WhileStmt), condition_(std::move(condition)), body_(std::move(body)) {
+        assert(condition_ && "WhileStmt condition must not be null");
+    }
+
+    [[nodiscard]] const Expr& condition() const noexcept { return *condition_; }
+    [[nodiscard]] std::span<const std::unique_ptr<Statement>> body() const noexcept { return body_; }
+
+    void accept(Visitor& v) const override { v.visit(*this); }
+
+private:
+    std::unique_ptr<Expr> condition_;
+    std::vector<std::unique_ptr<Statement>> body_;
+};
+
+class BreakStmt final : public Statement {
+public:
+    BreakStmt() : Statement(NodeKind::BreakStmt) {}
+
+    void accept(Visitor& v) const override { v.visit(*this); }
+};
+
+// One parsed source file.
+struct Module {
+    std::string name;
+    std::vector<std::unique_ptr<Statement>> body;
+};
+
+}  // namespace MemoLang
 
 #endif  // AST_H_

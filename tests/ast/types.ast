@@ -1,0 +1,18 @@
+Module types
+  FunctionDef types(matrix<float> a, matrix<matrix<float>> b, matrix<f32, i64> c) -> matrix<float>
+    DeclareVar deep : matrix<matrix<matrix<int>>>
+    DeclareVar flag : bool
+      Cast to bool
+        Name a
+    DeclareVar small : byte
+      Cast to byte
+        Integer 1
+    DeclareVar text : str
+      String "t"
+    DeclareVar narrow : i32
+      Cast to i32
+        Integer 1
+    DeclareVar wide : f64
+      Float 1
+    Return
+      Name a

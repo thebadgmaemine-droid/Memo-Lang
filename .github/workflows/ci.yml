@@ -1,0 +1,38 @@
+# Builds MemoLang and runs the full test suite on every push and pull request,
+# on Windows (MSVC) and Linux (GCC), in Debug and Release.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }} / ${{ matrix.config }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        config: [Debug, Release]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DMEMOLANG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.config }} --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C ${{ matrix.config }} --output-on-failure
+
+      # Print the stress and fuzz results (timings, throughput) in the log even when they pass.
+      - name: Stress and fuzz report
+        if: always()
+        shell: bash
+        run: |
+          runner=$(find build -name 'MemoLangTests*' -type f \( -name '*.exe' -o -perm -u+x \) | head -1)
+          "$runner" stress | tr '\r' '\n' | grep -v '^\.\.\.\.'
+          "$runner" fuzz

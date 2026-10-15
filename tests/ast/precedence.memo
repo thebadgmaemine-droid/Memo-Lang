@@ -1,0 +1,28 @@
+# Operator precedence and associativity. See the table in docs/STATUS.md.
+def precedence(int a, int b, int c, int d) {
+    a + b * c;
+    a - b - c;
+    a ** b ** c;
+    -a ** b;
+    a ** -b;
+    not a == b and c or d;
+    not not a;
+    a is not b;
+    a not in b;
+    a in b == c;
+    a << b + c;
+    a & b | c ^ d;
+    a @ b @ c;
+    a @ b * c;
+    a + b as float;
+    float(a) * 2;
+    (a + b) * c;
+    a // b % c;
+    ~a + -b;
+    + a;
+    ++a;
+    a--;
+    f(a)(b);
+    f(a, b, key = c);
+    f();
+}

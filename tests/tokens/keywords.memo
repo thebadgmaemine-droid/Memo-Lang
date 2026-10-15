@@ -1,0 +1,7 @@
+# Keywords and type names, then identifiers that only look like them.
+def extern return if else while for break const static true false none import
+not and or in is as try catch throw case
+int i32 i64 float f32 f64 bool str byte void matrix
+define iff int32 _x x1 matrixx Int DEF __ _
+"string with def inside" # comment with def inside
+	tab_indented
