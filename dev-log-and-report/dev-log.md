@@ -195,3 +195,6 @@ Haakon Dybdahl, Per Gunnar Kjeldsberg, Marius Grann{\ae}s, and Lasse Natvig,
 
 aDJUST THE SPACING
 Prompt to claude 28/9/2026
+
+10/15/2026 due to Delays:
+Day goal : 
