@@ -35,19 +35,32 @@ void DiagnosticEngine::print(const Diagnostic& diagnostic) const {
     if (!loc.isValid()) return;
 
     std::string_view line = sources_.lineText(loc.line);
+    std::size_t caret = loc.column - 1;  // 0-based; may be just past the end of the line.
+
+    // Show at most kMaxShown characters around the caret, so one very long line
+    // (minified or generated code) doesn't print megabytes per error.
+    constexpr std::size_t kMaxShown = 120;
+    std::size_t first = 0;
+    if (line.size() > kMaxShown) {
+        first = std::min(caret > kMaxShown / 2 ? caret - kMaxShown / 2 : 0, line.size() - kMaxShown);
+        line = line.substr(first, kMaxShown);
+    }
+    bool cutBefore = first != 0;
+    bool cutAfter = first + line.size() < sources_.lineText(loc.line).size();
+    caret -= first;
+
     std::string lineNumber = std::to_string(loc.line);
-    out_ << ' ' << lineNumber << " | " << line << '\n';
-    out_ << ' ' << std::string(lineNumber.size(), ' ') << " | ";
+    out_ << ' ' << lineNumber << " | " << (cutBefore ? "..." : "") << line << (cutAfter ? "..." : "") << '\n';
+    out_ << ' ' << std::string(lineNumber.size(), ' ') << " | " << (cutBefore ? "   " : "");
 
     // Copy tabs from the source line so the caret lines up under tab-indented code.
-    std::size_t caret = loc.column - 1;
     for (std::size_t i = 0; i < caret; ++i) out_ << (i < line.size() && line[i] == '\t' ? '\t' : ' ');
     out_ << '^';
 
     // Underline the rest of the range when it stays on the same line.
     const SourceLocation& end = diagnostic.range.end;
     if (end.line == loc.line && end.column > loc.column + 1) {
-        std::size_t last = std::min<std::size_t>(end.column - 1, line.size());
+        std::size_t last = std::min<std::size_t>(end.column - 1 - first, line.size());
         if (last > caret + 1) out_ << std::string(last - caret - 1, '~');
     }
     out_ << '\n';

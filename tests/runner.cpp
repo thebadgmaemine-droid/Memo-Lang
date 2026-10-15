@@ -299,13 +299,18 @@ int runStress() {
         std::size_t errors = static_cast<std::size_t>(std::count_if(
             result.diagnostics.begin(), result.diagnostics.end(),
             [](const Diagnostic& d) { return d.severity == Severity::Error; }));
-        bool ok = errors == c.expectedErrors &&
+        // Printed output must stay small per error, even when the source line is huge.
+        bool boundedOutput = result.diagnosticText.size() <= 512 * (errors + 1);
+        bool ok = errors == c.expectedErrors && boundedOutput &&
                   (c.expectedMessage.empty() || errors == 0 ||
                    result.diagnostics.front().message.find(c.expectedMessage) != std::string::npos);
         std::printf("%s %-36s %9zu bytes %8.2f ms  %zu error(s)\n", ok ? "PASS" : "FAIL", c.name.c_str(),
                     c.source.size(), result.milliseconds, errors);
         if (!ok) {
             ++failures;
+            if (!boundedOutput)
+                std::printf("     printed %zu bytes of diagnostics for %zu error(s)\n", result.diagnosticText.size(),
+                            errors);
             std::printf("     expected %zu error(s) starting with \"%s\"; first message: %s\n", c.expectedErrors,
                         c.expectedMessage.c_str(),
                         result.diagnostics.empty() ? "(none)" : result.diagnostics.front().message.c_str());
