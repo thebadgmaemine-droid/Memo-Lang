@@ -1,3 +1,18 @@
+// ---------------------------------------------------------------------------
+// diags.cpp: the DiagnosticEngine, which every stage uses to report problems
+//
+// Each error is printed as soon as it is reported, in the same style as clang:
+//   examples/errors.memo:6:18: error: expected ';' after variable declaration
+//    6 |     int b = a * 2
+//      |                  ^
+// The caret (^) marks the column and `~` underlines the rest of the token.
+// Every diagnostic is also stored (diagnostics()), so the tests can check them.
+//
+// History: written 2026-10-14 (diag.h, diagengine.h and diags.cpp were empty).
+// 2026-10-15: long lines are shown as a 120-character window around the caret.
+// Before that, a 200 KB line with 100000 errors printed tens of GB and got the
+// CI job killed.
+// ---------------------------------------------------------------------------
 #include "Diag/diagengine.h"
 
 #include <algorithm>

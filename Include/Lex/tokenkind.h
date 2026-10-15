@@ -7,6 +7,15 @@
 // diagnostics show, e.g. "expected ')'". Keywords live in their own list so
 // keywordKind() can look them up by spelling. Add new tokens here only; the
 // enum and tokenKindName() are generated from these lists.
+//
+// History: 2026-10-14, the original enum's names were kept (TOK_PLUSPLUSINC,
+// TOK_KEYWORDTYPE, UNKNOWN_TOKEN_SYNTAX_ERROR, ...) and turned into these
+// lists. Added the punctuation and operators the parser needs (`( ) { } , ;
+// -> = == < >`, `@` for matrix multiplication, ...) and keywords such as def,
+// extern, static, and, or, as. Removed TOK_NEWLINE, TOK_INDENTATION, TOK_BYTES,
+// TOK_REGEX and TOK_COMMENT: the language uses braces, and the lexer skips
+// comments, so nothing produced them. TOK_PERCENTDIVIDE became TOK_PERCENT
+// (`%` is modulo). Also fixed `#endif TOKENKIND_H_`, which isn't valid C++.
 #define MEMOLANG_TOKEN_LIST(TOK)                       \
     /* Special */                                      \
     TOK(TOK_EOF, "end of file")                        \
