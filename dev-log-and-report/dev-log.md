@@ -196,5 +196,22 @@ Haakon Dybdahl, Per Gunnar Kjeldsberg, Marius Grann{\ae}s, and Lasse Natvig,
 aDJUST THE SPACING
 Prompt to claude 28/9/2026
 
-10/15/2026 due to Delays:
-Day goal : 
+16/10/2026: 
+GOAL : Review pull request to make sure requirements are statisfied
+		Review pull request of before-commit branch
+
+Actions taken : Each header file and source files are inspected carefully and comments are added, which will be added here :
+{
+parser.h/cpp
+lexer.h/cpp
+diags
+ast.h/cpp ( now tokenkind )
+
+IR builder has only the baseline build. Semantics will be implemented later
+
+} 
+
+* Note that this will be added **after** all commits are stashed and ready to be deployed
+
+
+Reorganising file 16/10/2026. This will be stored as artifact.

@@ -11,9 +11,11 @@
 #include <vector>
 #include <span>
 
+/* Reviewed on 15/10/2026 */
+
 //  Private data members are named [name]_ 
-//  Nodes are move-only. Use clone() for deep copies.
-//  * Preconditions use assert().
+//  Nodes are move-only. Use clone() for deep copies. Note that clone allocates memory using heap, effectively fitting nicely with the scheme set out by the project
+//  * Preconditions use assert(). 
 
 namespace MemoLang {
 
