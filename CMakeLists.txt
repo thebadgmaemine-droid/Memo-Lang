@@ -36,10 +36,15 @@ endif()
 set(MEMOLANG_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/Include
 )
-file(GLOB MEMOLANG_INCLUDE_SUBDIRS LIST_DIRECTORIES true
+file(GLOB MEMOLANG_INCLUDE_ENTRIES LIST_DIRECTORIES true
     "${CMAKE_SOURCE_DIR}/Include/*"
 )
-list(APPEND MEMOLANG_INCLUDE_DIRS ${MEMOLANG_INCLUDE_SUBDIRS})
+# Only folders belong on the include path; the glob also returns files.
+foreach(entry ${MEMOLANG_INCLUDE_ENTRIES})
+    if(IS_DIRECTORY ${entry})
+        list(APPEND MEMOLANG_INCLUDE_DIRS ${entry})
+    endif()
+endforeach()
 
 # The front-end as a library, so the compiler and the test runner share it.
 add_library(MemoLangFrontend STATIC

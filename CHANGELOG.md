@@ -20,6 +20,16 @@ All notable changes to MemoLang. Versions follow `project(VERSION ...)` in
 
 ### Fixed
 - Unused-variable warnings in Release builds from assert-only loops in `AST.h`.
+- Mismatches left over from the old LLVM/Kaleidoscope driver:
+  - `CMakePresets.json` used the "Visual Studio 17 2022" generator, so opening
+    the project in Visual Studio 2026 failed (MSB8020, v143 toolset not found).
+    It now uses Ninja, which works with Visual Studio 2022 and 2026.
+  - `Include/IR/-IRBuilder.h` (LLVM codegen interface) didn't compile:
+    `namespace memo-lang`, constructor name not matching the class, no return
+    type on `emit`, missing `;`, undeclared types. Now valid C++ in `MemoLang`.
+  - Removed `Include/CMakeLists.txt`, an unused old build file that defined a
+    second `MemoLang` target from the old `main.cpp` and required LLVM.
+  - The include path now gets only folders under `Include/`, not files.
 
 ## [0.1.0] - 2026-10-14
 
