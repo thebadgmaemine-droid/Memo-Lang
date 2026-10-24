@@ -8,8 +8,8 @@ option(MEMOLANG_BUILD_EXAMPLES "Build MemoLang example programs" OFF)
 # without it. Turn this on once code generation is written.
 option(MEMOLANG_USE_LLVM "Link against LLVM and enable LLVM frontend support" OFF)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 20) # Use Cpp 20 for compiler and tests
+set(CMAKE_CXX_STANDARD_REQUIRED ON) 
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Configure LLVM (adjust LLVM_DIR if needed)

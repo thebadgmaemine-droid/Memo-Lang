@@ -263,3 +263,53 @@ Debug (unoptimized) throughput on Linux: 3.8 MB, 112000 lines, 16000 functions p
 Fix: source text quoted in an error message (literals, identifiers) is cut to 32 characters plus "...".
 
 Run 3 (commit ee38ffc): all 4 jobs PASS (windows-latest Debug and Release, ubuntu-latest Debug and Release). All 16 tests pass on both compilers, including every stress and fuzz case.
+
+
+---
+
+# Dev Log - October 24, 2026
+
+## Commits on GitHub since 14/10/2026
+
+| Date | Commit | Author | Branch | What changed |
+|---|---|---|---|---|
+| 14/10 20:21 | db098dd | notoastedtoast | master | English and Vietnamese reports (.tex): added the separate GEMM kernel integrated with CUTLASS |
+| 14/10 20:30 | 2741ecf | notoastedtoast | master | Added BC MemoLang.docx |
+| 15/10 08:21 | 02cb690 | thebadgmaemine-droid | master | dev-log-and-report/dev-log.md: delay note |
+| 15/10 19:19 | 4c49666 | notoastedtoast | before-commit-main | Lexer, parser, diagnostics engine, AST printer, driver, test suite, CI workflow, examples, docs/STATUS.md, CHANGELOG.md |
+| 15/10 19:34 | 82b9c8f | notoastedtoast | before-commit-main | Diagnostics show a 120-character window of long lines (bug found by CI) |
+| 15/10 19:40 | ee38ffc | notoastedtoast | before-commit-main | Long text in error messages shortened (bug found by CI); also included the edited BC MemoLang.docx |
+| 15/10 19:43 | e07909d | notoastedtoast | before-commit-main | Dev log: CI passes on all platforms |
+| 15/10 20:29 | 35aeb97 | notoastedtoast | before-commit-main | Explanatory comments in the code |
+| 16/10 22:06 | 3f98e69 | thebadgmaemine-droid | pass-branch | Code review notes: AST.h comments, dev-log-and-report/dev-log.md, new devlog-new.md and prompt.md |
+| 17/10 12:07 | b246134 | notoastedtoast | before-commit-main | Fixed mismatches left from the old LLVM driver: CMakePresets.json (Ninja generator, works with Visual Studio 2022 and 2026), Include/IR/-IRBuilder.h made valid C++, removed unused Include/CMakeLists.txt |
+| 24/10 09:30 | 78a6e2f | thebadgmaemine-droid | before-commit-main | Code review comments in parser.h and parser.cpp |
+| 24/10 09:30 | bdb4e92 | thebadgmaemine-droid | before-commit-main | Merged b246134 with the review commit |
+
+Branches: before-commit-main holds the new compiler and is not merged into master yet (master is at 02cb690). pass-branch holds the review notes.
+
+CI (GitHub Actions, Windows MSVC + Linux GCC, Debug + Release): every run since e07909d passes, including b246134, 3f98e69 and bdb4e92.
+
+## AI usage (code tasks)
+
+Tool: Claude Code (Anthropic, model Claude Opus 5.5), 14/10 - 17/10/2026. This section covers code work only.
+
+What the AI did:
+- Checked the repository: found lexer.cpp, parser.cpp, diags.cpp and the Diag headers empty, main.cpp still calling the deleted Kaleidoscope parser, and compile errors in token.h, tokenkind.h, AST.h and AST.cpp.
+- Wrote the front-end (4c49666): SourceManager, DiagnosticEngine, lexer, recursive-descent parser, AST printer, command-line driver and the new AST nodes, built on our existing AST.h, tokenkind.h and the syntax example in the report.
+- Wrote the test suite (tests/runner.cpp, 11 test files, stress and fuzz tests), the GitHub Actions workflow and the example programs.
+- Fixed the bugs found by the tests (82b9c8f, ee38ffc) and the old/new driver mismatches (b246134).
+- Added explanatory comments to the code (35aeb97).
+
+What we did:
+- Original code design: AST.h, tokenkind.h and token.h, and the language syntax in the report.
+- Wrote the prompts below, decided the branch setup, and made all commits and pushes ourselves.
+- Reviewed the AI-written code file by file and added review comments (3f98e69, 78a6e2f).
+- Checked the CI results and passed the failing logs back for fixing.
+
+Prompts (code tasks):
+- 14/10: "complete with lexer, parser and diagsengine if it exists"
+- 14/10: "Can you add the requirements up above (lexer, parser and diagsengine) ..." (logged above)
+- 15/10: "Build and run the tests (edge test cases so it can put it the best it can perform) ..."
+- 15/10: "can you put comments on what you have done on the code"
+- 17/10: "just fix anything that is crucial for stable complier"
