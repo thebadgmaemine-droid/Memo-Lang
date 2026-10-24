@@ -146,22 +146,3 @@ Keywords the lexer recognizes but the parser rejects with "not supported yet":
 5. **More tests**: one `.memo` file per feature, compared against expected
    `--dump-ast` output. The CTest setup is already in `CMakeLists.txt`.
 
-## Version control workflow
-
-Suggested conventions for the team:
-
-- **Branches:** keep `master` building. Do each feature on its own branch
-  (`feature/sema`, `fix/lexer-hex`), then merge with a pull request so someone
-  else looks at it first.
-- **Commit messages:** one line saying what changed, e.g. "Add consumption
-  analysis for @ operands". Messages like "s" or "sync" make it hard to find
-  when something broke, and that history is the evidence for the report.
-- **Versions:** bump `VERSION` in `CMakeLists.txt`, add a section to
-  `CHANGELOG.md`, and tag the commit (`git tag v0.2.0`) for every milestone
-  or report submission. `MemoLang --version` prints the version.
-- **Generated files:** LaTeX build files (`*.aux`, `*.toc`, `*.synctex.gz`, ...)
-  are now in `.gitignore`. Some of these files were committed earlier, and
-  `.gitignore` doesn't affect files already in git. Stop tracking them with
-  `git rm --cached <file>`.
-- **Dev log:** keep logging AI prompts in `submission-online-final/dev-log.md`,
-  as done so far.
