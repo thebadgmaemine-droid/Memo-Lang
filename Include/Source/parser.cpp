@@ -14,6 +14,7 @@ namespace {
 
 // Binary operator precedence, lowest first. `not` sits between `and` and the
 // comparisons, as in Python: `not a == b` means `not (a == b)`.
+// Not that the design specifications do not include = for string comparisons for now.
 constexpr int kPrecOr = 1;
 constexpr int kPrecAnd = 2;
 constexpr int kPrecNot = 3;
@@ -46,6 +47,7 @@ std::unique_ptr<T> make(SourceLocation loc, Args&&... args) {
 }
 
 // How a token kind appears in "expected X" messages.
+// Output when error, use this to identify.
 std::string describe(TokenKind kind) {
     switch (kind) {
     case TokenKind::TOK_EOF:
@@ -57,7 +59,7 @@ std::string describe(TokenKind kind) {
     case TokenKind::UNKNOWN_TOKEN_SYNTAX_ERROR:
         return std::string(tokenKindName(kind));
     default:
-        return "'" + std::string(tokenKindName(kind)) + "'";
+        return "'" + std::string(tokenKindName(kind)) + "'"; 
     }
 }
 
@@ -83,7 +85,7 @@ bool startsStatement(TokenKind kind) {
         return false;
     }
 }
-
+// assigns the operand with tokens
 std::optional<AssignOp> assignOp(TokenKind kind) {
     switch (kind) {
     case TokenKind::TOK_ASSIGN:       return AssignOp::Assign;
@@ -97,7 +99,7 @@ std::optional<AssignOp> assignOp(TokenKind kind) {
 }
 
 }  // namespace
-
+// Constructor for parser, don't know if optimizations are needed
 Parser::Parser(Lexer& lexer, DiagnosticEngine& diags) : lexer_(lexer), diags_(diags), tok_(lexer.next()) {}
 
 // ---------------------------------------------------------------------------

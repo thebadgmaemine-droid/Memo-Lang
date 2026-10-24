@@ -12,6 +12,8 @@
 namespace MemoLang {
     class DiagnosticEngine;
     class Lexer;
+    /* Reviewing 17/10/2026 */
+
 
     // Recursive-descent parser; binary operators use precedence climbing.
     // The grammar is written out in docs/STATUS.md.
@@ -39,7 +41,6 @@ namespace MemoLang {
             int precedence;
             int tokenCount;  // 2 for `is not` and `not in`.
         };
-
         // Token stream
         [[nodiscard]] const Token& peekNext();
         Token consume();
@@ -50,6 +51,8 @@ namespace MemoLang {
         bool tooDeep();
 
         // Error recovery
+        // Recovers from a run-time/compile error and sends the diagnostic info to the Diagnostics
+        // This error recovery only includes ; and braces error 
         void synchronize(std::uint32_t statementStart);
         void skipBalancedBraces();
         void skipUnsupported();
