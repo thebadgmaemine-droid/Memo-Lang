@@ -1,3 +1,38 @@
+// ---------------------------------------------------------------------------
+// parser.cpp: stage 2 of the compiler pipeline
+//
+//   source text -> Lexer -> tokens -> [Parser] -> AST
+//
+// The parser reads tokens from the lexer and builds the abstract syntax tree
+// (the node classes in AST.h). It is a recursive-descent parser: each grammar
+// rule (statement, if, block, expression, ...) is one function, and the
+// functions call each other the way the rules nest. The full grammar is
+// written out in docs/STATUS.md.
+//
+// Binary operators use precedence climbing, the same idea as ParseBinOpRHS in
+// the old Kaleidoscope parser. parseExpression(minPrecedence) reads one
+// operand, then keeps taking operators whose precedence is at least
+// minPrecedence. The right-hand side is parsed with (precedence + 1), so for
+// `a + b * c`:
+//   - read `a`; `+` (level 9) >= 1, so parse its right side with minimum 10
+//       - read `b`; `*` (level 10) >= 10, so it binds here: b * c
+//   - result: a + (b * c)
+// For `a - b - c`, the second `-` (9) is below 10, so the inner call stops and
+// the outer loop takes it: (a - b) - c. That is what left-associative means.
+//
+// Error recovery: when a statement is broken, the parser reports one error,
+// then synchronize() skips to a likely statement boundary (`;`, `}`, or a
+// keyword such as `return`) and carries on. One run finds every mistake
+// without a cascade of follow-on errors; tests/errors/syntax.memo checks this.
+//
+// Nesting limit: each nested construct uses stack space. NestingGuard counts
+// the depth; past Parser::kMaxNestingDepth (256) the parser reports one error
+// and stops, instead of crashing with a stack overflow.
+//
+// History: written 2026-10-14, replacing the Kaleidoscope-style parser.h
+// (git commit dae18ee). 2026-10-15: nesting limit and fatal stop (found by the
+// stress tests); long text shortened in error messages.
+// ---------------------------------------------------------------------------
 #include "Parser/parser.h"
 
 #include <charconv>

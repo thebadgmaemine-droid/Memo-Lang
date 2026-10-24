@@ -8,6 +8,9 @@
 #include "Source/SourceLocation.h"
 #include "Lex/tokenkind.h"
 namespace MemoLang {
+// One token produced by the lexer: its kind, where it is, and its text.
+// 2026-10-14: finished the original declaration (it had no data members and
+// was missing the `;` after the class) and made the accessors inline.
 class Token {
     public:
     Token() = default;

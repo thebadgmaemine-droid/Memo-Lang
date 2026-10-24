@@ -1,3 +1,13 @@
+// ---------------------------------------------------------------------------
+// token.cpp: names and keyword lookup for token kinds
+//
+// tokenkind.h lists every token exactly once, in MEMOLANG_TOKEN_LIST and
+// MEMOLANG_KEYWORD_LIST (an "X-macro"). The TokenKind enum and both functions
+// below are generated from those lists, so adding a token in one place updates
+// all three.
+//
+// History: added 2026-10-14.
+// ---------------------------------------------------------------------------
 #include "Lex/tokenkind.h"
 
 namespace MemoLang {

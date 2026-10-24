@@ -17,6 +17,10 @@
 // comment; otherwise the error is expected on the comment's own line. The text
 // must appear in the message. Every error must be expected, and every
 // expectation must be met.
+//
+// History: added 2026-10-15. Its stress cases found three real bugs: a stack
+// overflow on deep nesting, gigabytes of output for long lines, and
+// 1000-digit literals quoted in full in error messages.
 
 #include <algorithm>
 #include <chrono>

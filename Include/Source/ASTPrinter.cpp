@@ -1,3 +1,12 @@
+// ---------------------------------------------------------------------------
+// ASTPrinter.cpp: prints the AST as an indented tree (`MemoLang --dump-ast`)
+//
+// The printer is a Visitor (see AST.h): each node's accept() calls back the
+// matching visit() here, and each tree level is indented two more spaces. The
+// tests compare this output with the .ast files in tests/ast/.
+//
+// History: added 2026-10-14.
+// ---------------------------------------------------------------------------
 #include "AST/ASTPrinter.h"
 
 #include <ostream>

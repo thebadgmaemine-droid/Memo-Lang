@@ -14,6 +14,17 @@
 //  Private data members are named [name]_ 
 //  Nodes are move-only. Use clone() for deep copies.
 //  * Preconditions use assert().
+//
+// Changes made 2026-10-14/15 for the new parser (everything else is the
+// original design):
+//  - New nodes: NameExpr, AssignStmt, ReturnStmt, IfStmt, WhileStmt,
+//    BreakStmt, and struct Module (one parsed file). Each one has a visit()
+//    in Visitor.
+//  - New operators: BinaryOp::MatMul (`@`), UnaryOp::Not, AssignOp::Mod (`%=`).
+//  - Fixed: FunctionDef::name_ was `static`, so every function shared one name.
+//  - Fixed: the closing comment named the namespace `Memolang`.
+//  - Assert-only loop variables are [[maybe_unused]]; Release builds remove
+//    assert() and warned about unused variables.
 
 namespace MemoLang {
 
@@ -621,12 +632,17 @@ public:
     void accept(Visitor& v) const override { v.visit(*this); }
 
 private:
-    std::string name_;
+    std::string name_;  // Was `static` (one name shared by every function); fixed 2026-10-14.
     std::vector<Param> params_;
     std::unique_ptr<TypeExpr> returnType_;
     std::vector<std::unique_ptr<Statement>> body_;
     std::string externName_;
 };
+
+// ---------------------------------------------------------------------------
+// Statement nodes added 2026-10-14 for the parser: assignment, return,
+// if/else, while, break, plus Module.
+// ---------------------------------------------------------------------------
 
 // `target = value;` and the compound forms `+=`, `-=`, `*=`, `/=`, `%=`.
 class AssignStmt final : public Statement {

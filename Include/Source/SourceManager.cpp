@@ -1,3 +1,13 @@
+// ---------------------------------------------------------------------------
+// SourceManager.cpp: holds the text of the file being compiled
+//
+// The lexer works with byte offsets (position 0, 1, 2, ... in the file), but
+// people read line:column. The constructor records where each line starts;
+// locationAt() turns an offset into line:column with a binary search, and
+// lineText() returns one line so error messages can show it.
+//
+// History: added 2026-10-14.
+// ---------------------------------------------------------------------------
 #include "Source/SourceManager.h"
 
 #include <algorithm>

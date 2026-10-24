@@ -57,7 +57,7 @@ The stages follow the pipeline figure in the report.
 | Driver | Done (front-end only) | `Include/Driver/driver.h`, `Include/Source/driver.cpp`, `main.cpp` |
 | Semantic analysis / types | **Empty file** | `Include/Semantics/sema.h`, `Include/Source/type.cpp` |
 | Consumption analysis (destructive read) | **Missing**, no file yet | Uses `State { Live, Consumed, MaybeConsumed }` in `AST.h` |
-| LLVM IR generation | **Empty file / broken stub** | `Include/Codegen/codegen.h`, `Include/Source/codegen.cpp`, `Include/IR/-IRBuilder.h` |
+| LLVM IR generation | **Empty file / interface only** | `Include/Codegen/codegen.h`, `Include/Source/codegen.cpp`, `Include/IR/-IRBuilder.h` |
 | JIT / AOT | **Missing** | none |
 | cuBLAS runtime | **Missing** (the report lists `CuBLASRuntime.cpp`, which was never created) | none |
 | CUTLASS GEMM kernel | **Missing** | none |
@@ -66,14 +66,10 @@ The stages follow the pipeline figure in the report.
 
 ### Known problems in existing files
 
-- `Include/IR/-IRBuilder.h`: doesn't compile and nothing includes it. It uses
-  `namespace memo-lang` (a hyphen isn't allowed in a name), its constructor is
-  named `IRGenerator` while the class is `IRBuilder`, `emit` has no return type,
-  and `TypeContext` doesn't exist. The leading `-` in the file name is also unusual.
-  Rewrite it when codegen starts.
-- `Include/CMakeLists.txt`: never used (the root CMake doesn't
-  `add_subdirectory` it) and defines a second `MemoLang` target. Delete it, or
-  turn it into a library target.
+- `Include/IR/-IRBuilder.h`: compiles now (fixed 2026-10-17) but is only an
+  interface, `IRGenerator`, with no implementation, and `TypeContext` is only
+  forward-declared. The leading `-` in the file name is unusual; consider
+  renaming it to `IRGenerator.h` when codegen starts.
 - `Include/AST/query.h`: declares `rangecontainer` and `Indentifier_Range`,
   which are never defined. Fine while unused; the second name has a typo.
 - `AST.h`: `Visitor` has a nested `State` enum that duplicates the

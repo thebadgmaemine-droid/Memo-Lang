@@ -1,3 +1,28 @@
+// ---------------------------------------------------------------------------
+// lexer.cpp: stage 1 of the compiler pipeline
+//
+//   source text -> [Lexer] -> tokens -> Parser -> AST -> (sema, codegen: not written yet)
+//
+// The lexer walks the source text one character at a time and groups the
+// characters into tokens. `int x = 3;` becomes
+//   type name 'int', identifier 'x', '=', integer literal '3', ';'
+// Every token remembers where it came from (line and column), so later stages
+// can point at the exact spot in an error message.
+//
+// How it works:
+//   - next() skips spaces and `#` comments, then looks at the first character
+//     to decide what kind of token starts there (letter, digit, quote, symbol).
+//   - Operators take the longest match ("maximal munch"): `+=` is one token,
+//     not `+` then `=`. match() consumes the next character only if it is the
+//     one we hoped for.
+//   - Mistakes (`$`, an unterminated string, `12abc`) are reported to the
+//     DiagnosticEngine and returned as UNKNOWN_TOKEN_SYNTAX_ERROR, so lexing
+//     carries on and one run reports every mistake.
+//
+// History: written 2026-10-14. The file was empty; the old lexer was gettok()
+// in the Kaleidoscope-style parser.h (git commit dae18ee). 2026-10-15: long
+// text is shortened when quoted in error messages (quoteForMessage).
+// ---------------------------------------------------------------------------
 #include "Lex/lexer.h"
 
 #include <cctype>
