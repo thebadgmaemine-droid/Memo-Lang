@@ -146,3 +146,9 @@ Keywords the lexer recognizes but the parser rejects with "not supported yet":
 5. **More tests**: one `.memo` file per feature, compared against expected
    `--dump-ast` output. The CTest setup is already in `CMakeLists.txt`.
 
+
+
+   ## UPDATE as of 10/30/2026
+   - Contributor : HL;
+   - Goals: 
+

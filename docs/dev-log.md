@@ -34,3 +34,6 @@ Building IRGenerator and visior pattern.
 
 10/15/2026 due to Delays:
 Day goal : 
+
+
+##  Decreprated file - Update 10/30/2026
