@@ -105,6 +105,7 @@ namespace MemoLang {
     // Returns the keyword's kind, TOK_KEYWORDTYPE for a built-in type name
     // (int, float, matrix, ...), or TOK_IDENTIFIER for anything else.
     [[nodiscard]] TokenKind keywordKind(std::string_view spelling);
+    
 }
 
 #endif // TOKENKIND_H_
