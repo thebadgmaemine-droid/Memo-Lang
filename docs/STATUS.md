@@ -58,6 +58,7 @@ The stages follow the pipeline figure in the report.
 | Semantic analysis / types | **Empty file** | `Include/Semantics/sema.h`, `Include/Source/type.cpp` |
 | Consumption analysis (destructive read) | **Missing**, no file yet | Uses `State { Live, Consumed, MaybeConsumed }` in `AST.h` |
 | LLVM IR generation | **Empty file / interface only** | `Include/Codegen/codegen.h`, `Include/Source/codegen.cpp`, `Include/IR/-IRBuilder.h` |
+| Optimization passes | No file yet |
 | JIT / AOT | **Missing** | none |
 | cuBLAS runtime | **Missing** (the report lists `CuBLASRuntime.cpp`, which was never created) | none |
 | CUTLASS GEMM kernel | **Missing** | none |
@@ -68,18 +69,13 @@ The stages follow the pipeline figure in the report.
 
 - `Include/IR/-IRBuilder.h`: compiles now (fixed 2026-10-17) but is only an
   interface, `IRGenerator`, with no implementation, and `TypeContext` is only
-  forward-declared. The leading `-` in the file name is unusual; consider
-  renaming it to `IRGenerator.h` when codegen starts.
-- `Include/AST/query.h`: declares `rangecontainer` and `Indentifier_Range`,
-  which are never defined. Fine while unused; the second name has a typo.
-- `AST.h`: `Visitor` has a nested `State` enum that duplicates the
-  namespace-level `State`. Keep one.
+  forward-declared.
 - `AST.h`: `InterpolatedString` and the `isByte`/`isRegex` flags exist in the
   AST, but the lexer has no syntax for them yet.
 - The report's "Main Source Files" table (`Lexer.h/.cpp`, `ExprAST.h`,
   `CodeGen.cpp`, `CuBLASRuntime.cpp`) doesn't match the real file names. Update
   it before the next submission.
-
++ Update 11/2/2026: Fixed most of the simple errors.
 ## Grammar (what the parser accepts today)
 
 ```
@@ -147,8 +143,4 @@ Keywords the lexer recognizes but the parser rejects with "not supported yet":
    `--dump-ast` output. The CTest setup is already in `CMakeLists.txt`.
 
 
-
-   ## UPDATE as of 10/30/2026
-   - Contributor : HL;
-   - Goals: 
 

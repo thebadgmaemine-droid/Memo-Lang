@@ -9,8 +9,8 @@ namespace MemoLang {
 
 // Prints the tree as indented text, one node per line. Used by --dump-ast and
 // handy for checking what the parser produced.
-void printAST(const Module& module, std::ostream& out);
+void printAST(const Module &module, std::ostream &out);
 
-}  // namespace MemoLang
+} // namespace MemoLang
 
-#endif  // ASTPRINTER_H_
+#endif // ASTPRINTER_H_

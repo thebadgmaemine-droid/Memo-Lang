@@ -1,9 +1,7 @@
 #pragma once
 
-#include "AST/AST.h"
-#include <llvm/IR/IRBuilder.h>
-// Need type context here
 #include <functional>
+#include <llvm/IR/IRBuilder.h>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -11,6 +9,9 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+
+// Need type context here
+#include "AST/AST.h"
 
 namespace llvm {
 class BasicBlock;
@@ -22,9 +23,7 @@ class Value;
 } // namespace llvm
 
 namespace memolang {
-    class DiagnosticEngine;
-    class SourceManager;
-    class IRGenerator { 
-        
-    }
+class DiagnosticEngine;
+class SourceManager;
+class IRGenerator {}
 }

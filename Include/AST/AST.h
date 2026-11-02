@@ -7,7 +7,7 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <utility>
+#include <utility> 
 #include <vector>
 
 //  Private data members are named [name]_
@@ -85,8 +85,6 @@ enum class NodeKind {
   // Type expressions
   TypeExpr,
 };
-
-enum class State { Live, Consumed, MaybeConsumed }; // There is no "maybe live".
 
 enum class BinaryOp {
   Add,

@@ -5,8 +5,8 @@ namespace MemoLang {
 
 // Command-line entry point: MemoLang [options] <file.memo>
 // Returns the process exit code: 0 = success, 1 = compile errors, 2 = bad usage.
-int runDriver(int argc, char** argv);
+int runDriver(int argc, char **argv);
 
-}  // namespace MemoLang
+} // namespace MemoLang
 
-#endif  // DRIVER_H_
+#endif // DRIVER_H_

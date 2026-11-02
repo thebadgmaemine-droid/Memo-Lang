@@ -12,8 +12,8 @@
 #include <llvm/IR/IRBuilder.h>
 #include <string>
 #include <unordered_map>
-#include <vector>
 #include <unordered_set>
+#include <vector>
 
 namespace llvm {
 class BasicBlock;
@@ -44,19 +44,15 @@ public:
 private:
   // Empty for now // Updating 10/30/2026
   // // Updating 10/30/2026
-  llvm::Type*lowers(const Type *type);
-  llvm::Value *
+  llvm::Type *lowers(const Type *type);
+
   emitAnyTypeMatch(llvm::IRBuilder<> &builder, llvm::value value,
                    const Type *target); // Has target, has builder has value.
-  std::unordered_map<std::string, llvm::Function*> functions_{};
-  std::unordered_map<std::string, const FunctionDef*> functionDefs_{};
+  std::unordered_map<std::string, llvm::Function *> functions_{};
+  std::unordered_map<std::string, const FunctionDef *> functionDefs_{};
   std::unordered_map<std::string, bool> externFunctions_{};
   std::unordered_set<std::string> reachable_{};
 
-
-
-
 }; // namespace MemoLang
-
 
 #endif // IR_BUILDER_H
