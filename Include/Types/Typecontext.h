@@ -6,6 +6,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+#include <cassert>
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -103,16 +104,24 @@ namespace MemoLang {
 -}
     class Typecontext {
         public:
-        // Allocator region for all types
+           // Allocator region for all types
+           // Can be called for all nodes to be destroyed using DestroyAll()
+           // 11/3/2026 Deciding if the Allocator should use malloc ( default type ) or any other.
+           // Alloc.Allocate(args) allocates pointers, to be destroyed using DestroyAll()
+    
             llvm::BumpPtrAllocator Alloc;
             // Pre allocated member types so that no look-up is needed
             Type VoidTy, LabelTy, FloatTy, DoubleTy /*...*/;
             IntegerType Int1Ty, Int8Ty, Int16Ty, Int32Ty, Int64Ty, Int128Ty;
-            
+
+         private:
+            // private instanced attribute for domain pointer regions.
+            llvm:SpecificBumpPtrAllocator<llvm::DomainValue> DomainValue_;
+            // For call during testing, least overhead
+            [[maybe_unused]] void llvm::detail::printBumpPtrAllocatorStats (unsigned NumSlabs, size_t TotalMemory)
+
             
 
-
-        private:
 
 
         }
@@ -123,7 +132,11 @@ namespace MemoLang {
 
 namespace Detail {
             std::string GenericKey(std::string_view ctor, const std::vector<const Type*>& args) { 
-                std::string key = "G:"; 
+                // Forward declaration of key to reserve the memory needed to prevent overflow
+                std::string key;
+                key.reserve(32 + args.size() * 16);
+                // key def
+                key = "G:"; 
                 key += ctor; // adds the generic name "ctor"
                 key += '<'; // connector
                 for (std::size_t i = 0; i < /* length */args.size() ; ++i) 
@@ -135,11 +148,74 @@ namespace Detail {
                 }
                 key += '>'; // deconnector
                 return key;
-
+            }
                 inline void appendPtr(std::string &key, const Type *t) {
                     key += std::to_string(reinterpret_cast<std::uintptr_t>(t));
                 }
+                // test this on trial.
+                /* auto appendPtr = [&key](const Type* t) {
+                key += (t == nullptr ? "?" : t->display());
+                };*/
+                class TypeRegistry {
+private:
+    std::unordered_map<std::string, const Type*> keyMap_;
+    mutable std::shared_mutex mutex_; // Protects keyMap_ and allows concurrent reads
+
+public:
+    // Takes a factory/compute function so we only compute the type if it's missing
+    template <typename ComputeFunc>
+    const Type* GetOrCompute(std::string_view ctor, 
+                             const std::vector<const Type*>& args, 
+                             ComputeFunc&& compute) 
+    {
+        // 1. Generate the key (done outside the lock to minimize contention)
+        std::string key = Detail::GenericKey(ctor, args);
+
+        // 2. Fast Path: Check if it exists using a Shared (Read) Lock
+        {
+            std::shared_lock<std::shared_mutex> readLock(mutex_);
+            auto it = keyMap_.find(key);
+            if (it != keyMap_.end()) {
+                return it->second; // Found! Return immediately without waiting for a write lock
+            }
         }
+
+        // 3. Slow Path: Acquire Exclusive (Write) Lock to insert
+            std::unique_lock<std::shared_mutex> writeLock(mutex_);
+
+            // Double-check: Another thread might have inserted it between dropping the read lock 
+            // and acquiring the write lock.
+            auto it = keyMap_.find(key);
+            if (it != keyMap_.end()) {
+                return it->second;
+            }
+
+        // 4. Compute the new type and insert using try_emplace
+            const Type* computedType = compute();
+            
+        // try_emplace moves the key only if insertion happens, avoiding redundant copies
+            auto [insertedIt, success] = keyMap_.try_emplace(std::move(key), computedType);
+            return insertedIt->second;
+
+        //5. Use template:
+        /*
+        TypeRegistry registry;
+        std::vector<const Type*> args = { args }; 
+        const Type* myType = registry.GetOrCompute("MyClass", args, [&]() {
+        return createExpensiveTypeImplementation(args);
+});
+        */
+
+    }
+};
+}
+                
+
+
+
+
+        
+
 
 
         
@@ -148,7 +224,7 @@ namespace Detail {
 
 
 
-        }
+    
 
 
 
