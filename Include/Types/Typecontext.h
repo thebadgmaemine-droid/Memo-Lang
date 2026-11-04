@@ -140,7 +140,7 @@ namespace MemoLang {
                       bool isMethod = false);
             [[nodiscard]] const std::vector<std::pair<const Type*, const Type*>>& instantiations() const;
             [[nodiscard]] const std::vector<FunctionInstantiation>& functionInstantiations() const;   
-              [[nodiscard]] const Type* neverType() const;
+            [[nodiscard]] const Type* neverType() const;
             [[nodiscard]] const Type* voidType() const;
             [[nodiscard]] const Type* noneType() const;
             [[nodiscard]] const Type* anyType() const;
