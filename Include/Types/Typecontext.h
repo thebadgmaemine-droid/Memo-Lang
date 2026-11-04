@@ -12,7 +12,6 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/IR/DerivedTypes.h"
 
 namespace MemoLang {
         // add here when needed
@@ -108,19 +107,69 @@ namespace MemoLang {
            // Can be called for all nodes to be destroyed using DestroyAll()
            // 11/3/2026 Deciding if the Allocator should use malloc ( default type ) or any other.
            // Alloc.Allocate(args) allocates pointers, to be destroyed using DestroyAll()
+           Typecontext();
+
     
             llvm::BumpPtrAllocator Alloc;
             // Pre allocated member types so that no look-up is needed
             Type VoidTy, LabelTy, FloatTy, DoubleTy /*...*/;
             IntegerType Int1Ty, Int8Ty, Int16Ty, Int32Ty, Int64Ty, Int128Ty;
-
-         private:
+            [[nodiscard]] const Type* primitive(std::string_view name) const;
+            [[nodiscard]] const Type* generic(std::string_view ctor, const std::vector<const Type*>& args);
+            [[nodiscard]] const Type* functionType(const std::vector<const Type*>& params,
+                                                    const Type* returnType);
+            [[nodiscard]] const Type* defineRecord(const std::string& name,
+                                                    std::vector<RecordField> fields,
+                                                    const std::string& qualifier = "");
+            void setRecordFlags(const Type* record, bool isFlags);
+            void setRecordFlags(const Type* record, bool isFlags);
+            void replaceRecordMethod(const Type* record, RecordMethod method);
+            [[nodiscard]] const Type* defineAlias(const std::string& name, const Type* underlying);
+            [[nodiscard]] const Type* defineGenericAlias(const std::string& name,
+                                               const Type* underlying,
+                                               std::vector<std::string> typeParams,
+                                               std::vector<const Type*> typeConstraints);
+            [[nodiscard]] const Type* defineTypeParam(const std::string& name);
+            [[nodiscard]] const Type* defineModule(const std::string& name, std::vector<RecordField> fields);
+            [[nodiscard]] const Type* instantiate(const Type* generic, const std::vector<const Type*>& args);
+            [[nodiscard]] const FunctionInstantiation*
+            instantiateFunction(const std::string& name,
+                      const std::vector<std::string>& typeParams,
+                      const Type* genericType,
+                      const std::vector<const Type*>& args,
+                      bool isMethod = false);
+            [[nodiscard]] const std::vector<std::pair<const Type*, const Type*>>& instantiations() const;
+            [[nodiscard]] const std::vector<FunctionInstantiation>& functionInstantiations() const;   
+              [[nodiscard]] const Type* neverType() const;
+            [[nodiscard]] const Type* voidType() const;
+            [[nodiscard]] const Type* noneType() const;
+            [[nodiscard]] const Type* anyType() const;
+            [[nodiscard]] const Type* boolType() const;
+            [[nodiscard]] const Type* i8Type() const;
+            [[nodiscard]] const Type* i32Type() const;
+            [[nodiscard]] const Type* i64Type() const;
+            [[nodiscard]] const Type* f32Type() const;
+            [[nodiscard]] const Type* f64Type() const;
+            [[nodiscard]] const Type* ptrType(const Type* pointee);
+            [[nodiscard]] const Type* listType(const Type* element, std::int64_t size = -1);
+            [[nodiscard]] const Type* arrayType(const Type* element);
+            [[nodiscard]] const Type* strType() const;
+            [[nodiscard]] const Type* vecType(const Type* element);
+             private:
             // private instanced attribute for domain pointer regions.
             llvm:SpecificBumpPtrAllocator<llvm::DomainValue> DomainValue_;
             // For call during testing, least overhead
-            [[maybe_unused]] void llvm::detail::printBumpPtrAllocatorStats (unsigned NumSlabs, size_t TotalMemory)
+            [[maybe_unused]] void llvm::detail::printBumpPtrAllocatorStats (unsigned NumSlabs, size_t TotalMemory);
+            // On start hashes
+              std::unordered_map<std::string, std::unique_ptr<Type>> interned_{};
+                std::unordered_map<std::string, const Type*> primitives_{};
+                std::unordered_map<std::string, const Type*> records_{};
+                std::unordered_map<std::string, const Type*> aliases_{};
+                std::unordered_map<std::string, const Type*> typeParams_{};
+                std::vector<std::pair<const Type*, const Type*>> instantiations_{};
+                std::vector<FunctionInstantiation> functionInstantiations_{};  
+                //add more methods here soon
 
-            
 
 
 

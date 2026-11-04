@@ -55,9 +55,9 @@ The stages follow the pipeline figure in the report.
 | Parser | Done, for the grammar below | `Include/Parser/parser.h`, `Include/Source/parser.cpp` |
 | AST | Done, for the grammar below | `Include/AST/AST.h`, `ASTPrinter.h`, `Include/Source/ASTPrinter.cpp` |
 | Driver | Done (front-end only) | `Include/Driver/driver.h`, `Include/Source/driver.cpp`, `main.cpp` |
-| Semantic analysis / types | **Empty file** | `Include/Semantics/sema.h`, `Include/Source/type.cpp` |
+| Semantic analysis / Types | **Empty file** | `Include/Semantics/sema.h`, `Include/Types/type.cpp` | Done |.
 | Consumption analysis (destructive read) | **Missing**, no file yet | Uses `State { Live, Consumed, MaybeConsumed }` in `AST.h` |
-| LLVM IR generation | **Empty file / interface only** | `Include/Codegen/codegen.h`, `Include/Source/codegen.cpp`, `Include/IR/-IRBuilder.h` |
+| LLVM IR generation | **Empty file / interface only** | `Include/IR/codegen.h`, `Include/IR/codegen.cpp`, `Include/IR/IRBuilder.h` |
 | Optimization passes | No file yet |
 | JIT / AOT | **Missing** | none |
 | cuBLAS runtime | **Missing** (the report lists `CuBLASRuntime.cpp`, which was never created) | none |
