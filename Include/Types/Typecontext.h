@@ -7,12 +7,13 @@
 #include <unordered_map>
 #include <vector>
 #include <cassert>
+#include <shared_mutex>
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Allocator.h"
-
+using namespace llvm;
 namespace MemoLang {
         // add here when needed
         // Generic key to build a "string key" for a generic type
@@ -108,6 +109,7 @@ namespace MemoLang {
            // 11/3/2026 Deciding if the Allocator should use malloc ( default type ) or any other.
            // Alloc.Allocate(args) allocates pointers, to be destroyed using DestroyAll()
            Typecontext();
+           
 
     
             llvm::BumpPtrAllocator Alloc;
