@@ -314,3 +314,40 @@ Prompts (code tasks):
 - 15/10: "Build and run the tests (edge test cases so it can put it the best it can perform) ..."
 - 15/10: "can you put comments on what you have done on the code"
 - 17/10: "just fix anything that is crucial for stable complier"
+
+
+---
+
+# Dev Log - November 6, 2026
+
+## Build fix
+
+Problem: since commit eb56fa0 (02/11/2026, "Reorganized project files and fixed indents") the project no longer built. GitHub Actions CI failed on every commit after it (the last 6 runs, 5a33df8 to 88fc1e0, all failed).
+
+Reasons found:
+1. CMakeLists.txt still listed the old .cpp paths. The reorganization moved each .cpp next to its header (for example Include/Source/AST.cpp to Include/AST/AST.cpp), so CMake stopped before compiling anything: "Cannot find source file: Include/Source/AST.cpp".
+2. MEMOLANG_USE_LLVM was switched back to ON by default. Configuring then needs LLVM at C:/dev/llvm, so it fails on every machine without it, including CI.
+3. Include/AST/AST.cpp held a half-finished move of the node definitions out of AST.h: the `Memolang` namespace typo again, duplicates of definitions that AST.h still has inline, members that don't exist (regex(), isCast(), setCast()), unbalanced braces and missing ';'. Over 100 compile errors.
+4. Include/Diag/diag.h got an extra `Severity warning` field in struct Diagnostic. That shifted the fields, so diags.cpp's push_back({severity, range, message}) no longer compiled. quoteForMessage also had unreachable code after its return.
+
+Possible reasons it went unnoticed:
+- Moving files in the editor or file explorer doesn't update CMakeLists.txt.
+- With LLVM installed locally, LLVM = ON works on that machine only.
+- Commits were pushed without a full local build, or without checking the CI result (red X) on GitHub.
+
+Fix:
+1. CMakeLists.txt: source list updated to the new paths; MEMOLANG_USE_LLVM back to OFF by default (with LLVM installed, configure with -DMEMOLANG_USE_LLVM=ON); duplicated comment removed.
+2. Include/AST/AST.cpp: restored the working stub. The unfinished version stays in git (eb56fa0) for later.
+3. Include/Diag/diag.h: removed the extra field (warnings already use `severity` = Warning) and the unreachable code.
+
+Result: clean configure, and Debug and Release builds of MemoLang, MemoLangFrontend and MemoLangTests with 0 errors and 0 warnings (MSVC 19.51, /W4). The tests run on GitHub Actions after the push (Smart App Control blocks running them locally).
+
+AI usage: the build problems were found and fixed with Claude Code.
+
+## To do later (not part of this fix)
+
+- New files not in the build yet: Types/Types.h, Types/Typecontext.h, Semantics/sema.h, Semantics/Scope.cpp, IR/IRBuilder.h, IR/IRGenerator.h, IR/IRBuilder.cpp, IR/codegen.cpp, Source/type.cpp. Most include LLVM headers, so they can only be compiled with -DMEMOLANG_USE_LLVM=ON.
+- Semantics/Scope.h: missing ';' after SymbolId, Binding and Scope; include guard mismatch (SCOPE_H / SCOPER_H); missing <string_view>.
+- docs/STATUS.md: rows with an extra "Done" column break the table, and "Done" for semantic analysis and IR generation doesn't match the code yet.
+- Moving the AST definitions out of AST.h (eb56fa0), if still wanted: remove each one from AST.h when adding it to AST.cpp.
+- Type class (based on Sere's): check Sere's license and credit it; trim it to MemoLang's types (matrix element type and shape, consumable flag).

@@ -9,6 +9,10 @@
 // Remember to call for function afterwards
 // Added warning to Diagnostic struct for warning diagnostics ( potentially very useful for a volatile language using destructive read btw)
 // No other change
+// 2026-11-06: removed that extra `warning` member again. Warnings already work
+// through `severity`: DiagnosticEngine::warning() stores Severity::Warning
+// there. The extra member shifted the fields, so diags.cpp's
+// push_back({severity, range, message}) no longer compiled.
 
 namespace MemoLang {
 
@@ -35,14 +39,11 @@ severityName(Severity severity) noexcept {
   if (text.size() <= maxLength)
     return "'" + std::string(text) + "'";
   return "'" + std::string(text.substr(0, maxLength)) + "...'";
-  if (text.size() == 0)
-    return "Not quote";
 }
 
 // One message from any compiler stage, attached to a range of source text.
 struct Diagnostic {
-  Severity severity = Severity::Error;
-  Severity warning = Severity::Warning;
+  Severity severity = Severity::Error;  // Note, Warning or Error.
   SourceRange range;
   std::string message;
 }; // Is called using a different function.

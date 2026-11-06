@@ -5,14 +5,15 @@ project(MemoLang VERSION 0.1.0 LANGUAGES CXX)
 option(MEMOLANG_BUILD_TESTS "Build MemoLang tests" ON)
 option(MEMOLANG_BUILD_EXAMPLES "Build MemoLang example programs" ON)
 # The front-end (lexer, parser, diagnostics) doesn't use LLVM, so it builds
-# without it. Turn this on once code generation is written.
-option(MEMOLANG_USE_LLVM "Link against LLVM and enable LLVM frontend support" ON)
+# without it. OFF by default so the project builds on machines without LLVM
+# (CI, teammates); with LLVM installed, configure with -DMEMOLANG_USE_LLVM=ON.
+option(MEMOLANG_USE_LLVM "Link against LLVM and enable LLVM frontend support" OFF)
 
 set(CMAKE_CXX_STANDARD 20) # Use Cpp 20 for compiler and tests
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# Configure LLVM (adjust LLVM_DIR if needed)# Configure LLVM (adjust LLVM_DIR if needed)
+# Configure LLVM (adjust LLVM_DIR if needed)
 set(LLVM_DIR "C:/dev/llvm/build/lib/cmake/llvm" CACHE PATH
     "Path to the LLVM CMake package")
 
@@ -47,14 +48,16 @@ foreach(entry ${MEMOLANG_INCLUDE_ENTRIES})
 endforeach()
 
 # The front-end as a library, so the compiler and the test runner share it.
+# Paths updated 2026-11-06 after the 2026-11-02 reorganization moved each .cpp
+# next to its header. When a file moves, update this list too.
 add_library(MemoLangFrontend STATIC
-    Include/Source/AST.cpp
-    Include/Source/ASTPrinter.cpp
+    Include/AST/AST.cpp
+    Include/AST/ASTPrinter.cpp
+    Include/Diag/diags.cpp
+    Include/Driver/driver.cpp
+    Include/Lex/lexer.cpp
+    Include/Parser/parser.cpp
     Include/Source/SourceManager.cpp
-    Include/Source/diags.cpp
-    Include/Source/driver.cpp
-    Include/Source/lexer.cpp
-    Include/Source/parser.cpp
     Include/Source/token.cpp
 )
 target_include_directories(MemoLangFrontend PUBLIC ${MEMOLANG_INCLUDE_DIRS})
