@@ -57,8 +57,8 @@ The stages follow the pipeline figure in the report.
 | Driver | Done (front-end only) | `Include/Driver/driver.h`, `Include/Source/driver.cpp`, `main.cpp` |
 | Semantic analysis / Types | **Empty file** | `Include/Semantics/sema.h`, `Include/Types/type.cpp` | Done |.
 | Consumption analysis (destructive read) | **Missing**, no file yet | Uses `State { Live, Consumed, MaybeConsumed }` in `AST.h` |
-| LLVM IR generation | **Empty file / interface only** | `Include/IR/codegen.h`, `Include/IR/codegen.cpp`, `Include/IR/IRBuilder.h` |
-| Optimization passes | No file yet |
+| LLVM IR generation | **Empty file / interface only** | `Include/IR/codegen.h`, `Include/IR/codegen.cpp`, `Include/IR/IRBuilder.h` | Done
+| Optimization passes | Not done |
 | JIT / AOT | **Missing** | none |
 | cuBLAS runtime | **Missing** (the report lists `CuBLASRuntime.cpp`, which was never created) | none |
 | CUTLASS GEMM kernel | **Missing** | none |
