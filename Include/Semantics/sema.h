@@ -3,13 +3,14 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 #include <vector>
 
 #include "AST/AST.h"
 
 namespace MemoLang {
+class DiagnosticEngine;
+
 namespace sema {
 
 using SourceLocation = SourceLoc;
@@ -42,23 +43,10 @@ private:
     std::unordered_map<std::string, Symbol> symbols_;
 };
 
-class DiagnosticSink {
-public:
-    DiagnosticSink();
-    ~DiagnosticSink();
-
-    void reportError(std::string_view message, const SourceLocation& location);
-    void reportWarning(std::string_view message, const SourceLocation& location);
-
-private:
-    std::vector<std::string> errors_;
-    std::vector<std::string> warnings_;
-};
-
 class SemanticAnalyzer {
 public:
     SemanticAnalyzer();
-    explicit SemanticAnalyzer(std::shared_ptr<DiagnosticSink> diag);
+    explicit SemanticAnalyzer(std::shared_ptr<DiagnosticEngine> diag);
     ~SemanticAnalyzer();
 
     bool analyzeModule(Module* module);
@@ -80,7 +68,7 @@ public:
 private:
     std::shared_ptr<Scope> globalScope_;
     std::vector<std::shared_ptr<Scope>> scopes_;
-    std::shared_ptr<DiagnosticSink> diagnostics_;
+    std::shared_ptr<DiagnosticEngine> diagnostics_;
     std::unordered_map<std::string, const Type*> namedTypes_;
 };
 

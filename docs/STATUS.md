@@ -1,10 +1,9 @@
 # MemoLang: project status
 
-Last updated: 2026-10-14 (v0.1.0)
+Last updated: 2026-11-09 (v0.1.0)
 
-This file tracks what exists in the code, what is a stub, and what is still
-missing, so anyone picking up the project knows where to start. Update it
-whenever a component changes state.
+This checklist is based on the current source tree. “Done” means implemented
+and connected to the executable or test suite, not merely declared in a header.
 
 ## Build and run
 
@@ -19,8 +18,9 @@ build/Debug/MemoLang --dump-tokens examples/basicadd.memo
 build/Debug/MemoLang examples/errors.memo                # shows diagnostics
 ```
 
-This needs a C++20 compiler: MSVC 2022+, GCC 11+ or Clang 14+. LLVM isn't
-needed until code generation exists (`-DMEMOLANG_USE_LLVM=ON` turns it back on).
+This needs a C++20 compiler: MSVC 2022+, GCC 11+ or Clang 14+. LLVM is
+optional for the syntax-only front end; enabling `MEMOLANG_USE_LLVM` currently
+selects an unfinished code-generation path.
 
 If Windows Smart App Control is on, it can block the freshly built,
 unsigned `.exe` files ("An Application Control policy has blocked this file").
@@ -36,46 +36,76 @@ In that case, run the tests in WSL, on another machine, or in CI.
 | `tests/tokens/*.memo` | Lexes with no errors; token list must equal the `.tokens` file |
 | `tests/errors/*.memo` | Every error matches an `# expect-error: <col>: <text>` comment on its line (or `# expect-error@+N:` for N lines below), and there are no other errors |
 | `stress` (built in) | Empty/huge/1 MB inputs, NUL bytes, CRLF, 100000-deep nesting of every kind, 10000-term chains, throughput |
-| `fuzz` (built in) | 9000 random, token-soup and mutated inputs: no crash, no hang, same result every run |
+| `fuzz` (built in) | 9000 random-byte, token-soup and mutated inputs: no crash, no hang, same result every run |
 
 To add a test, drop a `.memo` file in the right folder and re-run CMake. For
 `ast`/`tokens`, the first run creates the expected-output file and fails until
 you have reviewed it. After an intended output change, regenerate it with
 `MemoLangTests ast tests/ast/<name>.memo --update` and check the diff.
 
-## Pipeline status
+## Functional compiler checklist
 
-The stages follow the pipeline figure in the report.
+The current executable is a syntax-checking front end. It does not yet perform
+semantic analysis or produce runnable output.
 
-| Stage | Status | Files |
-|---|---|---|
-| Source / locations | Done | `Include/Source/SourceLocation.h`, `SourceManager.h/.cpp` |
-| Diagnostics | Done | `Include/Diag/diag.h`, `diagengine.h`, `Include/Source/diags.cpp` |
-| Lexer | Done | `Include/Lex/tokenkind.h`, `token.h`, `lexer.h`, `Include/Source/lexer.cpp`, `token.cpp` |
-| Parser | Done, for the grammar below | `Include/Parser/parser.h`, `Include/Source/parser.cpp` |
-| AST | Done, for the grammar below | `Include/AST/AST.h`, `ASTPrinter.h`, `Include/Source/ASTPrinter.cpp` |
-| Driver | Done (front-end only) | `Include/Driver/driver.h`, `Include/Source/driver.cpp`, `main.cpp` |
-| Semantic analysis / Types | **Empty file** | `Include/Semantics/sema.h`, `Include/Types/type.cpp` | Done |.
-| Consumption analysis (destructive read) | **Missing**, no file yet | Uses `State { Live, Consumed, MaybeConsumed }` in `AST.h` |
-| LLVM IR generation | **Empty file / interface only** | `Include/IR/codegen.h`, `Include/IR/codegen.cpp`, `Include/IR/IRBuilder.h` | Done
-| Optimization passes | Not done |
-| JIT / AOT | **Missing** | none |
-| cuBLAS runtime | **Missing** (the report lists `CuBLASRuntime.cpp`, which was never created) | none |
-| CUTLASS GEMM kernel | **Missing** | none |
-| Macros | **Notes only** | `Include/Macro/read.md`, `Include/AST/query.h` (declared, not implemented) |
-| Tests | Front-end covered | `tests/` (see "Tests" below), `examples/*.memo` |
+### Implemented and verified
 
-### Known problems in existing files
+- [x] C++20 front-end executable and test runner build with GCC 13.2
+  (`MEMOLANG_USE_LLVM=OFF`).
+- [x] Source file loading, source ranges, lexer, parser, AST, and source-aware
+  diagnostics.
+- [x] CLI syntax checking plus `--dump-tokens`, `--dump-ast`, `--help`, and
+  `--version`.
+- [x] Golden lexer, AST, and diagnostic tests; stress and deterministic fuzz
+  tests; example programs. The current suite passes all 16 CTest tests.
 
-- `Include/IR/-IRBuilder.h`: compiles now (fixed 2026-10-17) but is only an
-  interface, `IRGenerator`, with no implementation, and `TypeContext` is only
-  forward-declared.
-- `AST.h`: `InterpolatedString` and the `isByte`/`isRegex` flags exist in the
-  AST, but the lexer has no syntax for them yet.
-- The report's "Main Source Files" table (`Lexer.h/.cpp`, `ExprAST.h`,
-  `CodeGen.cpp`, `CuBLASRuntime.cpp`) doesn't match the real file names. Update
-  it before the next submission.
-+ Update 11/2/2026: Fixed most of the simple errors.
+### Required for a functional compiler
+
+- [ ] Resolve the conflicting `//` handling: the grammar documents it as
+  floor division, but the lexer also has an unreachable `//` comment branch.
+  The `/* ... */` comment checks also compare a single `char` to
+  multi-character constants. Specify supported comment syntax and test it.
+- [ ] Implement and test the type system. `Include/Types/Typecontext.h` is an
+  unfinished draft with undefined types and malformed declarations;
+  `Include/Source/type.cpp` is empty. The current front-end build does not
+  compile this code.
+- [ ] Complete scope support. `Include/Semantics/Scope.h` declares operations,
+  but `Include/Semantics/Scope.cpp` is empty.
+- [ ] Implement semantic analysis: name and scope resolution, type checking,
+  assignment/call/operator validation, and `auto` return-type inference.
+  `Include/Semantics/sema.h` contains declarations only; there is no
+  implementation or driver integration.
+- [ ] Implement destructive/consumption analysis. `Analysis/destructive.h`
+  currently walks the AST and records declarations as live; it does not mark
+  consumed matrix values, detect invalid use, model control-flow joins, or
+  report diagnostics. It is not part of the build or driver pipeline.
+- [ ] Implement a valid LLVM IR lowering path and integrate it after analysis.
+  `Include/IR/IRBuilder.h` is not a compilable interface, and
+  `Include/IR/IRBuilder.cpp` is a stub (`getmodule()` returns null and `emit()`
+  returns false). LLVM-enabled builds have not been verified.
+- [ ] Add end-to-end tests that compile valid programs to output and execute
+  them, and reject semantic errors before code generation.
+- [ ] Choose and implement a runtime/output strategy (AOT or JIT), then add
+  linking and execution tests.
+
+### Optional or language-specific follow-ups
+
+- [ ] Add optimization passes if needed.
+- [ ] Implement the matrix runtime (cuBLAS) and CUTLASS GEMM kernel if those
+  remain project requirements; neither exists in the source tree.
+- [ ] Implement macros; `Include/Macro/read.md` is notes only and
+  `Include/AST/query.h` contains declarations without implementations.
+- [ ] Add syntax and tests for AST features not currently lexed or parsed, such
+  as interpolated strings and byte/regex string flags.
+
+### Current validation notes
+
+- The verified command used a separate Ninja build directory and GCC because
+  the available Visual Studio CMake generator could not locate an MSVC
+  compiler. This does not verify the MSVC or LLVM-enabled configurations.
+- GCC reports multi-character character-constant warnings in
+  `Include/Lex/lexer.cpp` for the ineffective comment checks above.
+
 ## Grammar (what the parser accepts today)
 
 ```
@@ -104,8 +134,8 @@ primary        := INTEGER | FLOAT | STRING | 'true' | 'false' | IDENT
 
 - `TYPE_NAME` is one of `int i32 i64 float f32 f64 bool str byte void matrix`.
 - Comments start with `#`. `//` is floor division.
-- A `def` without `-> type` gets return type `auto` (to be inferred by sema).
-  An `extern` without one gets `void`.
+- A `def` without `-> type` gets return type `auto` (inference is not
+  implemented yet). An `extern` without one gets `void`.
 - `if` and `while` conditions don't need parentheses.
 
 Binary operator precedence, lowest first. All are left-associative except `**`.
@@ -128,19 +158,3 @@ Binary operator precedence, lowest first. All are left-associative except `**`.
 
 Keywords the lexer recognizes but the parser rejects with "not supported yet":
 `for`, `import`, `try`, `catch`, `throw`, `case`, `none`.
-
-## Suggested next steps
-
-1. **Semantic analysis** (`sema.h`): name resolution, type checking, and
-   inferring `auto` return types. It reports through `DiagnosticEngine`, like the parser.
-2. **Consumption analysis**: a `Visitor` that marks each matrix operand of `@`
-   as `Consumed`, and reports use-after-consume as an error. This is the core of
-   the research.
-3. **Matrix runtime**: a small C++ library wrapping cuBLAS (and later the
-   CUTLASS kernel) with `memo_matmul(a, b, consume_a, consume_b)`.
-4. **Codegen**: lower the AST to LLVM IR that calls the runtime with consume flags.
-5. **More tests**: one `.memo` file per feature, compared against expected
-   `--dump-ast` output. The CTest setup is already in `CMakeLists.txt`.
-
-
-

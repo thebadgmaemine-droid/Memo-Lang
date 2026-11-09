@@ -1,6 +1,6 @@
 #pragma once
 #ifndef SCOPE_H
-#define SCOPER_H
+#define SCOPE_H
 // Inteface for tracking variable scope and lifetime
 // SymbolId  represents the current state of the variable
 // The SymbolIID binded record is very important for destructive analysis
@@ -8,6 +8,7 @@
 // AFfine states are mutable, and test functiosn will be below
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -17,11 +18,11 @@
 namespace MemoLang {
     struct SymbolId {
         std::uint32_t value;
-    }
+    };
     struct Binding {
         std::string name;
         // overload this with type & location if plausible
-    }
+    };
     class Scope {
         public:
         // Constructor
@@ -33,7 +34,7 @@ namespace MemoLang {
         Scope* parent_; // Non-owning; parent must outlive this scope.
         std::unordered_map<std::string, SymbolId> names_;
         
-    }
+    };
     
 
 
