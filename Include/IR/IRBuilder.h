@@ -44,10 +44,10 @@ public:
 private:
   // Empty for now // Updating 10/30/2026
   // // Updating 10/30/2026
-  llvm::Type *lowers(const Type *type);
+  llvm::Type *lowers(const llvm::Type *type);
 
   emitAnyTypeMatch(llvm::IRBuilder<> &builder, llvm::value value,
-                   const Type *target); // Has target, has builder has value.
+                   const llvm::Type * target); // Has target, has builder has value.
   std::unordered_map<std::string, llvm::Function *> functions_{};
   std::unordered_map<std::string, const FunctionDef *> functionDefs_{};
   std::unordered_map<std::string, bool> externFunctions_{};
