@@ -11,7 +11,7 @@
 #include <string>
 #include <string_view>
 
-#include "AST/ASTPrinter.h"
+#include "ASTPrinter.h"
 
 namespace MemoLang {
 namespace {

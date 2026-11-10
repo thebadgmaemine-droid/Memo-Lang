@@ -9,10 +9,6 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-
-// Need type context here
-#include "AST/AST.h"
-
 namespace llvm {
 class BasicBlock;
 class Function;
@@ -25,5 +21,5 @@ class Value;
 namespace memolang {
 class DiagnosticEngine;
 class SourceManager;
-class IRGenerator {}
+class IRGenerator {};
 }

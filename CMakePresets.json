@@ -1,106 +1,124 @@
-﻿{
-  "version": 3,
-  "configurePresets": [
-    {
-      "name": "windows-base",
-      "hidden": true,
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/out/build/${presetName}",
-      "installDir": "${sourceDir}/out/install/${presetName}",
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "cl.exe",
-        "CMAKE_CXX_COMPILER": "cl.exe"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
-    },
-    {
-      "name": "x64-debug",
-      "displayName": "x64 Debug",
-      "inherits": "windows-base",
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_COMPILER": "$env{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe",
-        "CMAKE_CXX_COMPILER": "$env{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe",
-        "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
-      }
-    },
-    {
-      "name": "x64-release",
-      "displayName": "x64 Release",
-      "inherits": "x64-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
-      }
-    },
-    {
-      "name": "x64-relwithdebinfo",
-      "displayName": "x64 RelWithDebInfo",
-      "inherits": "windows-base",
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "CMAKE_C_COMPILER": "$env{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe",
-        "CMAKE_CXX_COMPILER": "$env{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe",
-        "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake",
-        "LLVM_DIR": "C:/dev/llvm/build/lib/cmake/llvm"
-      }
-    },
-    {
-      "name": "x86-debug",
-      "displayName": "x86 Debug",
-      "inherits": "windows-base",
-      "architecture": {
-        "value": "x86",
-        "strategy": "external"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
-      }
-    },
-    {
-      "name": "x86-release",
-      "displayName": "x86 Release",
-      "inherits": "x86-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
-      }
-    }
-  ],
-  "buildPresets": [
-    {
-      "name": "x64-debug-build",
-      "displayName": "Build x64 Debug (MemoLang)",
-      "configurePreset": "x64-debug",
-      "description": "Build preset that targets the MemoLang executable",
-      "targets": [ "MemoLang" ]
-    },
-    {
-      "name": "x64-release-build",
-      "displayName": "Build x64 Release (MemoLang)",
-      "configurePreset": "x64-release",
-      "description": "Build preset that targets the MemoLang executable",
-      "targets": [ "MemoLang" ]
-    },
-    {
-      "name": "x64-relwithdebinfo-build",
-      "displayName": "Build x64 RelWithDebInfo (MemoLang)",
-      "configurePreset": "x64-relwithdebinfo",
-      "description": "Build preset that targets the MemoLang executable",
-      "targets": [ "MemoLang" ]
-    }
-  ]
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "windows-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "installDir": "${sourceDir}/out/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "x64-debug",
+            "displayName": "x64 Debug",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "$env{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe",
+                "CMAKE_CXX_COMPILER": "$env{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe",
+                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
+            }
+        },
+        {
+            "name": "x64-release",
+            "displayName": "x64 Release",
+            "inherits": "x64-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
+            }
+        },
+        {
+            "name": "x64-relwithdebinfo",
+            "displayName": "x64 RelWithDebInfo",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_C_COMPILER": "$env{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe",
+                "CMAKE_CXX_COMPILER": "$env{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe",
+                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake",
+                "LLVM_DIR": "C:/dev/llvm/build/lib/cmake/llvm"
+            }
+        },
+        {
+            "name": "x86-debug",
+            "displayName": "x86 Debug",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x86",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
+            }
+        },
+        {
+            "name": "x86-release",
+            "displayName": "x86 Release",
+            "inherits": "x86-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
+            }
+        },
+        {
+            "name": "Clang 23.1.6 x86_64-pc-linux-gnu",
+            "displayName": "Clang 23.1.6 x86_64-pc-linux-gnu",
+            "description": "Using compilers: C = /usr/bin/clang, CXX = /usr/bin/clang++",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_C_COMPILER": "/usr/bin/clang",
+                "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "x64-debug-build",
+            "displayName": "Build x64 Debug (MemoLang)",
+            "configurePreset": "x64-debug",
+            "description": "Build preset that targets the MemoLang executable",
+            "targets": [
+                "MemoLang"
+            ]
+        },
+        {
+            "name": "x64-release-build",
+            "displayName": "Build x64 Release (MemoLang)",
+            "configurePreset": "x64-release",
+            "description": "Build preset that targets the MemoLang executable",
+            "targets": [
+                "MemoLang"
+            ]
+        },
+        {
+            "name": "x64-relwithdebinfo-build",
+            "displayName": "Build x64 RelWithDebInfo (MemoLang)",
+            "configurePreset": "x64-relwithdebinfo",
+            "description": "Build preset that targets the MemoLang executable",
+            "targets": [
+                "MemoLang"
+            ]
+        }
+    ]
 }

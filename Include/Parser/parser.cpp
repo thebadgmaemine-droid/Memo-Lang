@@ -33,15 +33,10 @@
 // (git commit dae18ee). 2026-10-15: nesting limit and fatal stop (found by the
 // stress tests); long text shortened in error messages.
 // ---------------------------------------------------------------------------
-#include <charconv>
-#include <cmath>
-#include <cstdlib>
-#include <limits>
-#include <utility>
 
-#include "Diag/diagengine.h"
-#include "Lex/lexer.h"
-#include "Parser/parser.h"
+#include "diag.h"
+#include "lexer.h"
+#include "parser.h"
 
 namespace MemoLang {
 namespace {

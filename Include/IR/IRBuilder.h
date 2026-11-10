@@ -32,21 +32,21 @@ struct Module;     // One parsed file (AST.h).
 }
 class IRGenerator {
 public:
-  IRGenerator(llvm::LLVMContext &theContext, TypeContext &types,
-              DiagnosticEngine &diagnostics);
+  IRGenerator(llvm::LLVMContext &theContext, MemoLang::TypeContext &types,
+              MemoLang::DiagnosticEngine &diagnostics);
   [[nodiscard]] llvm::Module *getmodule() const; // module placeholder
   // Lowers `ast` to LLVM IR. Returns false if errors were reported.
-  bool emit(const Module &ast, const std::string &moduleName,
-            const std::vector<const Module *> *imported = nullptr);
+  bool emit(const llvm::Module &ast, const std::string &moduleName,
+            const std::vector<const llvm::Module *> *imported = nullptr);
   void SetModuleSources(
-      std::unordered_map<const Module *, const SourceManager *> sources);
+      std::unordered_map<const llvm::Module *, const MemoLang::SourceManager *> sources);
   // Gets the file each module is read from, the dianosticengine uses this.
 private:
   // Empty for now // Updating 10/30/2026
   // // Updating 10/30/2026
   llvm::Type *lowers(const llvm::Type *type);
 
-  emitAnyTypeMatch(llvm::IRBuilder<> &builder, llvm::value value,
+  int emitAnyTypeMatch(llvm::IRBuilder<> &builder, llvm::Value value,
                    const llvm::Type * target); // Has target, has builder has value.
   std::unordered_map<std::string, llvm::Function *> functions_{};
   std::unordered_map<std::string, const FunctionDef *> functionDefs_{};
@@ -54,5 +54,4 @@ private:
   std::unordered_set<std::string> reachable_{};
 
 }; // namespace MemoLang
-
 #endif // IR_BUILDER_H

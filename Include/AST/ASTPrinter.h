@@ -3,7 +3,7 @@
 
 #include <iosfwd>
 
-#include "AST/AST.h"
+#include "AST.h"
 
 namespace MemoLang {
 
