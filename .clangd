@@ -1,5 +1,7 @@
 CompileFlags:
-  CompilationDatabase: build-ninja
+  # The project root holds a copy of the build's compile_commands.json.
+  # (build-ninja doesn't exist, so clangd had no include paths.)
+  CompilationDatabase: .
   Add:
     - -I/usr/lib/llvm-23/include
     - -std=c++20

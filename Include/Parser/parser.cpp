@@ -34,9 +34,15 @@
 // stress tests); long text shortened in error messages.
 // ---------------------------------------------------------------------------
 
-#include "diag.h"
-#include "lexer.h"
-#include "parser.h"
+#include <charconv>
+#include <cmath>
+#include <cstdlib>
+#include <limits>
+#include <system_error>
+
+#include "Diag/diagengine.h"
+#include "Lex/lexer.h"
+#include "Parser/parser.h"
 
 namespace MemoLang {
 namespace {

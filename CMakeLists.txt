@@ -20,10 +20,13 @@ set(LLVM_DIR "C:/dev/llvm/build/lib/cmake/llvm" CACHE PATH
 if(MEMOLANG_USE_LLVM)
   find_package(LLVM REQUIRED CONFIG)
 
-  list(APPEND LLVM_INCLUDE_DIRS
-        "C:/dev/llvm/build/include"
-        "C:/dev/llvm/llvm/include"
-    )
+  # Windows source build only; on Linux these became bogus relative paths.
+  if(WIN32)
+    list(APPEND LLVM_INCLUDE_DIRS
+          "C:/dev/llvm/build/include"
+          "C:/dev/llvm/llvm/include"
+      )
+  endif()
 
   message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
   message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")

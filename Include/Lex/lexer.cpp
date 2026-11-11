@@ -78,13 +78,18 @@ void Lexer::skipWhitespaceAndComments() {
                '#') { // Line comment. (`//` is floor division, not a comment.)
       while (pos_ < text_.size() && peek() != '\n')
         ++pos_;
-    } else if (c == '//') {
-      while (pos_ < text_.size() && peek() != '\n')
+    } else if (c == '/' && peek(1) == '*') { // Block comment; doesn't nest.
+      std::uint32_t start = pos_;
+      pos_ += 2;
+      while (pos_ < text_.size() && !(peek() == '*' && peek(1) == '/'))
         ++pos_;
-    } else if (c == '/*') {
-      while (pos_ < text_.size() && peek() != '*/') {
-        ++pos_;
+      if (pos_ >= text_.size()) {
+        // Point at the opening '/*'.
+        diags_.error({sources_.locationAt(start), sources_.locationAt(start + 2)},
+                     "unterminated block comment");
+        return;
       }
+      pos_ += 2; // '*/'
     } else
       return;
   }

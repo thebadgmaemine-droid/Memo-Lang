@@ -1,25 +1,10 @@
-#pragma once
+#ifndef IR_GENERATOR_H
+#define IR_GENERATOR_H
+// MemoLang::IRGenerator is declared in IR/IRBuilder.h.
+//
+// 2026-11-11: this file declared a second, empty IRGenerator in `memolang`
+// (lower-case l, a different namespace from MemoLang). It now just forwards,
+// so either include gives the same class.
+#include "IR/IRBuilder.h"
 
-#include <functional>
-#include <llvm/IR/IRBuilder.h>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
-#include <vector>
-namespace llvm {
-class BasicBlock;
-class Function;
-class LLVMContext;
-class Module;
-class Type;
-class Value;
-} // namespace llvm
-
-namespace memolang {
-class DiagnosticEngine;
-class SourceManager;
-class IRGenerator {};
-}
+#endif // IR_GENERATOR_H

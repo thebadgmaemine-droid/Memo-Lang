@@ -13,8 +13,10 @@ namespace MemoLang {
 class DiagnosticEngine;
 class SourceManager;
 
-// Turns source text into tokens. Whitespace and `#` line comments are skipped.
-// added 16/10/2026 : Added // and /* */
+// Turns source text into tokens. Whitespace, `#` line comments and `/* */`
+// block comments are skipped. `//` is floor division, not a comment.
+// 2026-11-11: the 16/10 `//` and `/* */` branches compared a char with a
+// multi-character constant, so they never ran; `/* */` now works.
 // Errors (unknown characters, unterminated strings, bad numbers) are reported
 // to the DiagnosticEngine and returned as UNKNOWN_TOKEN_SYNTAX_ERROR, so one
 // run reports every problem instead of stopping at the first.
