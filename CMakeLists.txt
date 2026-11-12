@@ -1,6 +1,6 @@
 ﻿cmake_minimum_required(VERSION 3.20)
 # Bump VERSION for each tagged release and add a matching entry to CHANGELOG.md.
-project(MemoLang VERSION 0.1.0 LANGUAGES CXX)
+project(MemoLang VERSION 0.1.0 LANGUAGES C CXX)
 
 option(MEMOLANG_BUILD_TESTS "Build MemoLang tests" ON)
 option(MEMOLANG_BUILD_EXAMPLES "Build MemoLang example programs" ON)
@@ -13,23 +13,24 @@ set(CMAKE_CXX_STANDARD 20) # Use Cpp 20 for compiler and tests
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# Configure LLVM (adjust LLVM_DIR if needed). Elsewhere find_package() finds
-# the system LLVM, or pass -DLLVM_DIR=<prefix>/lib/cmake/llvm.
-if(WIN32)
-  set(LLVM_DIR "C:/dev/llvm/build/lib/cmake/llvm" CACHE PATH
-      "Path to the LLVM CMake package")
-endif()
 
+# ---------------------------------------------------------------------------
+# LLVM
+# LLVM_DIR must point at the folder containing LLVMConfig.cmake (NOT the
+# include folder). Override on the command line with -DLLVM_DIR=...
+# ---------------------------------------------------------------------------
 if(MEMOLANG_USE_LLVM)
-  find_package(LLVM REQUIRED CONFIG)
-
-  # Windows source build only; on Linux these became bogus relative paths.
-  if(WIN32)
-    list(APPEND LLVM_INCLUDE_DIRS
-          "C:/dev/llvm/build/include"
-          "C:/dev/llvm/llvm/include"
-      )
+  if(NOT DEFINED LLVM_DIR AND NOT WIN32
+     AND EXISTS "/usr/lib/llvm-23/lib/cmake/llvm/LLVMConfig.cmake")
+    set(LLVM_DIR "/usr/lib/llvm-23/lib/cmake/llvm" CACHE PATH
+        "Path to the LLVM CMake package (folder containing LLVMConfig.cmake)")
   endif()
+
+  # No hard-coded paths: LLVMConfig.cmake sets LLVM_INCLUDE_DIRS for installed
+  # packages and for hand-built trees alike (a build tree's config lists both
+  # its source and build include folders). On Windows, point LLVM_DIR at your
+  # LLVM, e.g. -DLLVM_DIR=C:/dev/llvm/build/lib/cmake/llvm.
+  find_package(LLVM REQUIRED CONFIG)
 
   message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
   message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
@@ -60,6 +61,7 @@ endforeach()
 # Paths updated 2026-11-06 after the 2026-11-02 reorganization moved each .cpp
 # next to its header. When a file moves, update this list too.
 add_library(MemoLangFrontend STATIC
+    Include/Analysis/destructive.cpp
     Include/AST/AST.cpp
     Include/AST/ASTPrinter.cpp
     Include/Diag/diags.cpp
@@ -68,7 +70,9 @@ add_library(MemoLangFrontend STATIC
     Include/Lex/token.cpp
     Include/Parser/parser.cpp
     Include/Semantics/Scope.cpp
+    Include/Semantics/sema.cpp
     Include/Source/SourceManager.cpp
+    Include/Types/Typecontext.cpp
 )
 # Code generation needs the LLVM headers, so it's built only with LLVM.
 if(MEMOLANG_USE_LLVM)
@@ -104,14 +108,11 @@ if(MEMOLANG_USE_LLVM)
   # Include dirs and definitions come from include_directories() and
   # add_definitions() above. Adding the unsplit LLVM_DEFINITIONS here again
   # produced -D_GLIBCXX_USE_CXX11_ABI="1 -D..." (the "macro redefined" warning).
-
-  if (TARGET LLVM::Core OR TARGET LLVM::Support)
-    target_link_libraries(MemoLang PRIVATE LLVM::Support LLVM::Core LLVM::IRReader)
-  elseif (DEFINED llvm_libs)
-    target_link_libraries(MemoLang PRIVATE ${llvm_libs})
-  else()
-    message(FATAL_ERROR "Could not find LLVM imported targets or legacy llvm_libs")
-  endif()
+  # llvm_libs comes from llvm_map_components_to_libnames above and works with
+  # every LLVM CMake package. If a Frontend source file ever includes LLVM
+  # headers and uses LLVM symbols, link this to MemoLangFrontend (PUBLIC)
+  # instead.
+  target_link_libraries(MemoLang PRIVATE ${llvm_libs})
 endif()
 
 if(MEMOLANG_BUILD_TESTS)
@@ -127,7 +128,7 @@ if(MEMOLANG_BUILD_TESTS)
   endif()
 
   # One test per file: tests/<mode>/<name>.memo runs as "<mode>/<name>".
-  foreach(mode ast tokens errors)
+  foreach(mode ast tokens errors check)
     file(GLOB test_files CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tests/${mode}/*.memo)
     foreach(test_file ${test_files})
       get_filename_component(test_name ${test_file} NAME_WE)

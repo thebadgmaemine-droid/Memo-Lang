@@ -5,6 +5,43 @@ All notable changes to MemoLang. Versions follow `project(VERSION ...)` in
 
 ## [Unreleased]
 
+### Added (2026-11-12)
+- Semantic analysis (`Include/Semantics/sema.cpp`): name resolution, type
+  checking, `auto` return types inferred from `return`, named arguments, and
+  the built-in `copy(x)`. Runs after parsing in the compiler.
+- Types (`Include/Types/Typecontext.cpp`): Error, Auto, Void, Bool, Int, Float,
+  Str, Matrix (element type and optional shape) and Function, interned by
+  TypeContext.
+- Destructive-read analysis (`Include/Analysis/destructive.cpp`): matrices are
+  consumed by `@`, calls, moves and `return`; use after consume is an error,
+  including after an `if` branch or an earlier loop iteration. Gives the
+  consume flags for each `@`.
+- Every AST node has a full source range, so errors underline the expression.
+- Driver options `--dump-symbols` and `--parse-only`.
+- Tests in `tests/check/` through the whole front-end; stress cases through
+  the analyses; fuzzing through every stage.
+
+### Changed (2026-11-12)
+- Merged master's 2026-11-09 commits (Clang 23 presets, `.clangd`).
+- One scope design (`Semantics/Scope.h`); the second `sema::Scope` class was
+  removed.
+- Types no longer depend on LLVM (one allocator: `std::unique_ptr`). The
+  declared-but-unimplemented records, aliases, modules and generic
+  instantiation API was removed; it's in git history (5281e16).
+- Postfix chains (`x as int as int ...`) count toward the nesting limit.
+- No hard-coded `C:/dev/llvm` in `CMakeLists.txt` or `CMakePresets.json`; put
+  `LLVM_DIR` in your own `CMakeUserPresets.json` (now ignored by git).
+- Analysis code moved to `Include/Analysis/` (the empty `Include/Analyzer/`
+  files were removed). Report drafts moved to `docs/reports/drafts/` and
+  legacy notes to `docs/legacy/`.
+- `examples/matmul_chain.memo` uses `copy(m)` in its loop: the new analysis
+  found it used `m` after consuming it.
+
+### Fixed (2026-11-12)
+- Long `a + b + c + ...` chains overflowed the stack in the analyses; they
+  are now walked with a loop.
+- Loop analysis was exponential in the nesting depth; results are cached.
+
 ### Added
 - Test suite (`tests/`): expected-output tests for the parser and lexer,
   `# expect-error` tests for diagnostics, stress and fuzz tests. See docs/STATUS.md.

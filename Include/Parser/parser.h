@@ -36,6 +36,11 @@ public:
 private:
   using StmtList = std::vector<std::unique_ptr<Statement>>;
 
+  // Creates a node whose range runs from `begin` to the end of the last
+  // consumed token (defined in parser.cpp).
+  template <typename T, typename... Args>
+  std::unique_ptr<T> make(SourceLocation begin, Args &&...args);
+
   struct BinaryOpInfo {
     BinaryOp op;
     int precedence;

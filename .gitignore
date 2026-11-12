@@ -75,3 +75,6 @@ Desktop.ini
 *.fdb_latexmk
 *.synctex.gz
 *.xdv
+
+# Per-person CMake presets (machine-specific paths such as LLVM_DIR)
+CMakeUserPresets.json

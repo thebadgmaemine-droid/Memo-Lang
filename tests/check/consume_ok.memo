@@ -1,0 +1,53 @@
+# Valid uses of matrices under destructive reads: must give no errors.
+
+def reuse_with_copy(matrix<float> m, matrix<float> v) -> matrix<float> {
+    matrix<float> once = copy(m) @ v;
+    return m @ once;              # copy(m) didn't consume m.
+}
+
+def reassign(matrix<float> a, matrix<float> b) -> matrix<float> {
+    a = a @ b;                    # Consumes a and b; then a holds the result.
+    a = copy(a) @ a;              # copy() reads a before `@` consumes it.
+    return a;
+}
+
+def branch_reassigns(matrix<float> a, matrix<float> b, bool c) -> matrix<float> {
+    if c {
+        a = a @ copy(b);          # Consumed and given a new value on this path.
+    }
+    return a @ b;
+}
+
+def loop_with_copy(matrix<float> m, matrix<float> v, int n) -> matrix<float> {
+    int i = 0;
+    while i < n {
+        v = copy(m) @ v;
+        i++;
+    }
+    return m @ v;
+}
+
+def move_into(matrix<float> a) -> matrix<float> {
+    matrix<float> b = a;          # Moves a into b.
+    return b;
+}
+
+def consumed_and_never_used_again(matrix<float> a, matrix<float> b) {
+    matrix<float> c = a @ b;
+    c = copy(c) @ c;
+}
+
+def unreachable_after_return(matrix<float> a) -> matrix<float> {
+    return a;
+    take(a);                      # Never runs, so it isn't an error.
+}
+
+def take(matrix<float> m) {
+}
+
+def reads_dont_consume(matrix<float> m) -> matrix<float> {
+    matrix<float> doubled = m * 2.0;
+    matrix<float> negated = -m;
+    matrix<float> total = doubled + negated;
+    return m @ total;
+}

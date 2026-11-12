@@ -1,0 +1,82 @@
+# Must pass semantic analysis and consumption checks with no errors.
+extern def gpu_identity(int n) -> matrix<float>;
+
+static const int limit = 10;
+const ratio = 0.5;
+
+def add(int a, int b) {
+    return a + b;
+}
+
+def uses_later() -> int {
+    return later(2);      # Defined below: signatures are collected first.
+}
+
+def later(int x) -> int {
+    return x * 2;
+}
+
+def numbers() -> float {
+    int i = 1;
+    i32 small = 2;
+    byte b = byte(255);
+    float f = i;          # int converts to float
+    f32 g = 1.5f;
+    f += i;
+    i += small;
+    i %= 3;
+    float q = 7 / 2;      # `/` gives a float
+    int r = 7 // 2;       # `//` keeps integers
+    bool flag = i < 10 and not (f > 2.0);
+    str s = "a" + "b";
+    i = i << 2 | 1;
+    i = -i ** 2;
+    float c = i as float;
+    return f + g + q + c;
+}
+
+def control(int n) -> int {
+    int total = 0;
+    int i = 0;
+    while i < n {
+        if i == 5 {
+            break;
+        } else if i % 2 == 0 {
+            total += i;
+        } else {
+            total -= 1;
+        }
+        i++;
+    }
+    return total;
+}
+
+def named(int x, int y) -> int {
+    return x - y;
+}
+
+def calls() -> int {
+    int a = named(1, 2);
+    int b = named(y = 1, x = 2);
+    int c = named(3, y = 4);
+    return add(a, b) + c;
+}
+
+def shadow(int x) -> int {
+    if x > 0 {
+        int x = 5;        # A new `x` in the inner block.
+        return x;
+    }
+    return x;
+}
+
+def nothing() {
+    return;
+}
+
+def matrices(matrix<float> a, matrix<float> b, float k) -> matrix<float> {
+    matrix<float> scaled = copy(a) * k;
+    matrix<float> sum = scaled + copy(b);
+    matrix<float> product = a @ b;
+    return product @ sum;
+}

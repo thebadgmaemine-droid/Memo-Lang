@@ -71,14 +71,6 @@ private:
   int &depth_;
 };
 
-// Creates a node and stamps it with a source location.
-template <typename T, typename... Args>
-std::unique_ptr<T> make(SourceLocation loc, Args &&...args) {
-  auto node = std::make_unique<T>(std::forward<Args>(args)...);
-  node->setLoc(SourceLoc{loc.line, loc.column});
-  return node;
-}
-
 // How a token kind appears in "expected X" messages.
 // Output when error, use this to identify.
 std::string describe(TokenKind kind) {
@@ -173,6 +165,19 @@ std::optional<AssignOp> assignOp(TokenKind kind) {
 }
 
 } // namespace
+
+// Creates a node spanning from `begin` to the end of the last consumed token.
+// Called once a node's last token has been consumed, so that is its end.
+template <typename T, typename... Args>
+std::unique_ptr<T> Parser::make(SourceLocation begin, Args &&...args) {
+  auto node = std::make_unique<T>(std::forward<Args>(args)...);
+  SourceLocation end = prevEnd_.isValid() ? prevEnd_ : begin;
+  if (end.offset < begin.offset) // Synthetic node before its first token.
+    end = begin;
+  node->setRange({begin, end});
+  return node;
+}
+
 // Constructor for parser, don't know if optimizations are needed
 Parser::Parser(Lexer &lexer, DiagnosticEngine &diags)
     : lexer_(lexer), diags_(diags), tok_(lexer.next()) {}
@@ -669,13 +674,13 @@ std::unique_ptr<Expr> Parser::parseExpression(int minPrecedence) {
   while (auto info = currentBinaryOp()) {
     if (info->precedence < minPrecedence)
       break;
-    SourceLocation loc = tok_.location();
+    SourceLocation start = lhs->range().begin; // `a + b` spans from `a`.
     for (int i = 0; i < info->tokenCount; ++i)
       consume();
     auto rhs = parseExpression(info->precedence + 1); // +1: left-associative.
     if (!rhs)
       return nullptr;
-    lhs = make<BinaryExpr>(loc, info->op, std::move(lhs), std::move(rhs));
+    lhs = make<BinaryExpr>(start, info->op, std::move(lhs), std::move(rhs));
   }
   return lhs;
 }
@@ -793,7 +798,8 @@ std::unique_ptr<Expr> Parser::parsePower() {
   auto base = parsePostfix();
   if (!base || !check(TokenKind::TOK_STARSTAR))
     return base;
-  SourceLocation loc = consume().location();
+  SourceLocation start = base->range().begin;
+  consume(); // '**'
   NestingGuard guard(
       depth_); // `a ** b ** c ...` recurses through the exponent.
   if (tooDeep())
@@ -801,7 +807,7 @@ std::unique_ptr<Expr> Parser::parsePower() {
   auto exponent = parseUnary();
   if (!exponent)
     return nullptr;
-  return make<BinaryExpr>(loc, BinaryOp::Pow, std::move(base),
+  return make<BinaryExpr>(start, BinaryOp::Pow, std::move(base),
                           std::move(exponent));
 }
 
@@ -809,22 +815,36 @@ std::unique_ptr<Expr> Parser::parsePower() {
 // If `primary` is given, it is used instead of parsing one.
 std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> primary) {
   auto expr = primary ? std::move(primary) : parsePrimary();
+  // Each postfix operation wraps the expression one level deeper. This is a
+  // loop, not recursion, so NestingGuard doesn't see it; count each one toward
+  // the nesting limit anyway, because later passes (semantic analysis, the
+  // AST printer) walk these trees recursively. Added 2026-11-12.
+  struct RestoreDepth {
+    int &depth;
+    int added = 0;
+    ~RestoreDepth() { depth -= added; }
+  } postfixDepth{depth_};
   while (expr) {
-    SourceLocation loc = tok_.location();
+    // `f(x)`, `x as T` and `x++` span from the start of `f` / `x`.
+    SourceLocation start = expr->range().begin;
     if (accept(TokenKind::TOK_LPAREN)) {
-      expr = parseCallArgs(std::move(expr), loc);
+      expr = parseCallArgs(std::move(expr), start);
     } else if (accept(TokenKind::TOK_AS)) {
       auto target = parseType();
       if (!target)
         return nullptr;
-      expr = make<CastExpr>(loc, std::move(expr), std::move(target));
+      expr = make<CastExpr>(start, std::move(expr), std::move(target));
     } else if (accept(TokenKind::TOK_PLUSPLUSINC)) {
-      expr = make<UnaryExpr>(loc, UnaryOp::PostInc, std::move(expr));
+      expr = make<UnaryExpr>(start, UnaryOp::PostInc, std::move(expr));
     } else if (accept(TokenKind::TOK_MINUSMINUSDEC)) {
-      expr = make<UnaryExpr>(loc, UnaryOp::PostDec, std::move(expr));
+      expr = make<UnaryExpr>(start, UnaryOp::PostDec, std::move(expr));
     } else {
       break;
     }
+    ++depth_;
+    ++postfixDepth.added;
+    if (tooDeep())
+      return nullptr;
   }
   return expr;
 }

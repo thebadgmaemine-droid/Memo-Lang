@@ -1,0 +1,128 @@
+# Semantic errors. The comment on each line names the error it must produce,
+# and no other errors may appear (one mistake, one error).
+
+def undeclared() {
+    int a = b + 1;                # expect-error: 13: use of undeclared name 'b'
+}
+
+def bad_init() {
+    int a = "text";               # expect-error: 13: cannot initialize 'a' of type 'int' with a value of type 'str'
+}
+
+def assign_const() {
+    const k = 1;
+    k = 2;                        # expect-error: 5: cannot assign to constant 'k'
+}
+
+def assign_type() {
+    int a = 1;
+    a = "no";                     # expect-error: 9: cannot assign a value of type 'str' to 'a' of type 'int'
+}
+
+def conditions() {
+    if 1 {                        # expect-error: 8: 'if' condition must be 'bool', found 'int'
+    }
+    while "s" {                   # expect-error: 11: 'while' condition must be 'bool', found 'str'
+    }
+}
+
+def loose_break() {
+    break;                        # expect-error: 5: 'break' outside a loop
+}
+
+def wrong_return() -> int {
+    return "x";                   # expect-error: 12: 'wrong_return' returns 'int', but this value is 'str'
+}
+
+def missing_value() -> int {
+    return;                       # expect-error: 5: 'missing_value' must return a value of type 'int'
+}
+
+def void_value() -> void {
+    return 1;                     # expect-error: 12: returns 'void', so its 'return' can't have a value
+}
+
+def mixed() {
+    if true {
+        return 1;
+    }
+    return "s";                   # expect-error: 5: inconsistent return types in 'mixed': 'int' and 'str'
+}
+
+def two(int a, int b) -> int {
+    return a + b;
+}
+
+def bad_calls() {
+    two(1);                       # expect-error: 5: missing argument for parameter 'b' of 'two'
+    two(1, 2, 3);                 # expect-error: 15: too many arguments to 'two': it takes 2
+    two(1, "x");                  # expect-error: 12: argument for 'b' of 'two' must be 'int', found 'str'
+    two(1, b = 2, c = 3);         # expect-error: 23: 'two' has no parameter named 'c'
+    two(1, a = 2, b = 3);         # expect-error: 16: parameter 'a' of 'two' is given twice
+    nope(1);                      # expect-error: 5: call to undeclared function 'nope'
+}
+
+def not_callable() {
+    int x = 1;
+    x(2);                         # expect-error: 5: 'x' is not a function; its type is 'int'
+}
+
+def function_as_value() {
+    int f = two;                  # expect-error: 13: function 'two' can't be used as a value; call it
+}
+
+def operators() {
+    int a = 1 + "s";              # expect-error: 13: invalid operands to '+': 'int' and 'str'
+    bool b = 1 and true;          # expect-error: 14: 'and' needs 'bool' operands, found 'int' and 'bool'
+    bool c = 1 < "s";             # expect-error: 14: cannot compare 'int' and 'str' with '<'
+    int d = 1.5 & 2;              # expect-error: 13: '&' needs integer operands, found 'float' and 'int'
+    bool e = 1 in 2;              # expect-error: 14: operator 'in' is not supported yet
+    bool f = not 1;               # expect-error: 14: invalid operand to 'not': 'int'
+}
+
+def casts() {
+    int a = "s" as int;           # expect-error: 13: cannot cast 'str' to 'int'
+}
+
+def redefine() {
+    int a = 1;
+    int a = 2;                    # expect-error: 5: redefinition of 'a'
+}
+
+def add_twice() {
+}
+def add_twice() {                 # expect-error: 1: redefinition of 'add_twice'
+}
+
+def copy(int x) {                 # expect-error: 1: 'copy' is a built-in function and can't be redefined
+}
+
+def nested() {
+    def inner() {                 # expect-error: 5: nested functions are not supported yet
+    }
+}
+
+def recursive(int n) {
+    return recursive(n - 1);      # expect-error: 12: can't infer the return type of 'recursive'
+}
+
+def matrix_errors(matrix<float> m, matrix<f32> h, int n) {
+    matrix<float> a = m @ n;      # expect-error: 23: '@' needs two matrices, found 'matrix<float>' and 'int'
+    matrix<float> b = m @ h;      # expect-error: 23: can't multiply matrices with different element types
+    matrix<float> c = m * m;      # expect-error: 23: '*' isn't defined for two matrices
+    matrix<str> d;                # expect-error: 12: matrix elements must be numbers, not 'str'
+}
+
+def use_void() {
+    int x = returns_nothing();    # expect-error: 13: this expression has no value (its type is 'void')
+}
+
+def returns_nothing() {
+}
+
+def modify_const() {
+    const c = 1;
+    c++;                          # expect-error: 5: cannot modify constant 'c'
+}
+
+return 1;                         # expect-error: 1: 'return' outside a function

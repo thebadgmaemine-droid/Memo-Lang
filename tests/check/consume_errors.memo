@@ -1,0 +1,67 @@
+# Destructive reads: using a matrix after it was consumed. Each mistake must
+# be reported exactly once (the note saying where it was consumed isn't
+# checked here).
+
+def take(matrix<float> m) {
+}
+
+def after_matmul(matrix<float> a, matrix<float> b) -> matrix<float> {
+    matrix<float> c = a @ b;
+    return a @ c;                 # expect-error: 12: use of consumed matrix 'a'
+}
+
+def same_operand_twice(matrix<float> a) -> matrix<float> {
+    return a @ a;                 # expect-error: 16: use of consumed matrix 'a'
+}
+
+def after_call(matrix<float> a) -> matrix<float> {
+    take(a);
+    return a;                     # expect-error: 12: use of consumed matrix 'a'
+}
+
+def after_move(matrix<float> a) -> matrix<float> {
+    matrix<float> b = a;
+    return a @ b;                 # expect-error: 12: use of consumed matrix 'a'
+}
+
+def consumed_on_one_branch(matrix<float> a, matrix<float> b, bool c) -> matrix<float> {
+    if c {
+        take(a);
+    }
+    return a @ b;                 # expect-error: 12: matrix 'a' may have been consumed
+}
+
+def consumed_on_both_branches(matrix<float> a, bool c) -> matrix<float> {
+    if c {
+        take(a);
+    } else {
+        take(a);
+    }
+    return a;                     # expect-error: 12: use of consumed matrix 'a'
+}
+
+def consumed_in_earlier_iteration(matrix<float> m, matrix<float> v, int n) -> matrix<float> {
+    int i = 0;
+    while i < n {
+        v = m @ v;                # expect-error: 13: matrix 'm' may have been consumed
+        i++;
+    }
+    return v;
+}
+
+def consumed_before_break(matrix<float> a, int n) -> matrix<float> {
+    while n > 0 {
+        take(a);
+        break;
+    }
+    return a;                     # expect-error: 12: matrix 'a' may have been consumed
+}
+
+def shadowed(matrix<float> a) -> matrix<float> {
+    if true {
+        matrix<float> a = copy(a); # A different `a`; consuming it leaves the outer one.
+        take(a);
+    }
+    take(a);
+    return a;                     # expect-error: 12: use of consumed matrix 'a'
+}

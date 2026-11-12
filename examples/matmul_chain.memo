@@ -1,5 +1,6 @@
 # Chains of matrix multiplications: the workload destructive reads target.
-# This only parses today. There is no matrix runtime or code generation yet.
+# This is checked for syntax, types and consumption. There is no matrix
+# runtime or code generation yet.
 #
 #   MemoLang --dump-ast examples/matmul_chain.memo
 
@@ -7,8 +8,8 @@
 extern def memo_matmul(matrix<float> a, matrix<float> b) -> matrix<float>;
 
 def chain(matrix<float> a, matrix<float> b, matrix<float> c) -> matrix<float> {
-    # `a @ b` is a short-lived intermediate. Once consumption analysis exists,
-    # its buffer can be freed as soon as `@ c` has read it.
+    # `a @ b` is a short-lived intermediate: `@ c` consumes it, so its buffer
+    # can be freed as soon as it has been read. a, b and c are consumed too.
     matrix<float> result = a @ b @ c;
     return result;
 }
@@ -16,7 +17,9 @@ def chain(matrix<float> a, matrix<float> b, matrix<float> c) -> matrix<float> {
 def power_iteration(matrix<float> m, matrix<float> v, int steps) -> matrix<float> {
     int i = 0;
     while i < steps {
-        v = m @ v;    # The old `v` is consumed by this multiplication.
+        # `m @ v` would consume m, and the next iteration needs it again, so
+        # multiply by a copy. The old `v` is consumed, and v gets the result.
+        v = copy(m) @ v;
         i++;
     }
     return v;
@@ -24,5 +27,5 @@ def power_iteration(matrix<float> m, matrix<float> v, int steps) -> matrix<float
 
 def scale(matrix<float> m, float factor) -> matrix<float> {
     const half = factor / 2.0;
-    return m * half;
+    return m * half;    # Scaling reads m without consuming it.
 }

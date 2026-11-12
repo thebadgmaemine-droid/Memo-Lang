@@ -7,8 +7,10 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <utility> 
+#include <utility>
 #include <vector>
+
+#include "Source/SourceLocation.h"
 
 //  Private data members are named [name]_
 //  Nodes are move-only. Use clone() for deep copies.
@@ -240,6 +242,8 @@ public:
 // ---------------------------------------------------------------------------
 // Node
 // ---------------------------------------------------------------------------
+// Line and column only. Nodes store a full SourceRange (see Node::range());
+// this is kept for code that only needs where a node starts.
 struct SourceLoc {
   std::uint32_t line = 0; // 1-based; 0 = unknown
   std::uint32_t column = 0;
@@ -253,8 +257,22 @@ public:
 
   [[nodiscard]] NodeKind kind() const noexcept { return kind_; }
 
-  [[nodiscard]] SourceLoc loc() const noexcept { return loc_; }
-  void setLoc(SourceLoc loc) noexcept { loc_ = loc; }
+  // Where the node starts.
+  [[nodiscard]] SourceLoc loc() const noexcept {
+    return {range_.begin.line, range_.begin.column};
+  }
+  // The node's whole source text, from its first character to one past its
+  // last, with byte offsets, so diagnostics can underline it. Set by the
+  // parser (2026-11-12; before that nodes only had line and column).
+  [[nodiscard]] SourceRange range() const noexcept { return range_; }
+  void setRange(SourceRange range) noexcept { range_ = range; }
+  // Sets only the start line and column (no offsets, empty range). Prefer
+  // setRange().
+  void setLoc(SourceLoc loc) noexcept {
+    range_.begin.line = loc.line;
+    range_.begin.column = loc.column;
+    range_.end = range_.begin;
+  }
 
   // The resolved type is analysis output, not part of the tree's structure,
   // so passes may set it through a const tree.
@@ -272,7 +290,7 @@ protected:
 
 private:
   NodeKind kind_;
-  SourceLoc loc_{};
+  SourceRange range_{};
   mutable const Type *resolvedType_ = nullptr;
 };
 class TypeExpr final : public Node {
@@ -296,7 +314,7 @@ public:
     for (const auto &a : args_)
       copy.push_back(a->clone());
     auto result = std::make_unique<TypeExpr>(name_, std::move(copy));
-    result->setLoc(loc());
+    result->setRange(range());
     return result;
   }
 
@@ -346,7 +364,7 @@ public:
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<NameExpr>(name_);
-    c->setLoc(loc());
+    c->setRange(range());
     return c;
   }
   void accept(Visitor &v) const override { v.visit(*this); }
@@ -370,7 +388,7 @@ public:
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<IntegerLiteral>(value_, isByte_);
-    c->setLoc(loc());
+    c->setRange(range());
     return c;
   }
   void accept(Visitor &v) const override { v.visit(*this); }
@@ -392,7 +410,7 @@ public:
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<FloatLiteral>(value_, isF32_);
-    c->setLoc(loc());
+    c->setRange(range());
     return c;
   }
   void accept(Visitor &v) const override { v.visit(*this); }
@@ -415,7 +433,7 @@ public:
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<StringLiteral>(value_, isRegex_);
-    c->setLoc(loc());
+    c->setRange(range());
     return c;
   }
   void accept(Visitor &v) const override { v.visit(*this); }
@@ -440,7 +458,7 @@ public:
     for (const auto &p : parts_)
       copy.push_back(p.clone());
     auto c = std::make_unique<InterpolatedString>(std::move(copy));
-    c->setLoc(loc());
+    c->setRange(range());
     return c;
   }
   void accept(Visitor &v) const override { v.visit(*this); }
@@ -458,7 +476,7 @@ public:
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<BooleanLiteral>(value_);
-    c->setLoc(loc());
+    c->setRange(range());
     return c;
   }
   void accept(Visitor &v) const override { v.visit(*this); }
@@ -483,7 +501,7 @@ public:
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<UnaryExpr>(op_, operand_->clone());
-    c->setLoc(loc());
+    c->setRange(range());
     return c;
   }
   void accept(Visitor &v) const override { v.visit(*this); }
@@ -509,7 +527,7 @@ public:
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<BinaryExpr>(op_, lhs_->clone(), rhs_->clone());
-    c->setLoc(loc());
+    c->setRange(range());
     return c;
   }
   void accept(Visitor &v) const override { v.visit(*this); }
@@ -535,7 +553,7 @@ public:
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<CastExpr>(value_->clone(), target_->clone());
-    c->setLoc(loc());
+    c->setRange(range());
     return c;
   }
   void accept(Visitor &v) const override { v.visit(*this); }
@@ -597,7 +615,7 @@ public:
       t.push_back(x->clone());
     auto c = std::make_unique<CallExpr>(callee_->clone(), std::move(a),
                                         std::move(t), paramNames_);
-    c->setLoc(loc());
+    c->setRange(range());
     return c;
   }
   void accept(Visitor &v) const override { v.visit(*this); }
