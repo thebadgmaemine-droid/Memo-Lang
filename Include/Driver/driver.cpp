@@ -3,7 +3,8 @@
 //
 // Reads the options, then runs the pipeline:
 //   SourceManager (read the file) -> Lexer -> Parser -> print the AST or errors
-// Exit code: 0 = no errors, 1 = errors in the source, 2 = bad command line.
+// Exit code: 0 = no errors, 1 = errors in the source or an unreadable input
+// file, 2 = bad command line.
 //
 // History: added 2026-10-14; the old REPL that was in main.cpp is at git
 // commit dae18ee. 2026-10-15: token printing moved into the lexer so the tests

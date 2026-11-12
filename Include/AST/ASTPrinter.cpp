@@ -7,11 +7,14 @@
 //
 // History: added 2026-10-14.
 // ---------------------------------------------------------------------------
+#include <array>
+#include <charconv>
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <system_error>
 
-#include "ASTPrinter.h"
+#include "AST/ASTPrinter.h"
 
 namespace MemoLang {
 namespace {
@@ -152,6 +155,15 @@ std::string escape(std::string_view text) {
   return out;
 }
 
+// The shortest text that reads back as exactly `value` (1, 3.14, 1e+20).
+// The stream default kept only 6 significant digits.
+std::string formatDouble(double value) {
+  std::array<char, 32> buffer{};
+  auto [end, ec] = std::to_chars(buffer.data(), buffer.data() + buffer.size(),
+                                 value);
+  return ec == std::errc() ? std::string(buffer.data(), end) : "?";
+}
+
 class Printer final : public Visitor {
 public:
   explicit Printer(std::ostream &out) : out_(out) {}
@@ -170,16 +182,30 @@ public:
     indent() << "Name " << n.name() << '\n';
   }
   void visit(const IntegerLiteral &n) override {
-    indent() << "Integer " << n.value() << '\n';
+    indent() << "Integer " << n.value() << (n.isByte() ? " (byte)" : "")
+             << '\n';
   }
   void visit(const FloatLiteral &n) override {
-    indent() << "Float " << n.value() << (n.isF32() ? " (f32)" : "") << '\n';
+    indent() << "Float " << formatDouble(n.value())
+             << (n.isF32() ? " (f32)" : "") << '\n';
   }
   void visit(const StringLiteral &n) override {
-    indent() << "String \"" << escape(n.value()) << "\"\n";
+    indent() << "String \"" << escape(n.value()) << '"'
+             << (n.isRegex() ? " (regex)" : "") << '\n';
   }
   void visit(const InterpolatedString &n) override {
     indent() << "InterpolatedString (" << n.parts().size() << " parts)\n";
+    ++depth_;
+    for (const StringPart &part : n.parts()) {
+      if (!part.literal.empty())
+        indent() << "Text \"" << escape(part.literal) << "\"\n";
+      if (part.value) {
+        indent() << "Value" << (part.spec.empty() ? "" : " :" + part.spec)
+                 << '\n';
+        child(*part.value);
+      }
+    }
+    --depth_;
   }
   void visit(const BooleanLiteral &n) override {
     indent() << "Boolean " << (n.value() ? "true" : "false") << '\n';
@@ -200,6 +226,8 @@ public:
   void visit(const CallExpr &n) override {
     indent() << "Call\n";
     child(n.callee());
+    for (const auto &typeArg : n.typeArgs())
+      child(*typeArg);
     auto names = n.paramNames();
     for (std::size_t i = 0; i < n.args().size(); ++i) {
       if (!names.empty() && !names[i].empty()) {

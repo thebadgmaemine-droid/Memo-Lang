@@ -35,8 +35,6 @@
 // ---------------------------------------------------------------------------
 
 #include <charconv>
-#include <cmath>
-#include <cstdlib>
 #include <limits>
 #include <system_error>
 
@@ -113,12 +111,46 @@ bool startsStatement(TokenKind kind) {
   case TokenKind::TOK_KEYWORDTYPE:
   case TokenKind::TOK_IMPORT:
   case TokenKind::TOK_TRY:
+  case TokenKind::TOK_CATCH:
   case TokenKind::TOK_THROW:
   case TokenKind::TOK_CASE:
     return true;
   default:
     return false;
   }
+}
+
+// For a float literal std::from_chars reported out of range: true if it is too
+// large (an error), false if too small (it rounds to zero, which is accepted).
+// Decides from the decimal exponent: digits before the point plus 'e'.
+bool floatLiteralOverflows(std::string_view text) {
+  std::size_t e = text.find_first_of("eE");
+  std::string_view mantissa = text.substr(0, e);
+  long long exponent = 0;
+  if (e != std::string_view::npos) {
+    std::string_view expText = text.substr(e + 1);
+    bool negative = !expText.empty() && expText[0] == '-';
+    if (!expText.empty() && (expText[0] == '+' || expText[0] == '-'))
+      expText.remove_prefix(1);
+    auto [end, ec] = std::from_chars(
+        expText.data(), expText.data() + expText.size(), exponent);
+    if (ec != std::errc())
+      return !negative; // Exponent too large to read: its sign decides.
+    if (negative)
+      exponent = -exponent;
+  }
+  std::size_t point = mantissa.find('.');
+  std::string_view intPart = mantissa.substr(0, point);
+  std::string_view fracPart = point == std::string_view::npos
+                                  ? std::string_view{}
+                                  : mantissa.substr(point + 1);
+  std::size_t firstNonZero = intPart.find_first_not_of('0');
+  long long order;
+  if (firstNonZero != std::string_view::npos)
+    order = static_cast<long long>(intPart.size() - firstNonZero);
+  else
+    order = -static_cast<long long>(fracPart.find_first_not_of('0'));
+  return order + exponent > 0;
 }
 // assigns the operand with tokens
 std::optional<AssignOp> assignOp(TokenKind kind) {
@@ -713,12 +745,15 @@ std::unique_ptr<Expr> Parser::parseUnary() {
   case TokenKind::TOK_MINUS:
     consume();
     // -9223372036854775808 fits in int64 but 9223372036854775808 doesn't,
-    // so this one literal has to be negated while parsing.
+    // so this one literal has to be negated while parsing. Postfix operators
+    // (`as float`, ...) still apply to it. Before `**` it isn't folded:
+    // -x ** y means -(x ** y), and 9223372036854775808 ** y is out of range.
     if (check(TokenKind::TOK_INTEGER) &&
-        tok_.spelling() == "9223372036854775808") {
+        tok_.spelling() == "9223372036854775808" &&
+        !peekNext().is(TokenKind::TOK_STARSTAR)) {
       consume();
-      return make<IntegerLiteral>(loc,
-                                  std::numeric_limits<std::int64_t>::min());
+      return parsePostfix(make<IntegerLiteral>(
+          loc, std::numeric_limits<std::int64_t>::min()));
     }
     op = UnaryOp::Neg;
     break;
@@ -771,8 +806,9 @@ std::unique_ptr<Expr> Parser::parsePower() {
 }
 
 // postfix := primary { '(' args ')' | 'as' type | '++' | '--' }
-std::unique_ptr<Expr> Parser::parsePostfix() {
-  auto expr = parsePrimary();
+// If `primary` is given, it is used instead of parsing one.
+std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> primary) {
+  auto expr = primary ? std::move(primary) : parsePrimary();
   while (expr) {
     SourceLocation loc = tok_.location();
     if (accept(TokenKind::TOK_LPAREN)) {
@@ -910,9 +946,15 @@ std::unique_ptr<Expr> Parser::parseFloatLiteral(const Token &tok) {
   bool isF32 = !text.empty() && text.back() == 'f';
   if (isF32)
     text.pop_back();
-  char *end = nullptr;
-  double value = std::strtod(text.c_str(), &end);
-  if (end != text.c_str() + text.size() || std::isinf(value)) {
+  // std::from_chars, unlike strtod, ignores the C locale (which may use ',').
+  double value = 0.0;
+  auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(),
+                                   value, std::chars_format::general);
+  if (ec == std::errc::result_out_of_range && !floatLiteralOverflows(text)) {
+    value = 0.0; // Too small to represent: rounds to zero, like strtod.
+    ec = std::errc();
+  }
+  if (ec != std::errc() || end != text.data() + text.size()) {
     error(tok.range(), "floating-point literal " +
                            quoteForMessage(tok.spelling()) +
                            " is out of range");

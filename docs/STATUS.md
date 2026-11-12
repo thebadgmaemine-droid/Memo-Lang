@@ -50,19 +50,19 @@ The stages follow the pipeline figure in the report.
 | Stage | Status | Files |
 |---|---|---|
 | Source / locations | Done | `Include/Source/SourceLocation.h`, `SourceManager.h/.cpp` |
-| Diagnostics | Done | `Include/Diag/diag.h`, `diagengine.h`, `Include/Source/diags.cpp` |
-| Lexer | Done | `Include/Lex/tokenkind.h`, `token.h`, `lexer.h`, `Include/Source/lexer.cpp`, `token.cpp` |
-| Parser | Done, for the grammar below | `Include/Parser/parser.h`, `Include/Source/parser.cpp` |
-| AST | Done, for the grammar below | `Include/AST/AST.h`, `ASTPrinter.h`, `Include/Source/ASTPrinter.cpp` |
-| Driver | Done (front-end only) | `Include/Driver/driver.h`, `Include/Source/driver.cpp`, `main.cpp` |
-| Semantic analysis / Types | **Empty file** | `Include/Semantics/sema.h`, `Include/Types/type.cpp` | Done |.
+| Diagnostics | Done | `Include/Diag/diag.h`, `diagengine.h`, `diags.cpp` |
+| Lexer | Done | `Include/Lex/tokenkind.h`, `token.h`, `token.cpp`, `lexer.h`, `lexer.cpp` |
+| Parser | Done, for the grammar below | `Include/Parser/parser.h`, `parser.cpp` |
+| AST | Done, for the grammar below | `Include/AST/AST.h`, `ASTPrinter.h`, `ASTPrinter.cpp` |
+| Driver | Done (front-end only) | `Include/Driver/driver.h`, `driver.cpp`, `main.cpp` |
+| Semantic analysis / Types | **Empty file** | `Include/Semantics/sema.h`, `Scope.h`, `Scope.cpp`, `Include/Types/Typecontext.h` | Done |.
 | Consumption analysis (destructive read) | **Missing**, no file yet | Uses `State { Live, Consumed, MaybeConsumed }` in `AST.h` |
-| LLVM IR generation | **Empty file / interface only** | `Include/IR/codegen.h`, `Include/IR/codegen.cpp`, `Include/IR/IRBuilder.h` | Done
+| LLVM IR generation | **Empty file / interface only** | `Include/IR/IRBuilder.h`, `IRBuilder.cpp`, `IRGenerator.h` | Done
 | Optimization passes | Not done |
 | JIT / AOT | **Missing** | none |
 | cuBLAS runtime | **Missing** (the report lists `CuBLASRuntime.cpp`, which was never created) | none |
 | CUTLASS GEMM kernel | **Missing** | none |
-| Macros | **Notes only** | `Include/Macro/read.md`, `Include/AST/query.h` (declared, not implemented) |
+| Macros | **Notes only** | `Include/Macro/read.md`, `Include/AST/query.h` (range helpers) |
 | Tests | Front-end covered | `tests/` (see "Tests" below), `examples/*.memo` |
 
 ### Known problems in existing files

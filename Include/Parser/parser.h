@@ -78,7 +78,7 @@ private:
   std::optional<BinaryOpInfo> currentBinaryOp();
   std::unique_ptr<Expr> parseUnary();
   std::unique_ptr<Expr> parsePower();
-  std::unique_ptr<Expr> parsePostfix();
+  std::unique_ptr<Expr> parsePostfix(std::unique_ptr<Expr> primary = nullptr);
   std::unique_ptr<Expr> parsePrimary();
   std::unique_ptr<Expr> parseCallArgs(std::unique_ptr<Expr> callee,
                                       SourceLocation loc);

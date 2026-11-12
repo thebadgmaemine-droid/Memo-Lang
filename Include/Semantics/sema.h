@@ -9,10 +9,15 @@
 
 #include "AST/AST.h"
 
-namespace MemoLang {
-namespace sema {
+// 2026-11-12: removed `using SourceLocation = SourceLoc;`, which hid the real
+// MemoLang::SourceLocation behind a different struct, and DiagnosticSink:
+// errors now go to the DiagnosticEngine every other stage uses, so they are
+// printed with source context, counted, and set the exit code.
 
-using SourceLocation = SourceLoc;
+namespace MemoLang {
+class DiagnosticEngine;
+
+namespace sema {
 
 struct Symbol {
     std::string name;
@@ -21,7 +26,7 @@ struct Symbol {
     bool isParameter = false;
     bool isLocal = false;
     std::uint32_t scopeDepth = 0;
-    SourceLocation location;
+    SourceLoc location; // Where it was declared (Node::loc()).
 };
 
 class Scope {
@@ -42,23 +47,10 @@ private:
     std::unordered_map<std::string, Symbol> symbols_;
 };
 
-class DiagnosticSink {
-public:
-    DiagnosticSink();
-    ~DiagnosticSink();
-
-    void reportError(std::string_view message, const SourceLocation& location);
-    void reportWarning(std::string_view message, const SourceLocation& location);
-
-private:
-    std::vector<std::string> errors_;
-    std::vector<std::string> warnings_;
-};
-
 class SemanticAnalyzer {
 public:
-    SemanticAnalyzer();
-    explicit SemanticAnalyzer(std::shared_ptr<DiagnosticSink> diag);
+    // `diags` must outlive the analyzer.
+    explicit SemanticAnalyzer(DiagnosticEngine& diags);
     ~SemanticAnalyzer();
 
     bool analyzeModule(Module* module);
@@ -80,7 +72,7 @@ public:
 private:
     std::shared_ptr<Scope> globalScope_;
     std::vector<std::shared_ptr<Scope>> scopes_;
-    std::shared_ptr<DiagnosticSink> diagnostics_;
+    DiagnosticEngine& diagnostics_;
     std::unordered_map<std::string, const Type*> namedTypes_;
 };
 

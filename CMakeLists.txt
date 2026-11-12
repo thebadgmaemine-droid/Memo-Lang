@@ -13,9 +13,12 @@ set(CMAKE_CXX_STANDARD 20) # Use Cpp 20 for compiler and tests
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# Configure LLVM (adjust LLVM_DIR if needed)
-set(LLVM_DIR "C:/dev/llvm/build/lib/cmake/llvm" CACHE PATH
-    "Path to the LLVM CMake package")
+# Configure LLVM (adjust LLVM_DIR if needed). Elsewhere find_package() finds
+# the system LLVM, or pass -DLLVM_DIR=<prefix>/lib/cmake/llvm.
+if(WIN32)
+  set(LLVM_DIR "C:/dev/llvm/build/lib/cmake/llvm" CACHE PATH
+      "Path to the LLVM CMake package")
+endif()
 
 if(MEMOLANG_USE_LLVM)
   find_package(LLVM REQUIRED CONFIG)
@@ -31,8 +34,11 @@ if(MEMOLANG_USE_LLVM)
   message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
   message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
-  include_directories(${LLVM_INCLUDE_DIRS})
-  add_definitions(${LLVM_DEFINITIONS})
+  # SYSTEM: warnings from inside LLVM's own headers aren't ours to fix.
+  include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
+  # LLVM_DEFINITIONS is one space-separated string; split it into a list.
+  separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
+  add_definitions(${LLVM_DEFINITIONS_LIST})
 
   llvm_map_components_to_libnames(llvm_libs support core irreader)
 endif()
@@ -59,10 +65,15 @@ add_library(MemoLangFrontend STATIC
     Include/Diag/diags.cpp
     Include/Driver/driver.cpp
     Include/Lex/lexer.cpp
+    Include/Lex/token.cpp
     Include/Parser/parser.cpp
+    Include/Semantics/Scope.cpp
     Include/Source/SourceManager.cpp
-    Include/Source/token.cpp
 )
+# Code generation needs the LLVM headers, so it's built only with LLVM.
+if(MEMOLANG_USE_LLVM)
+  target_sources(MemoLangFrontend PRIVATE Include/IR/IRBuilder.cpp)
+endif()
 target_include_directories(MemoLangFrontend PUBLIC ${MEMOLANG_INCLUDE_DIRS})
 target_compile_definitions(MemoLangFrontend PRIVATE MEMOLANG_VERSION="${PROJECT_VERSION}")
 
@@ -90,8 +101,9 @@ foreach(target MemoLangFrontend MemoLang)
 endforeach()
 
 if(MEMOLANG_USE_LLVM)
-  target_include_directories(MemoLang PRIVATE ${LLVM_INCLUDE_DIRS})
-  target_compile_definitions(MemoLang PRIVATE ${LLVM_DEFINITIONS})
+  # Include dirs and definitions come from include_directories() and
+  # add_definitions() above. Adding the unsplit LLVM_DEFINITIONS here again
+  # produced -D_GLIBCXX_USE_CXX11_ABI="1 -D..." (the "macro redefined" warning).
 
   if (TARGET LLVM::Core OR TARGET LLVM::Support)
     target_link_libraries(MemoLang PRIVATE LLVM::Support LLVM::Core LLVM::IRReader)

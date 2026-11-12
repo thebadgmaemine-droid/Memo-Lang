@@ -38,7 +38,11 @@ severityName(Severity severity) noexcept {
                                                  std::size_t maxLength = 32) {
   if (text.size() <= maxLength)
     return "'" + std::string(text) + "'";
-  return "'" + std::string(text.substr(0, maxLength)) + "...'";
+  // Don't cut a UTF-8 character in half: back up past continuation bytes.
+  std::size_t cut = maxLength;
+  while (cut > 0 && (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80)
+    --cut;
+  return "'" + std::string(text.substr(0, cut)) + "...'";
 }
 
 // One message from any compiler stage, attached to a range of source text.

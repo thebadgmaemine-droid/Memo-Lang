@@ -4,7 +4,8 @@
 namespace MemoLang {
 
 // Command-line entry point: MemoLang [options] <file.memo>
-// Returns the process exit code: 0 = success, 1 = compile errors, 2 = bad usage.
+// Returns the process exit code: 0 = success, 1 = errors (in the source, or
+// the input file can't be read), 2 = bad command line.
 int runDriver(int argc, char **argv);
 
 } // namespace MemoLang
