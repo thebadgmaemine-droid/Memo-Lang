@@ -4,6 +4,9 @@
 //   MemoLangTests tokens <file.memo> [--update]  lex; output must match <file>.tokens
 //   MemoLangTests errors <file.memo>             errors must match the file's
 //                                                "# expect-error" comments
+//   MemoLangTests check  <file.memo>             like errors, through the whole
+//                                                front-end (types, consumption);
+//                                                no comments = must be clean
 //   MemoLangTests stress                         huge and deeply nested input
 //   MemoLangTests fuzz                           random input must not crash or hang
 //
@@ -39,10 +42,13 @@
 #include <vector>
 
 #include "AST/ASTPrinter.h"
+#include "Analysis/destructive.h"
 #include "Diag/diagengine.h"
 #include "Lex/lexer.h"
 #include "Parser/parser.h"
+#include "Semantics/sema.h"
 #include "Source/SourceManager.h"
+#include "Types/Typecontext.h"
 
 using namespace MemoLang;
 
@@ -63,8 +69,10 @@ struct ParseResult {
   double milliseconds = 0;
 };
 
+// Parses `text`. With `analyze`, a clean parse also goes through semantic and
+// destructive analysis, as in the compiler.
 ParseResult parseSource(const std::string &moduleName, std::string text,
-                        bool printTree = true) {
+                        bool printTree = true, bool analyze = false) {
   SourceManager sources(moduleName + ".memo", std::move(text));
   std::ostringstream diagOut;
   DiagnosticEngine diags(sources, diagOut);
@@ -76,6 +84,14 @@ ParseResult parseSource(const std::string &moduleName, std::string text,
     Lexer lexer(sources, diags);
     Parser parser(lexer, diags);
     Module module = parser.parseModule(moduleName);
+    if (analyze && !diags.hasErrors()) {
+      TypeContext types;
+      sema::SemanticAnalyzer sema(types, diags);
+      if (sema.analyzeModule(module)) {
+        Destructive destructive(sema, diags);
+        destructive.analyzeModule(module);
+      }
+    }
     result.milliseconds = millisecondsSince(start);
     result.statements = module.body.size();
     if (printTree) {
@@ -210,18 +226,24 @@ std::vector<Expectation> readExpectations(const std::string &source) {
   return expectations;
 }
 
-int runErrors(const std::filesystem::path &file) {
+// `errors` mode: parse only, and the file must expect at least one error.
+// `check` mode (analyze = true): the whole front-end; a file with no
+// expect-error comments must come through clean. Notes are not checked.
+int runErrors(const std::filesystem::path &file, bool analyze = false) {
   std::string source = readFile(file);
   auto expectations = readExpectations(source);
-  if (expectations.empty()) {
+  if (expectations.empty() && !analyze) {
     std::cout << "FAIL: no expect-error comments in "
               << file.filename().string() << '\n';
     return 1;
   }
-  ParseResult result = parseSource(file.stem().string(), source, false);
+  ParseResult result =
+      parseSource(file.stem().string(), source, false, analyze);
 
   int failures = 0;
   for (const Diagnostic &d : result.diagnostics) {
+    if (d.severity == Severity::Note)
+      continue; // Notes explain an error; the error itself is what's checked.
     auto match = std::find_if(
         expectations.begin(), expectations.end(), [&](const Expectation &e) {
           return !e.met && e.line == d.range.begin.line &&
@@ -248,8 +270,11 @@ int runErrors(const std::filesystem::path &file) {
     std::cout << "\nWhat the compiler printed:\n" << result.diagnosticText;
     return 1;
   }
-  std::cout << "PASS: all " << expectations.size()
-            << " expected errors reported, no others\n";
+  if (expectations.empty())
+    std::cout << "PASS: no errors, as expected\n";
+  else
+    std::cout << "PASS: all " << expectations.size()
+              << " expected errors reported, no others\n";
   return 0;
 }
 
@@ -270,6 +295,7 @@ struct StressCase {
   std::string source;
   std::size_t expectedErrors;
   std::string expectedMessage; // Must appear in the first error, if any.
+  bool analyze = false;        // Also run semantic and destructive analysis.
 };
 
 std::vector<StressCase> stressCases() {
@@ -334,8 +360,13 @@ std::vector<StressCase> stressCases() {
                    "def f(matrix<float> m) -> matrix<float> { return m" +
                        repeat(" @ m", 10000) + "; }",
                    0, ""});
+  // Postfix chains count toward the nesting limit (2026-11-12): later passes
+  // walk them recursively.
   cases.push_back({"10000 casts",
                    "def f(int x) { return x" + repeat(" as int", 10000) + "; }",
+                   1, tooDeep});
+  cases.push_back({"casts under the limit",
+                   "def f(int x) { return x" + repeat(" as int", atLimit) + "; }",
                    0, ""});
   cases.push_back({"10000 call arguments",
                    "def f(int x) { g(x" + repeat(", x", 10000) + "); }", 0,
@@ -358,6 +389,40 @@ std::vector<StressCase> stressCases() {
       {"100000 stray '}'", repeat("} ", kDeep), kDeep, "unexpected '}'"});
   cases.push_back({"100000 lexer errors", repeat("$ ", kDeep), kDeep,
                    "unexpected character"});
+
+  // Through semantic and destructive analysis too. Long left-leaning chains
+  // make the analyses recurse as deep as the chain is long.
+  auto analyzed = [&](std::string name, std::string source,
+                      std::size_t expectedErrors, std::string message) {
+    cases.push_back({std::move(name), std::move(source), expectedErrors,
+                     std::move(message), /*analyze=*/true});
+  };
+  analyzed("analyzed: 10000-term sum",
+           "def f(int x) -> int { return x" + repeat(" + x", 10000) + "; }",
+           0, "");
+  analyzed("analyzed: 10000-term matmul chain of copies",
+           "def f(matrix<float> m) -> matrix<float> { return copy(m)" +
+               repeat(" @ copy(m)", 10000) + "; }",
+           0, "");
+  analyzed("analyzed: 1000 matmuls reusing one matrix",
+           "def f(matrix<float> m) -> matrix<float> { return m" +
+               repeat(" @ m", 1000) + "; }",
+           1, "use of consumed matrix 'm'");
+  analyzed("analyzed: 2000 functions",
+           repeat("def g() -> int { return 1; }\n", 1) +
+               [&] {
+                 std::string s;
+                 for (int i = 0; i < 2000; ++i)
+                   // "fn_": f32 and f64 are type names.
+                   s += "def fn_" + std::to_string(i) + "(int x) -> int { return g() + x; }\n";
+                 return s;
+               }(),
+           0, "");
+  analyzed("analyzed: 100 nested loops consuming",
+           "def f(matrix<float> m, int n) -> matrix<float> { " +
+               repeat("while n > 0 { ", 100) + "m = m @ m; " +
+               repeat("} ", 100) + "return m; }",
+           1, "use of consumed matrix 'm'");
   return cases;
 }
 
@@ -367,7 +432,7 @@ int runStress() {
     // Flushed first, so a crash still shows which case caused it.
     std::printf(".... %s\r", c.name.c_str());
     std::fflush(stdout);
-    ParseResult result = parseSource("stress", c.source, false);
+    ParseResult result = parseSource("stress", c.source, false, c.analyze);
     std::size_t errors = static_cast<std::size_t>(std::count_if(
         result.diagnostics.begin(), result.diagnostics.end(),
         [](const Diagnostic &d) { return d.severity == Severity::Error; }));
@@ -520,8 +585,8 @@ int runFuzz() {
       bytes += input.size();
       // Saved first, so a crash leaves the input behind for debugging.
       std::ofstream("fuzz_last_input.memo", std::ios::binary) << input;
-      ParseResult first = parseSource("fuzz", input);
-      ParseResult second = parseSource("fuzz", input);
+      ParseResult first = parseSource("fuzz", input, true, /*analyze=*/true);
+      ParseResult second = parseSource("fuzz", input, true, /*analyze=*/true);
       if (first.diagnosticText != second.diagnosticText ||
           first.ast != second.ast) {
         std::printf("FAIL %s #%d: two runs on the same input differ (see "
@@ -553,11 +618,13 @@ int main(int argc, char **argv) {
       return runTokens(args[1], update);
     if (args.size() >= 2 && args[0] == "errors")
       return runErrors(args[1]);
+    if (args.size() >= 2 && args[0] == "check")
+      return runErrors(args[1], /*analyze=*/true);
     if (args.size() == 1 && args[0] == "stress")
       return runStress();
     if (args.size() == 1 && args[0] == "fuzz")
       return runFuzz();
-    std::cerr << "usage: MemoLangTests ast|tokens|errors <file.memo> "
+    std::cerr << "usage: MemoLangTests ast|tokens|errors|check <file.memo> "
                  "[--update] | stress | fuzz\n";
     return 2;
   } catch (const std::exception &e) {

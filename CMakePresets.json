@@ -53,8 +53,7 @@
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo",
                 "CMAKE_C_COMPILER": "$env{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe",
                 "CMAKE_CXX_COMPILER": "$env{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe",
-                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake",
-                "LLVM_DIR": "C:/dev/llvm/build/lib/cmake/llvm"
+                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
             }
         },
         {
