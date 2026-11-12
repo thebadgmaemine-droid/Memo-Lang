@@ -13,6 +13,7 @@ set(CMAKE_CXX_STANDARD 20) # Use Cpp 20 for compiler and tests
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Configure LLVM (adjust LLVM_DIR if needed). Elsewhere find_package() finds
 # the system LLVM, or pass -DLLVM_DIR=<prefix>/lib/cmake/llvm.
 if(WIN32)
@@ -69,6 +70,7 @@ add_library(MemoLangFrontend STATIC
     Include/Parser/parser.cpp
     Include/Semantics/Scope.cpp
     Include/Source/SourceManager.cpp
+    
 )
 # Code generation needs the LLVM headers, so it's built only with LLVM.
 if(MEMOLANG_USE_LLVM)
