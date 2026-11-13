@@ -5,13 +5,12 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-
 #include "AST/AST.h"
 
 namespace MemoLang {
 class DiagnosticEngine;
 
-namespace sema {
+namespace Sema {
 
 using SourceLocation = SourceLoc;
 

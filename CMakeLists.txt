@@ -70,6 +70,7 @@ add_library(MemoLangFrontend STATIC
     Include/Parser/parser.cpp
     Include/Source/SourceManager.cpp
     Include/Source/token.cpp
+    Include/Semantics/sema.cpp
 )
 target_include_directories(MemoLangFrontend PUBLIC ${MEMOLANG_INCLUDE_DIRS})
 target_compile_definitions(MemoLangFrontend PRIVATE MEMOLANG_VERSION="${PROJECT_VERSION}")
