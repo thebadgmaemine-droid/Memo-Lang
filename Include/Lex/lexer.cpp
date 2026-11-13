@@ -1,4 +1,4 @@
-// ---------------------------------------------------------------------------
+                      // ---------------------------------------------------------------------------
 // lexer.cpp: stage 1 of the compiler pipeline
 //
 //   source text -> [Lexer] -> tokens -> Parser -> AST -> (sema, codegen: not written yet)
