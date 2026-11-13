@@ -1,6 +1,6 @@
 ﻿cmake_minimum_required(VERSION 3.20)
 # Bump VERSION for each tagged release and add a matching entry to CHANGELOG.md.
-project(MemoLang VERSION 0.1.0 LANGUAGES CXX)
+project(MemoLang VERSION 0.1.0 LANGUAGES C CXX)
 
 option(MEMOLANG_BUILD_TESTS "Build MemoLang tests" ON)
 option(MEMOLANG_BUILD_EXAMPLES "Build MemoLang example programs" ON)
@@ -13,17 +13,28 @@ set(CMAKE_CXX_STANDARD 20) # Use Cpp 20 for compiler and tests
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# Configure LLVM (adjust LLVM_DIR if needed)
-set(LLVM_DIR "C:/dev/llvm/build/lib/cmake/llvm" CACHE PATH
-    "Path to the LLVM CMake package")
 
+# ---------------------------------------------------------------------------
+# LLVM
+# LLVM_DIR must point at the folder containing LLVMConfig.cmake (NOT the
+# include folder). Override on the command line with -DLLVM_DIR=...
+# ---------------------------------------------------------------------------
 if(MEMOLANG_USE_LLVM)
+  if(NOT DEFINED LLVM_DIR AND NOT WIN32
+     AND EXISTS "/usr/lib/llvm-23/lib/cmake/llvm/LLVMConfig.cmake")
+    set(LLVM_DIR "/usr/lib/llvm-23/lib/cmake/llvm" CACHE PATH
+        "Path to the LLVM CMake package (folder containing LLVMConfig.cmake)")
+  endif()
+
   find_package(LLVM REQUIRED CONFIG)
 
-  list(APPEND LLVM_INCLUDE_DIRS
-        "C:/dev/llvm/build/include"
-        "C:/dev/llvm/llvm/include"
-    )
+  # Only needed for a hand-built LLVM tree on Windows; find_package already
+  # provides LLVM_INCLUDE_DIRS for installed packages.
+  if(WIN32)
+    list(APPEND LLVM_INCLUDE_DIRS
+         "C:/dev/llvm/build/include"
+         "C:/dev/llvm/llvm/include")
+  endif()
 
   message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
   message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
@@ -89,14 +100,11 @@ endforeach()
 if(MEMOLANG_USE_LLVM)
   target_include_directories(MemoLang PRIVATE ${LLVM_INCLUDE_DIRS})
   target_compile_definitions(MemoLang PRIVATE ${LLVM_DEFINITIONS})
-
-  if (TARGET LLVM::Core OR TARGET LLVM::Support)
-    target_link_libraries(MemoLang PRIVATE LLVM::Support LLVM::Core LLVM::IRReader)
-  elseif (DEFINED llvm_libs)
-    target_link_libraries(MemoLang PRIVATE ${llvm_libs})
-  else()
-    message(FATAL_ERROR "Could not find LLVM imported targets or legacy llvm_libs")
-  endif()
+  # llvm_libs comes from llvm_map_components_to_libnames above and works with
+  # every LLVM CMake package. If a Frontend source file ever includes LLVM
+  # headers and uses LLVM symbols, link this to MemoLangFrontend (PUBLIC)
+  # instead.
+  target_link_libraries(MemoLang PRIVATE ${llvm_libs})
 endif()
 
 if(MEMOLANG_BUILD_TESTS)
