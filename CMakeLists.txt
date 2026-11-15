@@ -117,7 +117,8 @@ endif()
 
 if(MEMOLANG_BUILD_TESTS)
   enable_testing()
-  add_executable(MemoLangTests tests/runner.cpp)
+  add_executable(MemoLangTests tests/runner.cpp
+    Include/IR/IRBuilder_GPU.cpp)
   target_link_libraries(MemoLangTests PRIVATE MemoLangFrontend)
   memolang_use_big_stack(MemoLangTests)
   target_compile_definitions(MemoLangTests PRIVATE MEMOLANG_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
