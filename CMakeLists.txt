@@ -78,7 +78,14 @@ add_library(MemoLangFrontend STATIC
 )
 # Code generation needs the LLVM headers, so it's built only with LLVM.
 if(MEMOLANG_USE_LLVM)
-  target_sources(MemoLangFrontend PRIVATE Include/IR/IRBuilder.cpp)
+  target_sources(MemoLangFrontend PRIVATE
+      Include/IR/IRBuilder.cpp
+      Include/Codegen/CodegenAction.cpp
+      Include/Codegen/CodegenModule.cpp
+      Include/Codegen/LifetimeUtils.cpp
+      Include/Codegen/Linker.cpp
+      Include/Codegen/ModuleBuilder.cpp
+  )
 endif()
 target_include_directories(MemoLangFrontend PUBLIC ${MEMOLANG_INCLUDE_DIRS})
 target_compile_definitions(MemoLangFrontend PRIVATE MEMOLANG_VERSION="${PROJECT_VERSION}")

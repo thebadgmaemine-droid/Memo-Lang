@@ -25,11 +25,11 @@ namespace MemoLang {
 class CodeGenerationType;
 class DiagnosticEngine; // Call from diagengine
 class SourceManager;
-
+// Converts diagnostics emitted by LLVM's back end into MemoLang
+// diagnostics. Only message, Source location uses LLVM's
 class BackendDiagnostics {
 public:
-  // Converts diagnostics emitted by LLVM's back end into MemoLang
-  // diagnostics. Only message, Source location uses LLVM's
+  
     BackendDiagnostics(DiagnosticEngine &Diags,
                      const CodeGenerationType &CodeGenType)
       : Diags(Diags), CodeGenType(CodeGenType) {}
