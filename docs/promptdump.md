@@ -167,3 +167,41 @@ ADJUST THE SPACING
 #----------------------------------------------------------------24/10/2026------------------------------------------------------------------------------------
 Generate a preset with no code for IR builder
 Generated a small prseset for IRBuilder.cpp
+
+#---------------------------------------------------------------Prompt to claude 12/11/2026-------------------------------------------------------------
+ok dude we need to get updates on things now:
+-check on this:
+[pasted: review notes on build wiring, sema.h design, types and the destructive analysis]
+- this:
+[pasted: second review list]
+- and checklist this to do list:
+[pasted: team to-do list]
+Result: Claude checked every item against commit 5281e16 and returned a done / open / partly-done checklist.
+
+can you check on the github if anything's not updated
+Result: Claude compared the local branch with GitHub and found the teammate's new commits to pull.
+
+fix that, do this:
+[pasted: the checklist from the prompt above]
+and change branch nam just to "commit-main"
+also fix the folder arrangement only for anything that is related to documentation (except devlog, changelog and readme)
+Result: Claude wrote the fixes for the open items (sema, types, source ranges, destructive analysis, tests), renamed the branch to commit-main and moved the documentation into docs/.
+
+uh i need the numbers for running this tho, if this using the method of destructive read and in theory, it will improves the compile speed; will it actually improves that speed tho?
+Result: Claude added a `bench` mode to tests/runner.cpp that times each compiler stage. The consumption analysis adds about 12% to checking time.
+
+we need to run numbers on that tho
+Result: Claude wrote the interpreter (Include/Interp), the CPU matrix runtime with memory counters (Include/Runtime), the four benchmark programs (benchmarks/*.memo), the `run` and `membench` test modes and the tests/run tests.
+
+ok so can you run it against mvsc
+Result: Claude wrote the same four workloads in C++ (benchmarks/cpp/workloads.cpp, plain and hand-freed) and added them to the membench table.
+
+#---------------------------------------------------------------Prompt to claude 16/11/2026-------------------------------------------------------------
+ok we need to log results to something...
+Result: Claude added `membench --save`, which writes docs/results/membench-<date>.md and appends to docs/results/membench.csv, and added the results to dev-log.md, STATUS.md and CHANGELOG.md.
+
+oh also add prompts into the promptdump also, dont make it too blatant just like finish work that seems to be incomplete or do the rest of a feature
+and i think check the report folder and update the content inside there, keep .tex file before adding content legacy and log the file in word about what have done today.
+check the whole folder and give me a list on what is left until finish the whole thing
+note: if i prompt this consider this as full evaluation on progress check of the prototype
+Result: Claude copied both reports to docs/reports/legacy/, updated the English and Vietnamese reports (source folders, testing table, benchmark results, progress, future work), added these prompts here, wrote the Word log docs/16-11-2026.docx and listed the work left.

@@ -1,0 +1,23 @@
+# Workload 4: every input created first, then one long chain in a single
+# expression. Peak memory comes at the start, when all inputs exist, so freeing
+# them early helps little. Temporaries in the chain are freed right away in
+# both modes.
+
+extern def random_matrix(int rows, int cols) -> matrix<f32>;
+extern def matrix_sum(matrix<f32> m) -> f32;
+
+def chain(int n) -> f32 {
+    matrix<f32> a = random_matrix(n, n);
+    matrix<f32> b = random_matrix(n, n);
+    matrix<f32> c = random_matrix(n, n);
+    matrix<f32> d = random_matrix(n, n);
+    matrix<f32> e = random_matrix(n, n);
+    matrix<f32> f = random_matrix(n, n);
+    matrix<f32> g = random_matrix(n, n);
+    matrix<f32> h = random_matrix(n, n);
+    return matrix_sum(a @ b @ c @ d @ e @ f @ g @ h);
+}
+
+def main() -> f32 {
+    return chain(256);
+}

@@ -1,0 +1,26 @@
+# Interpreter checks for matrix operations. main() returns how many passed.
+# expect-result: 6
+
+extern def random_matrix(int rows, int cols) -> matrix<float>;
+extern def identity_matrix(int n) -> matrix<float>;
+extern def zeros_matrix(int rows, int cols) -> matrix<float>;
+extern def matrix_sum(matrix<float> m) -> float;
+
+def close(float a, float b) -> bool {
+    float d = a - b;
+    return d < 0.000001 and d > -0.000001;
+}
+
+def main() -> int {
+    int score = 0;
+    matrix<float> r = random_matrix(8, 8);
+    float total = matrix_sum(copy(r));
+    if close(matrix_sum(identity_matrix(8) @ copy(r)), total) { score++; }
+    if close(matrix_sum(copy(r) * 2.0), 2.0 * total) { score++; }
+    if close(matrix_sum(copy(r) - copy(r)), 0.0) { score++; }
+    if close(matrix_sum(-copy(r)), -total) { score++; }
+    if close(matrix_sum(zeros_matrix(4, 4)), 0.0) { score++; }
+    matrix<float> a = random_matrix(3, 5);              # Not square.
+    if close(matrix_sum(identity_matrix(3) @ copy(a)), matrix_sum(copy(a))) { score++; }
+    return score;
+}

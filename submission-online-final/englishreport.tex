@@ -320,7 +320,7 @@
 	\end{itemize}
 	However, for implementation practicality and other design reasons, we made the following adjustments to the core Python syntax:
 	\begin{itemize}
-		\item Special precedence of \texttt{clone()} for cloning memory.
+		\item A built-in \texttt{copy()} that copies a matrix, for keeping a matrix that an operation would otherwise consume.
 		\item Braces instead of indentation for function scope.
 	\end{itemize}
 	
@@ -419,48 +419,64 @@
 	
 	\subsection{Process}
 	
-	The compiler front-end is written in C++. Each stage is first designed, then coded, then debugged independently to look for errors, and the stages are then assembled modularly. The main source files are listed in Table~\ref{tab:modules}.
-	
+	The compiler is written in C++20. Each stage is first designed, then coded, then debugged independently to look for errors, and the stages are then assembled modularly. Every stage reports errors through one diagnostic engine, so all messages share one format and point at the exact source text. The main source folders are listed in Table~\ref{tab:modules}. Until code generation exists, checked programs are run by an interpreter on a CPU matrix runtime, which is also what the measurements in Section~\ref{sec:evidence} use.
+
 	\begin{table}[h]
 		\centering
-		\caption{Main Source Files}
+		\caption{Main Source Folders}
 		\label{tab:modules}
-		\begin{tabular}{ll}
+		\begin{tabular}{@{}>{\RaggedRight}p{0.36\linewidth} >{\RaggedRight}p{0.58\linewidth}@{}}
 			\toprule
-			File & Purpose \\
+			Folder & Purpose \\
 			\midrule
-			\texttt{Lexer.h/.cpp} & Tokenizes language source \\
-			\texttt{Parser.h/.cpp} & Builds the AST \\
-			\texttt{ExprAST.h} & AST node definitions \\
-			\texttt{CodeGen.cpp} & LLVM IR generation \\
-			\texttt{CuBLASRuntime.cpp} & cuBLAS MatMul bindings \\
-			\texttt{main.cpp} & Driver / REPL \\
+			\texttt{Include/Source/} & Reads source files; maps positions to line and column \\
+			\texttt{Include/Diag/} & Diagnostic engine (error messages) \\
+			\texttt{Include/Lex/} & Lexer: source text to tokens \\
+			\texttt{Include/Parser/} & Parser: tokens to the abstract syntax tree (AST) \\
+			\texttt{Include/AST/} & AST node definitions and printer \\
+			\texttt{Include/Types/} & Semantic types, including matrices \\
+			\texttt{Include/Semantics/} & Semantic analysis: names and types \\
+			\texttt{Include/Analysis/} & Consumption (destructive-read) analysis \\
+			\texttt{Include/Interp/} & Interpreter: runs checked programs \\
+			\texttt{Include/Runtime/} & CPU matrix runtime with memory accounting \\
+			\texttt{Include/IR/} & LLVM IR generation (interface only) \\
+			\texttt{Include/Driver/}, \texttt{main.cpp} & Command-line program \\
+			\texttt{tests/}, \texttt{benchmarks/} & Automated tests and benchmark programs \\
 			\bottomrule
 		\end{tabular}
 	\end{table}
 	
 	\subsection{Testing}
-	
-	
+
+	The project has 27 automated tests (Table~\ref{tab:verification}). They run on every change, on Windows (MSVC) and Linux (GCC), in Debug and Release builds. All 27 pass.
+
 	\begin{table}[h]
 		\centering
 		\caption{Correctness Test Results}
 		\label{tab:verification}
-		\begin{tabular}{ll}
+		\begin{tabular}{@{}>{\RaggedRight}p{0.70\linewidth} >{\RaggedRight}p{0.24\linewidth}@{}}
 			\toprule
 			Test Case & Result \\
 			\midrule
-			$N \times N$ MatMul vs. reference (conventional) & TBD \\
-			Destructive-read re-use error detection (runtime) & TBD \\
-			Edge cases (empty, 1x1, non-square) & TBD \\
+			Lexer and parser output compared line by line with expected output (8 files) & Pass \\
+			Syntax errors: 36 deliberate mistakes, each reported exactly once & Pass \\
+			Semantic errors: 38 deliberate mistakes (names, types, calls) & Pass \\
+			Destructive-read re-use detection: 9 uses of a consumed matrix, found at compile time, including after a branch and in a later loop iteration & Pass \\
+			Valid programs accepted with no errors (2 files) & Pass \\
+			Matrix multiplication against a reference: identity $\times$ $M = M$ for square and non-square matrices, and identical results across four implementations (Section~\ref{sec:evidence}) & Pass \\
+			Arithmetic and control flow when running programs (20 checks) & Pass \\
+			Shape mismatch detected while running & Pass \\
+			No memory leaks: every allocated matrix freed, in both modes & Pass \\
+			Stress tests: 36 extreme inputs (100\,000-deep nesting, 1~MB lines, 10\,000-term chains) & Pass \\
+			Fuzzing: 9\,000 random inputs, no crash or hang & Pass \\
 			\bottomrule
 		\end{tabular}
 	\end{table}
 
 	\begin{itemize}
-		\item $N \times N$ MatMul vs. reference (conventional): Evaluating a chain of matrix multiplication operations to stress-test for evaluating end-to-end improvements.
-		\item Destructive-read re-use error detection: evaluates at run time and compile time to detect errors.
-		\item Edge cases: evaluates edge cases to stress-test the compatibility and thoroughness of the algorithm.
+		\item Matrix multiplication against a reference: every benchmark computes the same result in all four implementations, and multiplying by the identity matrix returns the original matrix, including for non-square matrices.
+		\item Destructive-read re-use detection: the compiler rejects any use of a matrix after it has been consumed, before the program runs; a note shows where the matrix was consumed.
+		\item Edge cases: empty files, 1~MB inputs, very deep nesting, very long chains and random input are all handled without a crash.
 	\end{itemize}
 	
 	
@@ -534,30 +550,59 @@
 	\subsection{Evidence and Reproducibility}
 	\label{sec:evidence}
 	
-	At the current stage, evidence is limited to the implemented front-end (lexer, parser, AST and driver). Results for GEMM execution and cuBLAS integration will be added once those stages are implemented. An example build of the current front-end:
-	\begin{lstlisting}[caption = Example compilation]
-	def basicadd(int i, int k) {
-		return i + k;
-		}
-	# Basic compilation of source code, addition only. No showcase of GEMMs or cuBLAS integration.
+	The first measurements compare memory use with and without destructive reads. MemoLang programs are run by the interpreter on a CPU matrix runtime that counts every allocation and free and records peak memory. Each workload is run four ways, all on the same matrix runtime:
+	\begin{itemize}
+		\item \textbf{MemoLang base}: each matrix is freed when its variable goes out of scope or is given a new value, as in C++ or Rust.
+		\item \textbf{MemoLang destructive}: each matrix is freed the moment it is consumed.
+		\item \textbf{C++ plain}: the same workload written in C++ and compiled with MSVC, freeing at the end of scope.
+		\item \textbf{C++ hand-freed}: the same, with every matrix freed by hand after its last use.
+	\end{itemize}
+	The four workloads use $256 \times 256$ single-precision matrices (0.25~MiB each): \texttt{named\_chain} (straight-line code with eight named intermediate results), \texttt{layer\_loop} (16 loop iterations of two multiplications), \texttt{single\_expression} (eight matrices created first, then multiplied in one expression) and \texttt{power\_iteration} (one matrix reused in every iteration). All four versions of each workload return the same result, and every allocated matrix is freed.
+
+	\begin{table}[h]
+		\centering
+		\caption{Peak matrix memory (MiB)}
+		\label{tab:results}
+		\small
+		\begin{tabular}{@{}lrrrr@{}}
+			\toprule
+			Workload & \shortstack[r]{MemoLang\\base} & \shortstack[r]{MemoLang\\destructive} & \shortstack[r]{C++\\plain} & \shortstack[r]{C++\\hand-freed} \\
+			\midrule
+			\texttt{named\_chain} & 4.25 & 0.75 ($-82.4\%$) & 4.25 & 0.75 \\
+			\texttt{layer\_loop} & 1.25 & 0.75 ($-40.0\%$) & 1.25 & 0.75 \\
+			\texttt{single\_expression} & 2.50 & 2.25 ($-10.0\%$) & 2.50 & 2.25 \\
+			\texttt{power\_iteration} & 0.75 & 1.00 ($+33.3\%$) & 0.75 & 0.75 \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+
+	Destructive reads lowered peak memory in three of the four workloads, by 10\% to 82\%, and matched C++ in which every matrix is freed by hand, without any manual freeing. MemoLang base used exactly the same memory as plain C++, which confirms that the baseline is realistic. In \texttt{power\_iteration}, reusing a matrix requires \texttt{copy()}, which C++ does not need; this raised peak memory by 33\% and allocations from 19 to 35. In the other workloads the number of allocations was unchanged: destructive reads free memory earlier, not less often.
+
+	CPU execution times varied by up to a factor of three between runs of identical code, so they show no speed difference either way. Speed will be measured on a GPU, with the cuBLAS runtime. The memory numbers do not depend on the device.
+
+	The consumption analysis is also cheap at compile time. On a 3.6~MB test program (93\,000 lines), the lexer and parser took 75.7~ms, semantic analysis 50.0~ms and consumption analysis 15.1~ms, adding about 12\% to the time needed to check a program.
+
+	Conditions: Intel Core i7-1185G7 at 3.00~GHz, 16~GB RAM, Windows 11, MSVC 19.51, Release build, median of 5 runs. The results are reproduced and saved to \texttt{docs/results/} with:
+	\begin{lstlisting}[caption = Reproducing the measurements]
+cmake -S . -B build -DMEMOLANG_BUILD_TESTS=ON
+cmake --build build --config Release
+build\Release\MemoLangTests.exe membench --save
 	\end{lstlisting}
 	\section{Conclusion}
 	
 	\subsection{Progress}
-	The project has completed a portion of the planned work. This includes the lexer, the parser,
-	the AST, and a basic driver implementation. Design for the remaining pipeline has been finalized,
-	but implementation of the features further down the pipeline has not yet begun due to time constraints.
+	The front-end of the language is complete: the lexer, the parser, the AST with source locations, the diagnostic engine, semantic analysis (names, types and inferred return types) and the consumption analysis that enforces destructive reads at compile time. MemoLang programs can be run by an interpreter on a CPU matrix runtime, which produced the first memory measurements (Section~\ref{sec:evidence}). The project has 27 automated tests, run on Windows and Linux for every change.
+
+	Not yet implemented are the GPU parts of the pipeline: the cuBLAS runtime, the CUTLASS kernel, and LLVM code generation with JIT/AOT compilation. The GPU runtime also needs a machine with an NVIDIA GPU to build and measure.
 
 	\subsection{Future work}
-	Features further down the pipeline, including integration of the precompiled matmul runtime library,
-	remain to be implemented. The currently planned features are as follows:
+	The planned next steps are:
 	\begin{itemize}
-		\item Vector and matrix types
-		\item A diagnostic driver and diagnostic engine
-		\item Static consumption analysis (destructive-read checking) and handling of GPU kernel buffers and intermediates
-		\item Linking against the precompiled matmul runtime to produce an executable capable of launching the GPU kernel
+		\item A cuBLAS version of the matrix runtime, to measure GPU memory and execution time, including the cuBLAS-only reference from the benchmark plan
 		\item Direct integration of a separate GEMM kernel using CUTLASS, with consumption-aware buffer reuse
-		\item Separation of code generation from the AST for cleaner lowering
+		\item LLVM IR code generation and JIT/AOT compilation, passing the consume flags computed by the consumption analysis to the runtime
+		\item Matrix shapes in the type syntax, so that matrix dimensions are checked at compile time
+		\item Larger and more realistic benchmark workloads, with model-sized matrices
 		\item Optimization passes
 		\item A macro system (link declarations, matmul-chain pattern abstraction)
 \end{itemize}
@@ -573,6 +618,7 @@
 		optimized to \emph{near theoretical limits} in raw throughput; this research instead targets memory
 		efficiency, using a novel ownership system to reduce the memory footprint required per workload,
 		as one contribution toward easing the demand-side pressure driving the current memory shortage.
+		The first measurements (Section~\ref{sec:evidence}) support this for programs with many short-lived matrices, and also show the cost when a matrix must be reused.
 		
 
 	

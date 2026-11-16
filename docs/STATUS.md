@@ -19,6 +19,14 @@ build/Debug/MemoLang --dump-symbols examples/basicadd.memo
 build/Debug/MemoLang --dump-tokens examples/basicadd.memo
 build/Debug/MemoLang --parse-only examples/basicadd.memo # syntax only
 build/Debug/MemoLang examples/errors.memo                # shows diagnostics
+
+# Running programs (interpreter + CPU matrix runtime); use a Release build:
+build/Release/MemoLang --run benchmarks/named_chain.memo
+build/Release/MemoLang --run --no-destructive benchmarks/named_chain.memo
+build/Release/MemoLang --compare benchmarks/named_chain.memo
+build/Release/MemoLangTests membench      # the table for every benchmark
+build/Release/MemoLangTests membench --save   # ...and record it in docs/results/
+build/Release/MemoLangTests bench         # compile time per stage
 ```
 
 This needs a C++20 compiler: MSVC 2022+, GCC 11+ or Clang 14+. LLVM isn't
@@ -45,20 +53,22 @@ The stages follow the pipeline figure in the report.
 | Types | Done for MemoLang's types | `Include/Types/Typecontext.h`, `Typecontext.cpp` |
 | Semantic analysis | Done (names, types, `auto` return types) | `Include/Semantics/sema.h`, `sema.cpp`, `Scope.h`, `Scope.cpp` |
 | Consumption analysis (destructive read) | Done (rules below) | `Include/Analysis/destructive.h`, `destructive.cpp` |
-| Driver | Done (front-end) | `Include/Driver/driver.h`, `driver.cpp`, `main.cpp` |
-| LLVM IR generation | **Interface only**: `IRGenerator` returns a null module | `Include/IR/IRBuilder.h`, `IRBuilder.cpp`, `IRGenerator.h` |
+| Driver | Done | `Include/Driver/driver.h`, `driver.cpp`, `main.cpp` |
+| Interpreter | Done: runs `main()` with or without destructive reads | `Include/Interp/interpreter.h`, `interpreter.cpp` |
+| Matrix runtime (CPU) | Done: allocates, multiplies, frees, measures memory | `Include/Runtime/runtime.h`, `runtime.cpp` |
+| LLVM IR generation | **Interface only**: `IRGenerator` returns a null module. Not needed for the memory measurements (the interpreter runs programs) | `Include/IR/IRBuilder.h`, `IRBuilder.cpp`, `IRGenerator.h` |
 | Optimization passes | **Missing** | none |
 | JIT / AOT | **Missing** | none |
-| cuBLAS runtime | **Missing** (the report lists `CuBLASRuntime.cpp`, which doesn't exist yet) | none |
+| cuBLAS runtime (GPU) | **Missing**: needs an NVIDIA GPU to build and run (the report lists `CuBLASRuntime.cpp`) | none |
 | CUTLASS GEMM kernel | **Missing** | none |
 | Macros | **Notes only** | `Include/Macro/read.md` |
 | Tests | Front-end, semantic and consumption analysis | `tests/` (see "Tests" below), `examples/*.memo` |
 
 ### Known gaps
 
-- Code generation: nothing turns the checked program into something that runs
-  yet. `Destructive::consumeFlags()` already gives each `@` its consume_a /
-  consume_b flags for when it does.
+- Programs run in the interpreter, on the CPU. GPU timing needs the cuBLAS
+  runtime on a machine with an NVIDIA GPU. `Destructive::consumeFlags()` gives
+  each `@` its consume_a / consume_b flags for it.
 - Matrix shapes: `matrix<float>` has no shape in the syntax, so shapes are
   unknown and `@` can't check them yet. `MatrixType` and the `@` check already
   support known shapes.
@@ -107,6 +117,8 @@ version; change them there as the design evolves.
 | `tests/tokens/*.memo` | Lexes with no errors; token list must equal the `.tokens` file |
 | `tests/errors/*.memo` | Parse errors: every error matches an `# expect-error: <col>: <text>` comment on its line (or `# expect-error@+N:` for N lines below), and there are no other errors |
 | `tests/check/*.memo` | The whole front-end (parse, semantic and consumption analysis), with the same `# expect-error` comments. A file with none must come through with no errors |
+| `tests/run/*.memo` | Runs `main()` with and without destructive reads: both must return the same value (`# expect-result: <value>`) or fail with `# expect-runtime-error: <text>`, and both must free every matrix |
+| `benchmarks/*.memo` | The same check for each benchmark program |
 | `stress` (built in) | Empty/huge/1 MB inputs, NUL bytes, CRLF, 100000-deep nesting of every kind, 10000-term chains (also through the analyses), 100 nested loops, throughput |
 | `fuzz` (built in) | 9000 random, token-soup and mutated inputs through every stage: no crash, no hang, same result every run |
 
@@ -178,18 +190,44 @@ also rejects `is`, `is not`, `in` and `not in` as not supported yet.
 |---|---|
 | `Include/` | The compiler, one folder per stage (headers and `.cpp` side by side) |
 | `tests/`, `examples/` | Tests and example programs |
+| `benchmarks/` | Programs for measuring memory with and without destructive reads |
 | `docs/` | This file, dev logs (`dev-log.md`, dated `.docx` logs), `promptdump.md` |
 | `docs/reports/drafts/` | Earlier report drafts (`.tex` / `.pdf`) |
 | `docs/legacy/` | Notes and code from the first, Kaleidoscope-style front-end |
 | `submission-online-final/` | The submission package: final reports, `.docx` files, its own README and dev log |
 
+## Measured so far (2026-11-12)
+
+`MemoLangTests membench`, CPU runtime, 256x256 f32 matrices (0.25 MiB each),
+Intel Core i7-1185G7, MSVC 19.51 Release. "Base" frees a named matrix when
+its scope ends or it is reassigned (like C++ / Rust), temporaries at once, and
+copy() costs nothing; "destr" frees each matrix when it is consumed.
+
+| Workload | Peak memory base -> destr | Allocations base -> destr |
+|---|---|---|
+| `named_chain` | 4.25 -> 0.75 MiB (-82.4%) | 17 -> 17 |
+| `layer_loop` | 1.25 -> 0.75 MiB (-40.0%) | 65 -> 65 |
+| `single_expression` | 2.50 -> 2.25 MiB (-10.0%) | 15 -> 15 |
+| `power_iteration` | 0.75 -> 1.00 MiB (+33.3%) | 19 -> 35 (+84.2%): the cost of copy() |
+
+Memory numbers are exact and carry over to a GPU. CPU times vary by about
+±15% between identical runs, so they don't show a speed difference either way.
+
+Against native C++ compiled with MSVC (`benchmarks/cpp/`, same matrix
+runtime): plain C++ (freeing at the end of scope) uses exactly the memory of
+MemoLang base in all four workloads, and C++ with every matrix freed by hand
+after its last use matches MemoLang destructive in three. So destructive reads
+reach hand-tuned C++ memory use automatically, except where reuse needs
+copy() (`power_iteration`, where C++ needs no copy).
+
 ## Suggested next steps
 
-1. **Matrix runtime**: a small C++/CUDA library wrapping cuBLAS (and later the
-   CUTLASS kernel) with `memo_matmul(a, b, consume_a, consume_b)`.
-2. **Codegen**: lower the checked AST to LLVM IR that calls the runtime, using
+1. **cuBLAS runtime**: a GPU version of `Include/Runtime/` (same interface),
+   built and run on a machine with an NVIDIA GPU (lab machine, Colab or
+   Kaggle), for real GPU memory and timing.
+2. **More benchmark workloads**, closer to real models (bigger matrices,
+   longer programs), and the cuBLAS-only reference from the report.
+3. **Codegen**: lower the checked AST to LLVM IR that calls the runtime, using
    `Destructive::consumeFlags()` for the consume flags.
-3. **Benchmarks** from the report: peak GPU memory and allocations with and
-   without destructive reads.
 4. **Shapes in the syntax** (e.g. `matrix<float, 4, 4>`), so `@` can check
    dimensions at compile time.

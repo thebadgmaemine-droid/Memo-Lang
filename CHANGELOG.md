@@ -5,6 +5,24 @@ All notable changes to MemoLang. Versions follow `project(VERSION ...)` in
 
 ## [Unreleased]
 
+### Added (2026-11-12, later)
+- Programs can run: an interpreter (`Include/Interp/`) and a CPU matrix
+  runtime (`Include/Runtime/`) that counts allocations, frees and peak memory.
+  `MemoLang --run`, `--run --no-destructive` and `--compare` run `main()` with
+  destructive reads, without them (C++/Rust-style freeing at scope end), or
+  both side by side.
+- `benchmarks/`: four workloads, and `MemoLangTests membench`, which prints
+  their peak memory, allocations and time in both modes.
+- `MemoLangTests bench`: compile time per stage.
+- `membench --save` records the results in `docs/results/` (a dated Markdown
+  report, and a line per measurement in `membench.csv`) with the CPU,
+  compiler and build type.
+- `benchmarks/cpp/`: the four workloads in native C++ (plain, and with every
+  matrix freed by hand), measured by `membench` next to MemoLang.
+- `tests/run/`: interpreter tests; each program runs in both modes and must
+  give the same result and free every matrix. The benchmarks are checked the
+  same way. 27 tests in total.
+
 ### Added (2026-11-12)
 - Semantic analysis (`Include/Semantics/sema.cpp`): name resolution, type
   checking, `auto` return types inferred from `return`, named arguments, and

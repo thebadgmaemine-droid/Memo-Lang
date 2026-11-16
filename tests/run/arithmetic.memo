@@ -1,0 +1,66 @@
+# Interpreter checks for numbers, logic, control flow and calls.
+# main() returns how many checks passed.
+# expect-result: 20
+
+static int counter = 0;
+
+def bump() -> int {
+    counter += 1;
+    return counter;
+}
+
+def fact(int n) -> int {
+    if n <= 1 {
+        return 1;
+    }
+    return n * fact(n - 1);
+}
+
+def sub(int a, int b) -> int {
+    return a - b;
+}
+
+def main() -> int {
+    int score = 0;
+    if 7 // 2 == 3 { score++; }                         # floor division
+    if -7 // 2 == -4 { score++; }                       # rounds toward minus infinity
+    if -7 % 2 == 1 { score++; }                         # agrees with //
+    if 7 / 2 == 3.5 { score++; }                        # `/` gives a float
+    if 2 ** 10 == 1024 { score++; }
+    if fact(10) == 3628800 { score++; }                 # recursion
+    if sub(b = 1, a = 10) == 9 { score++; }             # named arguments
+    if (300 as byte) == 44 { score++; }                 # byte wraps around
+    if (2147483648 as i32) == -2147483648 { score++; }  # i32 wraps around
+    if (3.9 as int) == 3 { score++; }                   # truncates
+    if -(3.9 as int) == -3 { score++; }
+    if (1 << 4 | 1) == 17 { score++; }
+    if not (1 > 2) and (2 > 1 or false) { score++; }
+    int i = 0;
+    int total = 0;
+    while true {
+        i++;
+        if i > 10 {
+            break;
+        }
+        if i % 2 == 0 {
+            total += i;
+        }
+    }
+    if total == 30 { score++; }                         # 2 + 4 + 6 + 8 + 10
+    bump();
+    bump();
+    if counter == 2 { score++; }                        # module-level variable
+    float f = 1;
+    f += 0.5;
+    if f == 1.5 { score++; }                            # int converts to float
+    f32 small = 0.1;
+    if small != 0.1 { score++; }                        # f32 is rounded
+    str s = "ab" + "c";
+    if s == "abc" { score++; }
+    int x = 5;
+    int y = x++;
+    if y == 5 and x == 6 { score++; }
+    int z = ++x;
+    if z == 7 { score++; }
+    return score;
+}

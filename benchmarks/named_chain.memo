@@ -1,0 +1,35 @@
+# Workload 1: straight-line code with named intermediates.
+# Each step creates a new weight matrix and multiplies it into the running
+# result, keeping every intermediate in its own named variable (as hand-written
+# model code often does). Each matrix is used once.
+#   Without destructive reads: every named matrix stays allocated until the
+#   function returns.
+#   With destructive reads: each one is freed as soon as `@` has used it.
+
+extern def random_matrix(int rows, int cols) -> matrix<f32>;
+extern def matrix_sum(matrix<f32> m) -> f32;
+
+def forward(int n) -> f32 {
+    matrix<f32> x  = random_matrix(n, n);
+    matrix<f32> w1 = random_matrix(n, n);
+    matrix<f32> h1 = x @ w1;
+    matrix<f32> w2 = random_matrix(n, n);
+    matrix<f32> h2 = h1 @ w2;
+    matrix<f32> w3 = random_matrix(n, n);
+    matrix<f32> h3 = h2 @ w3;
+    matrix<f32> w4 = random_matrix(n, n);
+    matrix<f32> h4 = h3 @ w4;
+    matrix<f32> w5 = random_matrix(n, n);
+    matrix<f32> h5 = h4 @ w5;
+    matrix<f32> w6 = random_matrix(n, n);
+    matrix<f32> h6 = h5 @ w6;
+    matrix<f32> w7 = random_matrix(n, n);
+    matrix<f32> h7 = h6 @ w7;
+    matrix<f32> w8 = random_matrix(n, n);
+    matrix<f32> h8 = h7 @ w8;
+    return matrix_sum(h8);
+}
+
+def main() -> f32 {
+    return forward(256);
+}

@@ -325,7 +325,7 @@
 	\end{itemize}
 	Tuy nhiên, vì tính thực tiễn khi cài đặt và các quyết định thiết kế khác, chúng em đã điều chỉnh một số điểm so với cú pháp Python gốc:
 	\begin{itemize}
-		\item Độ ưu tiên đặc biệt cho \texttt{clone()} dùng để sao chép vùng nhớ.
+		\item Hàm có sẵn \texttt{copy()} để sao chép một ma trận, dùng khi cần giữ lại một ma trận mà một phép toán khác sẽ tiêu thụ.
 		\item Sử dụng dấu ngoặc nhọn thay cho thụt lề để xác định phạm vi của hàm.
 	\end{itemize}
 	
@@ -424,48 +424,64 @@
 	
 	\subsection{Quy trình thực hiện}
 	
-	Phần front-end của trình biên dịch được viết bằng C++. Mỗi giai đoạn được thiết kế trước, sau đó lập trình, rồi gỡ lỗi độc lập để phát hiện lỗi, và cuối cùng các giai đoạn được ghép nối theo dạng mô-đun. Các tệp mã nguồn chính được liệt kê trong Bảng~\ref{tab:modules}.
-	
+	Trình biên dịch được viết bằng C++20. Mỗi giai đoạn được thiết kế trước, sau đó lập trình, rồi gỡ lỗi độc lập để phát hiện lỗi, và cuối cùng các giai đoạn được ghép nối theo dạng mô-đun. Mọi giai đoạn đều báo lỗi qua cùng một bộ chẩn đoán, nên các thông báo lỗi có chung định dạng và chỉ đúng vị trí trong mã nguồn. Các thư mục mã nguồn chính được liệt kê trong Bảng~\ref{tab:modules}. Trong khi chưa có bước sinh mã, các chương trình đã được kiểm tra được chạy bằng một trình thông dịch trên runtime ma trận chạy trên CPU; đây cũng là cách các phép đo trong Mục~\ref{sec:evidence} được thực hiện.
+
 	\begin{table}[h]
 		\centering
-		\caption{Các tệp mã nguồn chính}
+		\caption{Các thư mục mã nguồn chính}
 		\label{tab:modules}
-		\begin{tabular}{ll}
+		\begin{tabular}{@{}>{\RaggedRight}p{0.36\linewidth} >{\RaggedRight}p{0.58\linewidth}@{}}
 			\toprule
-			Tệp & Chức năng \\
+			Thư mục & Chức năng \\
 			\midrule
-			\texttt{Lexer.h/.cpp} & Tách mã nguồn của ngôn ngữ thành token \\
-			\texttt{Parser.h/.cpp} & Xây dựng AST \\
-			\texttt{ExprAST.h} & Định nghĩa các nút AST \\
-			\texttt{CodeGen.cpp} & Sinh LLVM IR \\
-			\texttt{CuBLASRuntime.cpp} & Liên kết cuBLAS cho phép nhân ma trận \\
-			\texttt{main.cpp} & Chương trình điều khiển / REPL \\
+			\texttt{Include/Source/} & Đọc tệp mã nguồn; chuyển vị trí thành dòng và cột \\
+			\texttt{Include/Diag/} & Bộ chẩn đoán (thông báo lỗi) \\
+			\texttt{Include/Lex/} & Bộ phân tích từ vựng: mã nguồn thành token \\
+			\texttt{Include/Parser/} & Bộ phân tích cú pháp: token thành cây cú pháp trừu tượng (AST) \\
+			\texttt{Include/AST/} & Định nghĩa các nút AST và chương trình in AST \\
+			\texttt{Include/Types/} & Các kiểu ngữ nghĩa, bao gồm ma trận \\
+			\texttt{Include/Semantics/} & Phân tích ngữ nghĩa: tên và kiểu \\
+			\texttt{Include/Analysis/} & Phân tích tiêu thụ (đọc phá hủy) \\
+			\texttt{Include/Interp/} & Trình thông dịch: chạy các chương trình đã được kiểm tra \\
+			\texttt{Include/Runtime/} & Runtime ma trận trên CPU, có đo đạc bộ nhớ \\
+			\texttt{Include/IR/} & Sinh LLVM IR (mới có giao diện) \\
+			\texttt{Include/Driver/}, \texttt{main.cpp} & Chương trình dòng lệnh \\
+			\texttt{tests/}, \texttt{benchmarks/} & Kiểm thử tự động và chương trình đánh giá hiệu năng \\
 			\bottomrule
 		\end{tabular}
 	\end{table}
 	
 	\subsection{Kiểm thử}
-	
-	
+
+	Dự án có 27 bài kiểm thử tự động (Bảng~\ref{tab:verification}). Chúng được chạy sau mỗi thay đổi, trên Windows (MSVC) và Linux (GCC), ở cả bản Debug và Release. Cả 27 bài đều đạt.
+
 	\begin{table}[h]
 		\centering
 		\caption{Kết quả kiểm tra tính đúng đắn}
 		\label{tab:verification}
-		\begin{tabular}{ll}
+		\begin{tabular}{@{}>{\RaggedRight}p{0.70\linewidth} >{\RaggedRight}p{0.24\linewidth}@{}}
 			\toprule
 			Trường hợp kiểm tra & Kết quả \\
 			\midrule
-			Nhân ma trận $N \times N$ so với tham chiếu (thông thường) & Chưa có \\
-			Phát hiện lỗi tái sử dụng sau đọc phá hủy (khi chạy) & Chưa có \\
-			Trường hợp biên (rỗng, 1x1, không vuông) & Chưa có \\
+			Kết quả của bộ phân tích từ vựng và cú pháp được so sánh từng dòng với kết quả mong đợi (8 tệp) & Đạt \\
+			Lỗi cú pháp: 36 lỗi cố ý, mỗi lỗi được báo đúng một lần & Đạt \\
+			Lỗi ngữ nghĩa: 38 lỗi cố ý (tên, kiểu, lời gọi hàm) & Đạt \\
+			Phát hiện lỗi tái sử dụng sau đọc phá hủy: 9 trường hợp dùng ma trận đã bị tiêu thụ, được phát hiện khi biên dịch, kể cả sau một nhánh rẽ và ở vòng lặp sau & Đạt \\
+			Các chương trình hợp lệ được chấp nhận, không có lỗi (2 tệp) & Đạt \\
+			Nhân ma trận so với tham chiếu: ma trận đơn vị $\times$ $M = M$ với ma trận vuông và không vuông, và kết quả giống nhau giữa bốn cách cài đặt (Mục~\ref{sec:evidence}) & Đạt \\
+			Số học và luồng điều khiển khi chạy chương trình (20 phép kiểm tra) & Đạt \\
+			Phát hiện kích thước ma trận không khớp khi chạy & Đạt \\
+			Không rò rỉ bộ nhớ: mọi ma trận đã cấp phát đều được giải phóng, ở cả hai chế độ & Đạt \\
+			Kiểm thử chịu tải: 36 đầu vào cực đoan (lồng nhau sâu 100\,000 cấp, dòng 1~MB, chuỗi 10\,000 số hạng) & Đạt \\
+			Kiểm thử ngẫu nhiên (fuzzing): 9\,000 đầu vào ngẫu nhiên, không bị treo hay dừng đột ngột & Đạt \\
 			\bottomrule
 		\end{tabular}
 	\end{table}
 
 	\begin{itemize}
-		\item Nhân ma trận $N \times N$ so với tham chiếu (thông thường): đánh giá một chuỗi phép nhân ma trận nhằm kiểm tra khả năng chịu tải và đánh giá mức cải thiện đầu-cuối.
-		\item Phát hiện lỗi tái sử dụng sau đọc phá hủy: kiểm tra tại cả thời điểm chạy và thời điểm biên dịch để phát hiện lỗi.
-		\item Trường hợp biên: đánh giá các trường hợp biên nhằm kiểm tra tính tương thích và độ chặt chẽ của thuật toán.
+		\item Nhân ma trận so với tham chiếu: mọi chương trình đánh giá cho cùng một kết quả ở cả bốn cách cài đặt, và nhân với ma trận đơn vị trả lại đúng ma trận ban đầu, kể cả với ma trận không vuông.
+		\item Phát hiện lỗi tái sử dụng sau đọc phá hủy: trình biên dịch từ chối mọi lần dùng một ma trận sau khi nó đã bị tiêu thụ, trước khi chương trình chạy; một ghi chú chỉ ra nơi ma trận bị tiêu thụ.
+		\item Trường hợp biên: tệp rỗng, đầu vào 1~MB, lồng nhau rất sâu, chuỗi rất dài và đầu vào ngẫu nhiên đều được xử lý mà không làm chương trình dừng đột ngột.
 	\end{itemize}
 	
 	
@@ -539,34 +555,66 @@
 	\subsection{Minh chứng và khả năng tái lập}
 	\label{sec:evidence}
 	
-	Ở giai đoạn hiện tại, minh chứng chỉ giới hạn ở phần front-end đã được hiện thực (bộ phân tích từ vựng, bộ phân tích cú pháp, AST và chương trình điều khiển). Kết quả cho việc thực thi GEMM và tích hợp cuBLAS sẽ được bổ sung khi các giai đoạn đó được hiện thực. Ví dụ biên dịch với phần front-end hiện tại:
-	\begin{lstlisting}[caption = Ví dụ biên dịch]
-	def basicadd(int i, int k) {
-		return i + k;
-		}
-	# Basic compilation of source code, addition only. No showcase of GEMMs or cuBLAS integration.
+	Các phép đo đầu tiên so sánh mức sử dụng bộ nhớ khi có và không có đọc phá hủy. Các chương trình MemoLang được chạy bằng trình thông dịch trên một runtime ma trận chạy trên CPU; runtime này đếm mọi lần cấp phát và giải phóng, và ghi lại mức bộ nhớ đỉnh. Mỗi chương trình đánh giá được chạy theo bốn cách, đều trên cùng một runtime ma trận:
+	\begin{itemize}
+		\item \textbf{MemoLang thông thường}: mỗi ma trận được giải phóng khi biến của nó ra khỏi phạm vi hoặc được gán giá trị mới, giống C++ hay Rust.
+		\item \textbf{MemoLang đọc phá hủy}: mỗi ma trận được giải phóng ngay khi bị tiêu thụ.
+		\item \textbf{C++ thông thường}: cùng chương trình viết bằng C++ và biên dịch bằng MSVC, giải phóng khi ra khỏi phạm vi.
+		\item \textbf{C++ giải phóng thủ công}: như trên, nhưng mọi ma trận được giải phóng thủ công ngay sau lần dùng cuối.
+	\end{itemize}
+	Bốn chương trình dùng ma trận số thực đơn chính xác $256 \times 256$ (mỗi ma trận 0.25~MiB): \texttt{named\_chain} (đoạn mã tuần tự với tám kết quả trung gian có tên), \texttt{layer\_loop} (16 vòng lặp, mỗi vòng hai phép nhân), \texttt{single\_expression} (tạo trước tám ma trận rồi nhân trong một biểu thức) và \texttt{power\_iteration} (một ma trận được dùng lại ở mọi vòng lặp). Cả bốn cách cài đặt của mỗi chương trình đều cho cùng kết quả, và mọi ma trận đã cấp phát đều được giải phóng.
+
+	\begin{table}[h]
+		\centering
+		\caption{Mức bộ nhớ ma trận đỉnh (MiB)}
+		\label{tab:results}
+		\small
+		\begin{tabular}{@{}lrrrr@{}}
+			\toprule
+			Chương trình & \shortstack[r]{MemoLang\\thông thường} & \shortstack[r]{MemoLang\\đọc phá hủy} & \shortstack[r]{C++\\thông thường} & \shortstack[r]{C++\\thủ công} \\
+			\midrule
+			\texttt{named\_chain} & 4.25 & 0.75 ($-82.4\%$) & 4.25 & 0.75 \\
+			\texttt{layer\_loop} & 1.25 & 0.75 ($-40.0\%$) & 1.25 & 0.75 \\
+			\texttt{single\_expression} & 2.50 & 2.25 ($-10.0\%$) & 2.50 & 2.25 \\
+			\texttt{power\_iteration} & 0.75 & 1.00 ($+33.3\%$) & 0.75 & 0.75 \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+
+	Đọc phá hủy giảm mức bộ nhớ đỉnh ở ba trên bốn chương trình, từ 10\% đến 82\%, và đạt ngang mức của C++ giải phóng thủ công từng ma trận mà không cần giải phóng thủ công. MemoLang thông thường dùng đúng bằng lượng bộ nhớ của C++ thông thường, cho thấy mốc so sánh là thực tế. Ở \texttt{power\_iteration}, việc dùng lại một ma trận đòi hỏi \texttt{copy()}, điều mà C++ không cần; việc này làm tăng mức bộ nhớ đỉnh thêm 33\% và số lần cấp phát từ 19 lên 35. Ở các chương trình còn lại, số lần cấp phát không đổi: đọc phá hủy giải phóng bộ nhớ sớm hơn, chứ không làm giảm số lần cấp phát.
+
+	Thời gian chạy trên CPU dao động tới ba lần giữa các lần chạy cùng một đoạn mã, nên không cho thấy khác biệt về tốc độ theo hướng nào. Tốc độ sẽ được đo trên GPU với runtime cuBLAS. Các số liệu bộ nhớ không phụ thuộc vào thiết bị.
+
+	Phân tích tiêu thụ cũng tốn ít chi phí khi biên dịch. Với một chương trình thử 3.6~MB (93\,000 dòng), bộ phân tích từ vựng và cú pháp mất 75.7~ms, phân tích ngữ nghĩa 50.0~ms và phân tích tiêu thụ 15.1~ms, tức tăng khoảng 12\% thời gian kiểm tra một chương trình.
+
+	Điều kiện đo: Intel Core i7-1185G7 3.00~GHz, RAM 16~GB, Windows 11, MSVC 19.51, bản Release, trung vị của 5 lần chạy. Có thể tái lập và lưu kết quả vào \texttt{docs/results/} bằng:
+	\begin{lstlisting}[caption = Tái lập các phép đo]
+cmake -S . -B build -DMEMOLANG_BUILD_TESTS=ON
+cmake --build build --config Release
+build\Release\MemoLangTests.exe membench --save
 	\end{lstlisting}
 	\section{Kết luận}
 	
 	\subsection{Tiến độ}
-	Dự án đã hoàn thành một phần khối lượng công việc dự kiến, bao gồm bộ phân tích từ vựng, bộ phân tích cú pháp, AST và một chương trình điều khiển (driver) cơ bản. Thiết kế cho phần còn lại của quy trình đã được hoàn thiện, nhưng việc hiện thực các tính năng ở các giai đoạn sau của quy trình chưa được bắt đầu do hạn chế về thời gian.
+	Phần front-end của ngôn ngữ đã hoàn thành: bộ phân tích từ vựng, bộ phân tích cú pháp, AST có vị trí mã nguồn, bộ chẩn đoán, phân tích ngữ nghĩa (tên, kiểu và suy luận kiểu trả về) và phân tích tiêu thụ nhằm bảo đảm ngữ nghĩa đọc phá hủy ngay khi biên dịch. Các chương trình MemoLang có thể được chạy bằng trình thông dịch trên runtime ma trận chạy trên CPU; đây là cách các số liệu bộ nhớ đầu tiên được đo (Mục~\ref{sec:evidence}). Dự án có 27 bài kiểm thử tự động, được chạy trên Windows và Linux sau mỗi thay đổi.
+
+	Các phần dành cho GPU trong quy trình chưa được hiện thực: runtime cuBLAS, kernel CUTLASS, và sinh mã LLVM cùng biên dịch JIT/AOT. Runtime GPU cũng cần một máy có GPU NVIDIA để biên dịch và đo đạc.
 
 	\subsection{Hướng phát triển}
-	Các tính năng ở các giai đoạn sau của quy trình, bao gồm việc tích hợp thư viện runtime nhân ma trận đã biên dịch sẵn, vẫn cần được hiện thực. Các tính năng hiện đang được lên kế hoạch gồm:
+	Các bước tiếp theo được lên kế hoạch gồm:
 	\begin{itemize}
-		\item Kiểu vector và ma trận
-		\item Chương trình điều khiển chẩn đoán và bộ chẩn đoán (diagnostic engine)
-		\item Phân tích tiêu thụ tĩnh (kiểm tra đọc phá hủy) và xử lý các bộ đệm cũng như giá trị trung gian của kernel GPU
-		\item Liên kết với runtime nhân ma trận đã biên dịch sẵn để tạo ra tệp thực thi có khả năng khởi chạy kernel GPU
+		\item Phiên bản cuBLAS của runtime ma trận, để đo bộ nhớ GPU và thời gian thực thi, bao gồm mốc tham chiếu chỉ dùng cuBLAS trong kế hoạch đánh giá
 		\item Tích hợp trực tiếp một kernel GEMM riêng sử dụng CUTLASS, có tái sử dụng bộ đệm dựa trên phân tích tiêu thụ
-		\item Tách quá trình sinh mã khỏi AST để việc hạ cấp mã (lowering) rõ ràng hơn
+		\item Sinh LLVM IR và biên dịch JIT/AOT, truyền các cờ tiêu thụ do phân tích tiêu thụ tính ra cho runtime
+		\item Đưa kích thước ma trận vào cú pháp kiểu, để kiểm tra kích thước ma trận ngay khi biên dịch
+		\item Các chương trình đánh giá lớn hơn và sát thực tế hơn, với ma trận cỡ mô hình thật
 		\item Các lượt tối ưu (optimization passes)
 		\item Hệ thống macro (khai báo liên kết, trừu tượng hóa mẫu chuỗi nhân ma trận)
 	\end{itemize}
 
 	\subsection{Ý nghĩa}
 	Dự án này vừa là một thử nghiệm nhằm khám phá các cải tiến tiềm năng cho các phép toán GEMM trong các thuật toán học máy và AI, bổ sung cho thư viện cuBLAS~\cite{cublas} vốn đã được tối ưu rất cao, vừa là một phản hồi trước một vấn đề rộng hơn của lĩnh vực. Quá trình huấn luyện mô hình hiện nay tiêu tốn lượng bộ nhớ khổng lồ, và nhu cầu từ hạ tầng AI đã vượt quá nguồn cung chip nhớ toàn cầu, góp phần khiến giá DRAM và NAND tăng liên tục, gây áp lực tài chính lên các doanh nghiệp công nghệ thông tin, các viện nghiên cứu khoa học và cả người tiêu dùng~\cite{DRAM_PRICE}.
-	Các thuật toán tính toán cho phép toán GEMM đã được tối ưu \emph{gần đến giới hạn lý thuyết} về thông lượng; thay vào đó, nghiên cứu này nhắm đến hiệu quả sử dụng bộ nhớ, sử dụng một hệ thống sở hữu mới để giảm dung lượng bộ nhớ cần thiết cho mỗi khối lượng công việc, như một đóng góp nhằm giảm bớt áp lực từ phía cầu đang thúc đẩy tình trạng thiếu hụt bộ nhớ hiện nay.
+	Các thuật toán tính toán cho phép toán GEMM đã được tối ưu \emph{gần đến giới hạn lý thuyết} về thông lượng; thay vào đó, nghiên cứu này nhắm đến hiệu quả sử dụng bộ nhớ, sử dụng một hệ thống sở hữu mới để giảm dung lượng bộ nhớ cần thiết cho mỗi khối lượng công việc, như một đóng góp nhằm giảm bớt áp lực từ phía cầu đang thúc đẩy tình trạng thiếu hụt bộ nhớ hiện nay. Các phép đo đầu tiên (Mục~\ref{sec:evidence}) ủng hộ điều này với các chương trình có nhiều ma trận có vòng đời ngắn, đồng thời cho thấy chi phí khi một ma trận phải được dùng lại.
 	
 	Về mặt thực tiễn, việc tái sử dụng các bộ đệm tensor trung gian và giảm chi phí cấp phát khi chạy có thể hỗ trợ việc huấn luyện và suy luận các mô hình học máy nhanh hơn.
 	

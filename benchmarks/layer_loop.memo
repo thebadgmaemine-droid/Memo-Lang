@@ -1,0 +1,23 @@
+# Workload 2: a loop of layers, two multiplications per layer.
+# Matrices created inside the loop body die at the end of each iteration even
+# without destructive reads, so the difference is only within one iteration.
+
+extern def random_matrix(int rows, int cols) -> matrix<f32>;
+extern def matrix_sum(matrix<f32> m) -> f32;
+
+def network(int n, int layers) -> f32 {
+    matrix<f32> x = random_matrix(n, n);
+    int i = 0;
+    while i < layers {
+        matrix<f32> w = random_matrix(n, n);
+        matrix<f32> h = x @ w;
+        matrix<f32> g = random_matrix(n, n);
+        x = h @ g;
+        i++;
+    }
+    return matrix_sum(x);
+}
+
+def main() -> f32 {
+    return network(256, 16);
+}

@@ -66,9 +66,11 @@ add_library(MemoLangFrontend STATIC
     Include/AST/ASTPrinter.cpp
     Include/Diag/diags.cpp
     Include/Driver/driver.cpp
+    Include/Interp/interpreter.cpp
     Include/Lex/lexer.cpp
     Include/Lex/token.cpp
     Include/Parser/parser.cpp
+    Include/Runtime/runtime.cpp
     Include/Semantics/Scope.cpp
     Include/Semantics/sema.cpp
     Include/Source/SourceManager.cpp
@@ -117,8 +119,11 @@ endif()
 
 if(MEMOLANG_BUILD_TESTS)
   enable_testing()
+  # benchmarks/cpp: the benchmark workloads in native C++, for `membench`.
   add_executable(MemoLangTests tests/runner.cpp
+    benchmarks/cpp/workloads.cpp
     Include/IR/IRBuilder_GPU.cpp)
+  target_include_directories(MemoLangTests PRIVATE ${CMAKE_SOURCE_DIR}/benchmarks/cpp)
   target_link_libraries(MemoLangTests PRIVATE MemoLangFrontend)
   memolang_use_big_stack(MemoLangTests)
   target_compile_definitions(MemoLangTests PRIVATE MEMOLANG_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -129,12 +134,20 @@ if(MEMOLANG_BUILD_TESTS)
   endif()
 
   # One test per file: tests/<mode>/<name>.memo runs as "<mode>/<name>".
-  foreach(mode ast tokens errors check)
+  foreach(mode ast tokens errors check run)
     file(GLOB test_files CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tests/${mode}/*.memo)
     foreach(test_file ${test_files})
       get_filename_component(test_name ${test_file} NAME_WE)
       add_test(NAME ${mode}/${test_name} COMMAND MemoLangTests ${mode} ${test_file})
     endforeach()
+  endforeach()
+  # The benchmark programs must run in both modes with the same result and no
+  # leaks. (`MemoLangTests membench` prints their memory/time table.)
+  file(GLOB benchmark_files CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/benchmarks/*.memo)
+  foreach(benchmark_file ${benchmark_files})
+    get_filename_component(benchmark_name ${benchmark_file} NAME_WE)
+    add_test(NAME benchmarks/${benchmark_name}
+             COMMAND MemoLangTests run ${benchmark_file})
   endforeach()
   add_test(NAME stress COMMAND MemoLangTests stress)
   add_test(NAME fuzz COMMAND MemoLangTests fuzz)

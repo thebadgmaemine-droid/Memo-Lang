@@ -1,0 +1,17 @@
+date,cpu,compiler,build,runs,workload,variant,peak_mib,allocations,time_ms,result
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,layer_loop,MemoLang base,1.2500,65,103.44,19.19621468
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,layer_loop,MemoLang destructive,0.7500,65,112.69,19.19621468
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,layer_loop,C++ plain,1.2500,65,84.44,19.19621468
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,layer_loop,C++ hand-freed,0.7500,65,116.12,19.19621468
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,named_chain,MemoLang base,4.2500,17,26.89,-6.605359077
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,named_chain,MemoLang destructive,0.7500,17,29.28,-6.605359077
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,named_chain,C++ plain,4.2500,17,29.15,-6.605359077
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,named_chain,C++ hand-freed,0.7500,17,21.26,-6.605359077
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,power_iteration,MemoLang base,0.7500,19,34.10,-18.58530045
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,power_iteration,MemoLang destructive,1.0000,35,94.51,-18.58530045
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,power_iteration,C++ plain,0.7500,19,108.39,-18.58530045
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,power_iteration,C++ hand-freed,0.7500,19,105.43,-18.58530045
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,single_expression,MemoLang base,2.5000,15,56.42,20.10727501
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,single_expression,MemoLang destructive,2.2500,15,58.35,20.10727501
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,single_expression,C++ plain,2.5000,15,58.74,20.10727501
+2026-11-16 14:28,"11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz","MSVC 19.51.36260",Release,5,single_expression,C++ hand-freed,2.2500,15,61.54,20.10727501

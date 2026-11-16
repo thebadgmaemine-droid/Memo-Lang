@@ -1,0 +1,22 @@
+# Workload 3: one matrix reused in every iteration.
+# Destructive reads would consume `m`, so the program has to multiply by
+# copy(m). Without destructive reads no copy is needed, so this shows the cost
+# side: extra allocations and copying.
+
+extern def random_matrix(int rows, int cols) -> matrix<f32>;
+extern def matrix_sum(matrix<f32> m) -> f32;
+
+def power(int n, int steps) -> f32 {
+    matrix<f32> m = random_matrix(n, n);
+    matrix<f32> v = random_matrix(n, n);
+    int i = 0;
+    while i < steps {
+        v = copy(m) @ v;
+        i++;
+    }
+    return matrix_sum(m @ v);
+}
+
+def main() -> f32 {
+    return power(256, 16);
+}

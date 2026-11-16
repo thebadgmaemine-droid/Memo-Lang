@@ -1,0 +1,9 @@
+# Shapes are only known at run time, so a mismatch is a runtime error.
+# expect-runtime-error: matrix shapes don't match for '@': 2x3 @ 2x3
+
+extern def random_matrix(int rows, int cols) -> matrix<float>;
+extern def matrix_sum(matrix<float> m) -> float;
+
+def main() -> float {
+    return matrix_sum(random_matrix(2, 3) @ random_matrix(2, 3));
+}

@@ -9,6 +9,14 @@
 //                                                no comments = must be clean
 //   MemoLangTests stress                         huge and deeply nested input
 //   MemoLangTests fuzz                           random input must not crash or hang
+//   MemoLangTests bench [file.memo] [runs]       time each stage (not a test; run
+//                                                it by hand, on a Release build)
+//   MemoLangTests run <file.memo>                run main() with and without
+//                                                destructive reads: same result,
+//                                                "# expect-result: <value>", no leaks
+//   MemoLangTests membench [files] [runs] [--save]  memory/time tables for
+//                                                benchmarks/; --save writes them
+//                                                to docs/results/
 //
 // --update rewrites the expected-output file instead of comparing. Review the
 // diff before committing it.
@@ -26,6 +34,14 @@
 // 1000-digit literals quoted in full in error messages.
 
 #include <algorithm>
+#include <cctype>
+#include <cstring>
+#include <ctime>
+#if defined(_MSC_VER)
+#include <intrin.h>
+#elif defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+#include <cpuid.h>
+#endif
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -43,6 +59,8 @@
 
 #include "AST/ASTPrinter.h"
 #include "Analysis/destructive.h"
+#include "Interp/interpreter.h"
+#include "workloads.h" // benchmarks/cpp: the benchmarks in native C++
 #include "Diag/diagengine.h"
 #include "Lex/lexer.h"
 #include "Parser/parser.h"
@@ -504,6 +522,504 @@ int runStress() {
 }
 
 // ---------------------------------------------------------------------------
+// Running programs (interpreter). Added 2026-11-12.
+// ---------------------------------------------------------------------------
+
+// A program checked and ready to run. Owns everything the interpreter needs.
+struct LoadedProgram {
+  std::unique_ptr<SourceManager> sources;
+  std::ostringstream diagOut;
+  std::unique_ptr<DiagnosticEngine> diags;
+  Module module;
+  std::unique_ptr<TypeContext> types;
+  std::unique_ptr<sema::SemanticAnalyzer> sema;
+  std::unique_ptr<Destructive> destructive;
+  bool ok = false;
+};
+
+std::unique_ptr<LoadedProgram> loadProgram(const std::filesystem::path &file) {
+  auto program = std::make_unique<LoadedProgram>();
+  program->sources = std::make_unique<SourceManager>(file.filename().string(),
+                                                     readFile(file));
+  program->diags =
+      std::make_unique<DiagnosticEngine>(*program->sources, program->diagOut);
+  Lexer lexer(*program->sources, *program->diags);
+  Parser parser(lexer, *program->diags);
+  program->module = parser.parseModule(file.stem().string());
+  program->types = std::make_unique<TypeContext>();
+  program->sema = std::make_unique<sema::SemanticAnalyzer>(*program->types,
+                                                           *program->diags);
+  program->destructive =
+      std::make_unique<Destructive>(*program->sema, *program->diags);
+  if (!program->diags->hasErrors() &&
+      program->sema->analyzeModule(program->module))
+    program->destructive->analyzeModule(program->module);
+  program->ok = !program->diags->hasErrors();
+  return program;
+}
+
+// The text after `key` on the first line containing it, trimmed.
+std::optional<std::string> findDirective(const std::string &source,
+                                         std::string_view key) {
+  for (const std::string &line : splitLines(source)) {
+    std::size_t pos = line.find(key);
+    if (pos == std::string::npos)
+      continue;
+    std::string value = line.substr(pos + key.size());
+    value.erase(0, value.find_first_not_of(' '));
+    value.erase(value.find_last_not_of(' ') + 1);
+    return value;
+  }
+  return std::nullopt;
+}
+
+std::string memoryLine(const char *mode, const RunReport &r) {
+  char buffer[200];
+  std::snprintf(buffer, sizeof buffer,
+                "  %-24s peak %6.2f MiB (%llu matrices), %llu allocations, "
+                "%llu frees\n",
+                mode, static_cast<double>(r.stats.peakBytes) / 1048576.0,
+                static_cast<unsigned long long>(r.stats.peakMatrices),
+                static_cast<unsigned long long>(r.stats.allocations),
+                static_cast<unsigned long long>(r.stats.frees));
+  return buffer;
+}
+
+// `run` mode: runs main() with and without destructive reads. Both must give
+// the same result (`# expect-result: <value>` if the file says), or fail with
+// the error in `# expect-runtime-error: <text>`, and both must free every
+// matrix they allocate.
+int runProgramTest(const std::filesystem::path &file) {
+  std::string source = readFile(file);
+  auto expectResult = findDirective(source, "expect-result:");
+  auto expectError = findDirective(source, "expect-runtime-error:");
+  auto program = loadProgram(file);
+  if (!program->ok) {
+    std::cout << "FAIL: the program doesn't compile:\n"
+              << program->diagOut.str();
+    return 1;
+  }
+  RunReport base = runProgram(program->module, *program->sema,
+                              *program->destructive,
+                              Interpreter::Mode::Baseline);
+  RunReport destr = runProgram(program->module, *program->sema,
+                               *program->destructive,
+                               Interpreter::Mode::Destructive);
+  int failures = 0;
+  auto check = [&](bool ok, const std::string &what) {
+    if (!ok) {
+      std::cout << "FAIL: " << what << '\n';
+      ++failures;
+    }
+  };
+  for (const auto *r : {&base, &destr}) {
+    const char *mode = r == &base ? "without destructive reads"
+                                  : "with destructive reads";
+    if (expectError) {
+      check(!r->result.ok &&
+                r->result.error.find(*expectError) != std::string::npos,
+            std::string(mode) + ": expected runtime error '" + *expectError +
+                "', got " +
+                (r->result.ok ? "result " + r->result.value
+                              : "error '" + r->result.error + "'"));
+    } else {
+      check(r->result.ok, std::string(mode) + ": runtime error: " +
+                              r->result.error);
+      if (expectResult)
+        check(r->result.value == *expectResult,
+              std::string(mode) + ": main() returned " + r->result.value +
+                  ", expected " + *expectResult);
+    }
+    check(r->stats.frees == r->stats.allocations,
+          std::string(mode) + ": " +
+              std::to_string(r->stats.allocations - r->stats.frees) +
+              " matrices were never freed");
+  }
+  if (!expectError)
+    check(base.result.value == destr.result.value,
+          "the two modes returned different results: " + base.result.value +
+              " and " + destr.result.value);
+  std::cout << memoryLine("without destructive reads", base)
+            << memoryLine("with destructive reads", destr);
+  if (failures == 0)
+    std::cout << "PASS: "
+              << (expectError ? "the expected runtime error in both modes"
+                              : "main() returned " + destr.result.value +
+                                    " in both modes")
+              << ", no leaks\n";
+  return failures == 0 ? 0 : 1;
+}
+
+// The conditions a benchmark result is only meaningful next to.
+std::string cpuName() {
+  char brand[49] = {};
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+  int regs[4];
+  __cpuid(regs, static_cast<int>(0x80000000));
+  if (static_cast<unsigned>(regs[0]) >= 0x80000004u)
+    for (int i = 0; i < 3; ++i) {
+      __cpuid(regs, static_cast<int>(0x80000002u + static_cast<unsigned>(i)));
+      std::memcpy(brand + 16 * i, regs, 16);
+    }
+#elif (defined(__x86_64__) || defined(__i386__)) && defined(__GNUC__)
+  unsigned regs[4];
+  for (unsigned i = 0; i < 3; ++i)
+    if (__get_cpuid(0x80000002u + i, &regs[0], &regs[1], &regs[2], &regs[3]))
+      std::memcpy(brand + 16 * i, regs, 16);
+#endif
+  std::string name(brand);
+  name.erase(0, name.find_first_not_of(' '));
+  name.erase(name.find_last_not_of(' ') + 1);
+  return name.empty() ? "unknown CPU" : name;
+}
+
+std::string compilerName() {
+#if defined(_MSC_VER) && !defined(__clang__)
+  int v = _MSC_FULL_VER; // e.g. 195136260 -> 19.51.36260
+  return "MSVC " + std::to_string(v / 10000000) + "." +
+         std::to_string((v / 100000) % 100) + "." + std::to_string(v % 100000);
+#elif defined(__clang__)
+  return std::string("Clang ") + __clang_version__;
+#elif defined(__GNUC__)
+  return std::string("GCC ") + __VERSION__;
+#else
+  return "unknown compiler";
+#endif
+}
+
+std::string buildType() {
+#ifdef NDEBUG
+  return "Release";
+#else
+  return "Debug (timings not representative)";
+#endif
+}
+
+std::string localTime(const char *format) {
+  std::time_t now = std::time(nullptr);
+  std::tm parts{};
+#if defined(_WIN32)
+  localtime_s(&parts, &now);
+#else
+  localtime_r(&now, &parts);
+#endif
+  char buffer[64];
+  std::strftime(buffer, sizeof buffer, format, &parts);
+  return buffer;
+}
+
+// `membench` mode: the tables to record. Runs every program in benchmarks/
+// (or the files given) four ways: MemoLang without and with destructive
+// reads, and the same workload in native C++ (benchmarks/cpp/), plain and with
+// matrices freed by hand. All four use the same matrix runtime, so they differ
+// only in when matrices are freed and in interpreted vs native code. Memory
+// numbers are exact and the same every run; times are the median of `runs`
+// runs, on the CPU.
+// With `save`, also writes docs/results/membench-<date>-<time>.md and appends
+// every measurement to docs/results/membench.csv, with the conditions.
+int runMemBench(std::vector<std::string> files, int runs, bool save) {
+  if (files.empty()) {
+    for (const auto &entry : std::filesystem::directory_iterator(
+             std::filesystem::path(MEMOLANG_SOURCE_DIR) / "benchmarks"))
+      if (entry.path().extension() == ".memo")
+        files.push_back(entry.path().string());
+    std::sort(files.begin(), files.end());
+  }
+  auto median = [](std::vector<double> v) {
+    std::sort(v.begin(), v.end());
+    return v[v.size() / 2];
+  };
+
+  struct Measured {
+    bool ran = false;
+    double peakMiB = 0;
+    double allocations = 0;
+    double ms = 0;
+    std::string result;
+  };
+  struct Row {
+    std::string name;
+    Measured variant[4]; // MemoLang base, MemoLang destr, C++ plain, C++ hand.
+  };
+  auto fromStats = [](Measured &m, const runtime::MemoryStats &s) {
+    m.ran = true;
+    m.peakMiB = static_cast<double>(s.peakBytes) / 1048576.0;
+    m.allocations = static_cast<double>(s.allocations);
+  };
+
+  std::vector<Row> rows;
+  int failures = 0;
+  for (const std::string &file : files) {
+    Row row;
+    row.name = std::filesystem::path(file).stem().string();
+    auto program = loadProgram(file);
+    if (!program->ok) {
+      std::printf("%s doesn't compile:\n%s", row.name.c_str(),
+                  program->diagOut.str().c_str());
+      ++failures;
+      continue;
+    }
+    // MemoLang, both modes.
+    for (int v = 0; v < 2; ++v) {
+      auto mode = v == 0 ? Interpreter::Mode::Baseline
+                         : Interpreter::Mode::Destructive;
+      std::vector<double> times;
+      RunReport report;
+      for (int run = 0; run < runs; ++run) {
+        report = runProgram(program->module, *program->sema,
+                            *program->destructive, mode);
+        times.push_back(report.totalMs);
+      }
+      if (!report.result.ok) {
+        std::printf("%s: runtime error: %s\n", row.name.c_str(),
+                    report.result.error.c_str());
+        ++failures;
+        continue;
+      }
+      fromStats(row.variant[v], report.stats);
+      row.variant[v].ms = median(times);
+      row.variant[v].result = report.result.value;
+    }
+    // Native C++, both versions.
+    for (const auto &workload : cppbench::workloads()) {
+      if (row.name != workload.name)
+        continue;
+      for (int v = 0; v < 2; ++v) {
+        auto function = v == 0 ? workload.plain : workload.handFreed;
+        std::vector<double> times;
+        runtime::MemoryStats stats;
+        double value = 0;
+        for (int run = 0; run < runs; ++run) {
+          runtime::Runtime rt; // Same random numbers as the MemoLang runs.
+          auto start = Clock::now();
+          value = function(rt);
+          times.push_back(millisecondsSince(start));
+          stats = rt.stats();
+        }
+        Measured &m = row.variant[2 + v];
+        fromStats(m, stats);
+        m.ms = median(times);
+        char buffer[64];
+        std::snprintf(buffer, sizeof buffer, "%.10g", value);
+        m.result = buffer;
+      }
+    }
+    // Every version must compute the same thing.
+    for (const Measured &m : row.variant) {
+      if (m.ran && m.result != row.variant[1].result) {
+        std::printf("%s: the versions return different results (%s vs %s)\n",
+                    row.name.c_str(), m.result.c_str(),
+                    row.variant[1].result.c_str());
+        ++failures;
+        break;
+      }
+    }
+    rows.push_back(std::move(row));
+  }
+
+  auto table = [&](const char *title, const char *format,
+                   double Measured::*field) {
+    std::printf("%s\n", title);
+    std::printf("  %-19s %14s %14s %14s %14s\n", "workload", "MemoLang",
+                "MemoLang", "C++ (MSVC)", "C++ (MSVC)");
+    std::printf("  %-19s %14s %14s %14s %14s\n", "", "base", "destructive",
+                "plain", "hand-freed");
+    for (const Row &row : rows) {
+      std::printf("  %-19s", row.name.c_str());
+      for (const Measured &m : row.variant) {
+        char cell[32] = "-";
+        if (m.ran)
+          std::snprintf(cell, sizeof cell, format, m.*field);
+        std::printf(" %14s", cell);
+      }
+      std::printf("\n");
+    }
+    std::printf("\n");
+  };
+  std::printf("MemoLang runtime benchmark: CPU matrix runtime, 256x256 f32 "
+              "matrices, median of %d runs\n\n",
+              runs);
+  table("Peak matrix memory (MiB)", "%.2f", &Measured::peakMiB);
+  table("Matrix allocations", "%.0f", &Measured::allocations);
+  table("Time (ms)", "%.1f", &Measured::ms);
+  std::printf(
+      "MemoLang base:        matrices freed at the end of their scope (like "
+      "C++).\n"
+      "MemoLang destructive: matrices freed the moment they are consumed.\n"
+      "C++ plain:            native code, matrices freed at the end of their "
+      "scope.\n"
+      "C++ hand-freed:       native code, each matrix freed by hand after its "
+      "last use.\n"
+      "All four compute the same results. Memory numbers carry over to a "
+      "GPU; CPU\n"
+      "times don't (GPU timing needs the cuBLAS version on an NVIDIA GPU).\n");
+
+  std::string conditions = cpuName() + ", " + compilerName() + ", " +
+                           buildType() + ", median of " +
+                           std::to_string(runs) + " runs";
+  std::printf("\nConditions: %s\n", conditions.c_str());
+  if (!save)
+    return failures == 0 ? 0 : 1;
+
+  // Save the results, exactly as measured.
+  static const char *variantNames[4] = {"MemoLang base", "MemoLang destructive",
+                                        "C++ plain", "C++ hand-freed"};
+  auto resultsDir = std::filesystem::path(MEMOLANG_SOURCE_DIR) / "docs" /
+                    "results";
+  std::filesystem::create_directories(resultsDir);
+  std::string stamp = localTime("%Y-%m-%d %H:%M");
+  auto mdPath = resultsDir / ("membench-" + localTime("%Y-%m-%d-%H%M") + ".md");
+  {
+    std::ofstream md(mdPath, std::ios::binary);
+    md << "# MemoLang runtime benchmark, " << stamp << "\n\n"
+       << "Written by `MemoLangTests membench --save`. Do not edit by hand.\n\n"
+       << "- Conditions: " << conditions << "\n"
+       << "- Matrices: 256x256 f32 (0.25 MiB each), CPU matrix runtime\n"
+       << "- MemoLang base: matrices freed at the end of their scope (like C++)\n"
+       << "- MemoLang destructive: matrices freed the moment they are "
+          "consumed\n"
+       << "- C++ plain: native code, freed at the end of scope\n"
+       << "- C++ hand-freed: native code, each matrix freed by hand after its "
+          "last use\n"
+       << "- All four versions of each workload returned the same result"
+       << (failures == 0 ? "" : " (EXCEPT where noted as failed)") << "\n\n";
+    auto mdTable = [&](const char *title, const char *format,
+                       double Measured::*field) {
+      md << "## " << title << "\n\n| Workload |";
+      for (const char *v : variantNames)
+        md << ' ' << v << " |";
+      md << "\n|---|---|---|---|---|\n";
+      for (const Row &row : rows) {
+        md << "| `" << row.name << "` |";
+        for (const Measured &m : row.variant) {
+          char cell[32] = "-";
+          if (m.ran)
+            std::snprintf(cell, sizeof cell, format, m.*field);
+          md << ' ' << cell << " |";
+        }
+        md << '\n';
+      }
+      md << '\n';
+    };
+    mdTable("Peak matrix memory (MiB)", "%.2f", &Measured::peakMiB);
+    mdTable("Matrix allocations", "%.0f", &Measured::allocations);
+    mdTable("Time (ms, CPU; noisy, see note)", "%.1f", &Measured::ms);
+    md << "Memory numbers are exact and carry over to a GPU. CPU times vary "
+          "between\nidentical runs and don't carry over; GPU timing needs the "
+          "cuBLAS version.\n";
+  }
+  auto csvPath = resultsDir / "membench.csv";
+  bool newCsv = !std::filesystem::exists(csvPath);
+  {
+    std::ofstream csv(csvPath, std::ios::binary | std::ios::app);
+    if (newCsv)
+      csv << "date,cpu,compiler,build,runs,workload,variant,peak_mib,"
+             "allocations,time_ms,result\n";
+    for (const Row &row : rows)
+      for (int v = 0; v < 4; ++v) {
+        const Measured &m = row.variant[v];
+        if (!m.ran)
+          continue;
+        char numbers[96];
+        std::snprintf(numbers, sizeof numbers, "%.4f,%.0f,%.2f", m.peakMiB,
+                      m.allocations, m.ms);
+        csv << stamp << ",\"" << cpuName() << "\",\"" << compilerName()
+            << "\"," << buildType() << ',' << runs << ',' << row.name << ','
+            << variantNames[v] << ',' << numbers << ',' << m.result << '\n';
+      }
+  }
+  std::printf("Saved: %s\n       %s (appended)\n", mdPath.string().c_str(),
+              csvPath.string().c_str());
+  return failures == 0 ? 0 : 1;
+}
+
+// ---------------------------------------------------------------------------
+// Benchmark: how long each compiler stage takes on one file. Not a test (CTest
+// doesn't run it); run it by hand on a Release build. Without a file it builds
+// a realistic one: examples/matmul_chain.memo repeated 3000 times with renamed
+// functions (about 3.6 MB, 93000 lines, 12000 functions).
+// Added 2026-11-12.
+// ---------------------------------------------------------------------------
+int runBench(const std::string &path, int runs) {
+  std::string text;
+  if (path.empty()) {
+    std::string example = withoutCarriageReturns(readFile(
+        std::filesystem::path(MEMOLANG_SOURCE_DIR) / "examples" /
+        "matmul_chain.memo"));
+    for (int i = 0; i < 3000; ++i) {
+      std::string copy = example;
+      for (std::string_view name :
+           {"chain", "power_iteration", "scale", "memo_matmul"}) {
+        std::string from = std::string(name) + "(";
+        std::string to = std::string(name) + "_" + std::to_string(i) + "(";
+        for (std::size_t p = copy.find(from); p != std::string::npos;
+             p = copy.find(from, p + to.size()))
+          copy.replace(p, from.size(), to);
+      }
+      text += copy;
+    }
+  } else {
+    text = readFile(path);
+  }
+
+  auto median = [](std::vector<double> v) {
+    std::sort(v.begin(), v.end());
+    return v[v.size() / 2];
+  };
+  std::vector<double> parse, semantic, destructive, total;
+  for (int run = 0; run < runs; ++run) {
+    SourceManager sources("bench.memo", text);
+    std::ostringstream diagOut;
+    DiagnosticEngine diags(sources, diagOut);
+    auto t0 = Clock::now();
+    Lexer lexer(sources, diags);
+    Parser parser(lexer, diags);
+    Module module = parser.parseModule("bench");
+    auto t1 = Clock::now();
+    TypeContext types;
+    sema::SemanticAnalyzer analyzer(types, diags);
+    bool ok = !diags.hasErrors() && analyzer.analyzeModule(module);
+    auto t2 = Clock::now();
+    if (ok) {
+      Destructive consumption(analyzer, diags);
+      consumption.analyzeModule(module);
+    }
+    auto t3 = Clock::now();
+    if (!ok || diags.hasErrors()) {
+      std::cout << "FAIL: the benchmark file has errors:\n" << diagOut.str();
+      return 1;
+    }
+    auto ms = [](Clock::time_point a, Clock::time_point b) {
+      return std::chrono::duration<double, std::milli>(b - a).count();
+    };
+    parse.push_back(ms(t0, t1));
+    semantic.push_back(ms(t1, t2));
+    destructive.push_back(ms(t2, t3));
+    total.push_back(ms(t0, t3));
+  }
+
+  double totalMs = median(total);
+  double mb = static_cast<double>(text.size()) / (1024.0 * 1024.0);
+  std::size_t lines =
+      static_cast<std::size_t>(std::count(text.begin(), text.end(), '\n'));
+  std::printf("MemoLang front-end benchmark: %.1f MB, %zu lines, median of %d "
+              "runs\n\n",
+              mb, lines, runs);
+  std::printf("  stage                     time   share\n");
+  std::printf("  lexer + parser       %8.1f ms   %4.1f%%\n", median(parse),
+              100.0 * median(parse) / totalMs);
+  std::printf("  semantic analysis    %8.1f ms   %4.1f%%\n", median(semantic),
+              100.0 * median(semantic) / totalMs);
+  std::printf("  destructive reads    %8.1f ms   %4.1f%%\n", median(destructive),
+              100.0 * median(destructive) / totalMs);
+  std::printf("  total                %8.1f ms\n\n", totalMs);
+  std::printf("  throughput           %8.1f MB/s, %.0f lines/s\n",
+              mb / (totalMs / 1000.0),
+              static_cast<double>(lines) / (totalMs / 1000.0));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // Fuzzing: random input must never crash, hang or trip an assert. The seed is
 // fixed so a failure can be reproduced; the failing input is written to disk.
 // ---------------------------------------------------------------------------
@@ -624,8 +1140,40 @@ int main(int argc, char **argv) {
       return runStress();
     if (args.size() == 1 && args[0] == "fuzz")
       return runFuzz();
-    std::cerr << "usage: MemoLangTests ast|tokens|errors|check <file.memo> "
-                 "[--update] | stress | fuzz\n";
+    if (!args.empty() && args[0] == "bench") {
+      // bench [file.memo] [runs]: a number alone is the run count.
+      std::string file;
+      int runs = 10;
+      for (std::size_t i = 1; i < args.size(); ++i) {
+        std::string arg(args[i]);
+        if (!arg.empty() && std::all_of(arg.begin(), arg.end(), ::isdigit))
+          runs = std::max(1, std::stoi(arg));
+        else
+          file = arg;
+      }
+      return runBench(file, runs);
+    }
+    if (args.size() >= 2 && args[0] == "run")
+      return runProgramTest(args[1]);
+    if (!args.empty() && args[0] == "membench") {
+      // membench [files...] [runs] [--save]: a number alone is the run count.
+      std::vector<std::string> files;
+      int runs = 5;
+      bool save = false;
+      for (std::size_t i = 1; i < args.size(); ++i) {
+        std::string arg(args[i]);
+        if (arg == "--save")
+          save = true;
+        else if (!arg.empty() && std::all_of(arg.begin(), arg.end(), ::isdigit))
+          runs = std::max(1, std::stoi(arg));
+        else
+          files.push_back(arg);
+      }
+      return runMemBench(std::move(files), runs, save);
+    }
+    std::cerr << "usage: MemoLangTests ast|tokens|errors|check|run <file.memo> "
+                 "[--update] | stress | fuzz | bench [file.memo] [runs] | "
+                 "membench [files...] [runs]\n";
     return 2;
   } catch (const std::exception &e) {
     std::cout << "FAIL: " << e.what() << '\n';

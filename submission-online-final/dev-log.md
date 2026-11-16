@@ -351,3 +351,45 @@ AI usage: the build problems were found and fixed with Claude Code.
 - docs/STATUS.md: rows with an extra "Done" column break the table, and "Done" for semantic analysis and IR generation doesn't match the code yet.
 - Moving the AST definitions out of AST.h (eb56fa0), if still wanted: remove each one from AST.h when adding it to AST.cpp.
 - Type class (based on Sere's): check Sere's license and credit it; trim it to MemoLang's types (matrix element type and shape, consumable flag).
+
+
+---
+
+# Dev Log - November 16, 2026
+
+## Runtime benchmark results
+
+Question: does freeing matrices the moment they are consumed (destructive reads) lower memory use when MemoLang programs run?
+
+Setup: four workloads in benchmarks/ (256x256 f32 matrices, 0.25 MiB each), run by MemoLang's interpreter with a CPU matrix runtime that counts allocations, frees and peak memory. Each workload is run four ways, all using the same matrix runtime:
+- MemoLang base: matrices freed at the end of their scope (like C++/Rust)
+- MemoLang destructive: matrices freed the moment they are consumed
+- C++ plain: the same workload in native C++ (MSVC), freed at the end of scope
+- C++ hand-freed: native C++ with every matrix freed by hand after its last use
+
+All four versions of every workload returned the same result, and every allocated matrix was freed.
+
+Conditions: Intel Core i7-1185G7 @ 3.00GHz, 16 GB RAM, Windows 11, MSVC 19.51.36260, Release build, median of 5 runs.
+Command: build\Release\MemoLangTests.exe membench --save
+Full record: docs/results/membench-2026-11-16-1428.md and docs/results/membench.csv
+
+Peak matrix memory (MiB):
+
+| Workload | MemoLang base | MemoLang destructive | C++ plain | C++ hand-freed |
+|---|---|---|---|---|
+| named_chain | 4.25 | 0.75 (-82.4%) | 4.25 | 0.75 |
+| layer_loop | 1.25 | 0.75 (-40.0%) | 1.25 | 0.75 |
+| single_expression | 2.50 | 2.25 (-10.0%) | 2.50 | 2.25 |
+| power_iteration | 0.75 | 1.00 (+33.3%) | 0.75 | 0.75 |
+
+Matrix allocations: the same in all four versions, except power_iteration with destructive reads: 35 instead of 19 (+84.2%), from the copy() needed to reuse a matrix.
+
+Results:
+- Destructive reads lowered peak memory in 3 of 4 workloads, by 10% to 82%, and matched C++ with every matrix freed by hand, without manual freeing.
+- MemoLang base used exactly the same memory as plain C++, so the baseline is realistic.
+- power_iteration used 33% more memory and 84% more allocations: reusing a matrix requires copy(), which C++ doesn't need.
+- CPU times varied by up to 3x between runs of identical code, so they show no speed difference either way. Speed has to be measured with the cuBLAS version on an NVIDIA GPU.
+
+Compile-time cost of destructive-read analysis (MemoLangTests bench, 3.6 MB file, 93,000 lines, Release, median of 10 runs, 2026-11-12): lexer + parser 75.7 ms, semantic analysis 50.0 ms, destructive-read analysis 15.1 ms, total 141.0 ms. The analysis adds about 12% to checking time.
+
+Tests: all 27 tests pass in Debug and Release.
