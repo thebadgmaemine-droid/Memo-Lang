@@ -13,6 +13,8 @@
 // can share it, and the module is named after the file (basicadd.memo -> basicadd).
 // 2026-11-12: runs semantic and destructive analysis; --parse-only and
 // --dump-symbols added.
+// 2026-11-17: code generation (builds with -DMEMOLANG_USE_LLVM=ON):
+// --emit-llvm, --emit-bc, -S, -c, -o and -O0..-O3.
 // ---------------------------------------------------------------------------
 #include <filesystem>
 #include <iostream>
@@ -29,6 +31,12 @@
 #include "Semantics/sema.h"
 #include "Source/SourceManager.h"
 #include "Types/Typecontext.h"
+
+#ifdef MEMOLANG_HAS_LLVM
+#include <llvm/IR/LLVMContext.h>
+
+#include "Codegen/CodegenAction.h"
+#endif
 
 // Set by CMake from project(VERSION ...).
 #ifndef MEMOLANG_VERSION
@@ -47,6 +55,10 @@ struct Options {
   bool run = false;
   bool noDestructive = false;
   bool compare = false;
+  // Code generation. `emit` is empty when no output was asked for.
+  std::string emit;       // "llvm", "bc", "asm" or "obj".
+  std::string outputPath; // -o; empty = derived from the input name.
+  unsigned optLevel = 0;
 };
 
 std::string mib(std::uint64_t bytes) {
@@ -133,6 +145,16 @@ void printUsage(std::ostream &out) {
          "  --no-destructive  With --run: free matrices at the end of their\n"
          "                  scope instead (the baseline)\n"
          "  --compare       Run main() both ways and compare memory and time\n"
+         "\n"
+         "Code generation (needs a build with -DMEMOLANG_USE_LLVM=ON):\n"
+         "  --emit-llvm     Write LLVM IR (.ll)\n"
+         "  --emit-bc       Write LLVM bitcode (.bc)\n"
+         "  -S              Write assembly for this machine (.s)\n"
+         "  -c              Write an object file (.o). Link it with the runtime:\n"
+         "                  c++ prog.o libMemoLangRuntime.a -o prog\n"
+         "  -o <file>       Output file (\"-\" = standard output)\n"
+         "  -O0 .. -O3      Optimization level (default -O0)\n"
+         "\n"
          "  --version       Print the compiler version\n"
          "  --help          Show this message\n";
 }
@@ -157,6 +179,26 @@ int runDriver(int argc, char **argv) {
       options.noDestructive = true;
     } else if (arg == "--compare") {
       options.compare = true;
+    } else if (arg == "--emit-llvm" || arg == "--emit-bc" || arg == "-S" ||
+               arg == "-c") {
+      std::string emit = arg == "--emit-llvm" ? "llvm"
+                         : arg == "--emit-bc" ? "bc"
+                         : arg == "-S"        ? "asm"
+                                              : "obj";
+      if (!options.emit.empty() && options.emit != emit) {
+        std::cerr << "error: choose one of --emit-llvm, --emit-bc, -S and -c\n";
+        return 2;
+      }
+      options.emit = emit;
+    } else if (arg == "-o") {
+      if (i + 1 >= argc) {
+        std::cerr << "error: -o needs a file name\n";
+        return 2;
+      }
+      options.outputPath = argv[++i];
+    } else if (arg.size() == 3 && arg.starts_with("-O") && arg[2] >= '0' &&
+               arg[2] <= '3') {
+      options.optLevel = static_cast<unsigned>(arg[2] - '0');
     } else if (arg == "--version") {
       std::cout << "MemoLang " MEMOLANG_VERSION "\n";
       return 0;
@@ -178,6 +220,13 @@ int runDriver(int argc, char **argv) {
     printUsage(std::cerr);
     return 2;
   }
+#ifndef MEMOLANG_HAS_LLVM
+  if (!options.emit.empty()) {
+    std::cerr << "error: this MemoLang was built without LLVM, so it can't "
+                 "generate code; rebuild with -DMEMOLANG_USE_LLVM=ON\n";
+    return 2;
+  }
+#endif
 
   std::string readError;
   auto sources = SourceManager::fromFile(options.inputPath, readError);
@@ -207,6 +256,30 @@ int runDriver(int argc, char **argv) {
       printAST(module, std::cout);
     if (options.dumpSymbols)
       std::cout << sema.dumpSymbolTable();
+
+    bool generating = !options.emit.empty();
+#ifdef MEMOLANG_HAS_LLVM
+    if (generating && !options.parseOnly && !diags.hasErrors()) {
+      BackendAction action = BackendAction::EmitObject;
+      if (options.emit == "llvm")
+        action = BackendAction::EmitLLVM;
+      else if (options.emit == "bc")
+        action = BackendAction::EmitBitcode;
+      else if (options.emit == "asm")
+        action = BackendAction::EmitAssembly;
+      std::string output =
+          options.outputPath.empty()
+              ? CodegenAction::defaultOutputPath(options.inputPath, action)
+              : options.outputPath;
+      CodegenOptions codegenOptions;
+      codegenOptions.optLevel = options.optLevel;
+      llvm::LLVMContext context;
+      CodegenAction codegen(action, context,
+                            CodegenInputs{types, diags, sema, destructive},
+                            codegenOptions);
+      codegen.execute(module, output);
+    }
+#endif
 
     bool running = options.run || options.compare;
     if (running && !options.parseOnly && !diags.hasErrors()) {
@@ -241,7 +314,7 @@ int runDriver(int argc, char **argv) {
         std::cout << "main() returned " << report.result.value << '\n';
         printRun(report, std::cout);
       }
-    } else if (!options.dumpAst && !options.dumpSymbols &&
+    } else if (!options.dumpAst && !options.dumpSymbols && !generating &&
                !diags.hasErrors()) {
       std::cout << options.inputPath << ": OK (" << module.body.size()
                 << " top-level statements)\n";

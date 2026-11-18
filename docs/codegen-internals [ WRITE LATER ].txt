@@ -1,0 +1,783 @@
+MemoLang code generation: internals and design decisions
+===========================================================
+
+Last updated: 2026-11-17
+LLVM version: built and checked against LLVM 23.1 (/usr/lib/llvm-23)
+Code: Include/Codegen/, Include/Runtime/runtime_abi.{h,cpp}
+
+This file explains how the LLVM back end turns a checked MemoLang AST into
+IR, object files and executables, and why it is built the way it is. It also
+collects the LLVM API knowledge the code depends on, including the version
+changes that have already bitten us. Read it before changing anything in
+Include/Codegen/.
+
+
+-----------------------------------------------------------------------------
+0. READ FIRST: known blocking bug (as of 2026-11-17)
+-----------------------------------------------------------------------------
+
+With LLVM 23, code generation produces invalid IR for every program. Both
+examples/basicadd.memo and examples/matmul_chain.memo fail with:
+
+    error: internal error: code generation produced invalid LLVM IR:
+    Basic Block in function 'memo.main' does not have terminator!
+
+Cause. CodegenFunction::reachable() (CodegenFunction.cpp:66-69) asks
+"does the current block still accept instructions?" like this:
+
+    return block && !block->getTerminator();
+
+Up to LLVM 22, BasicBlock::getTerminator() returned null for a block that
+did not end in a terminator. In LLVM 23 it ASSUMES the block is well formed:
+it asserts hasTerminator() and returns &InstList.back(). Distro LLVM is
+built without assertions, so the assert vanishes and it returns the last
+instruction (or a bogus pointer for an empty block). reachable() is then
+always false, so emitBody() skips every statement and finish() never adds
+the closing `ret`.
+
+Fix (one line, verified on a scratch copy, not yet applied to the repo):
+
+    return block && !block->hasTerminator();
+
+With that change, basicadd compiles, links and prints "main() returned 4",
+and all four benchmarks (layer_loop, named_chain, power_iteration,
+single_expression) give the same result compiled as with --run, with no
+leaked matrices.
+
+LLVM 23 added getTerminatorOrNull() for the old behaviour. Use
+hasTerminator() for yes/no questions and getTerminatorOrNull() when you need
+the instruction. Never call getTerminator() on a block you are still
+building.
+
+
+-----------------------------------------------------------------------------
+1. The pipeline at a glance
+-----------------------------------------------------------------------------
+
+    source --lexer/parser--> AST
+           --sema-------->  types + symbols        (Semantics/sema.*)
+           --destructive--> "consumed here" marks  (Analysis/destructive.*)
+           --ModuleBuilder/CodegenModule/CodegenFunction--> llvm::Module
+           --verifyModule (optional, on by default)
+           --TargetMachine setup (triple + data layout)
+           --PassBuilder O1..O3 pipeline (only if -O1 or higher)
+           --emit: .ll | .bc | .s | .o
+    .o + libMemoLangRuntime.a --c++--> executable
+
+Driver flags (Driver/driver.cpp):
+
+    --emit-llvm    textual IR (.ll)
+    --emit-bc      bitcode (.bc)
+    -S             assembly (.s)
+    -c             object file (.o)
+    -o <file>      output path; "-" is stdout; default is <stem>.<ext>
+    -O0 .. -O3     optimization level (default -O0)
+
+Building a runnable program:
+
+    cmake -S . -B build -DMEMOLANG_USE_LLVM=ON
+    cmake --build build --target MemoLang MemoLangRuntime
+    build/MemoLang -c prog.memo
+    c++ prog.o build/libMemoLangRuntime.a -o prog
+    ./prog                         # prints "main() returned ..."
+
+Code generation is only compiled when MEMOLANG_USE_LLVM=ON. That option
+defines MEMOLANG_HAS_LLVM=1, which turns on the driver's codegen flags. The
+front end and the runtime build without LLVM, so teammates and CI without
+LLVM can still build the rest.
+
+
+-----------------------------------------------------------------------------
+2. File map
+-----------------------------------------------------------------------------
+
+CodegenOptions.h     Settings from the driver: optLevel, targetTriple,
+                     verify, optimizationRemarks, emitEntryPoint.
+CodegenAction.h/.cpp Runs the whole back end for one input: lower, set the
+                     target, optimize, write the output. BackendAction enum
+                     plus clang-style shorthands (EmitObjAction, ...).
+ModuleBuilder.h/.cpp Front-end entry point. Declares everything, then emits
+                     bodies, for the main module and its imports.
+CodegenModule.h/.cpp Per-module state: the llvm::Module, function and global
+                     tables, type lowering, runtime declarations, string
+                     constants, memo.init / memo.fini / main.
+CodegenFunction.h/.cpp
+                     Lowers statements and expressions of one function (or
+                     of memo.init). Most of the semantics live here.
+LifetimeUtils.h/.cpp llvm.lifetime.start/end helpers and LifetimeScope, the
+                     per-scope cleanup list.
+CallUtils.h          Argument evaluation order (always left to right) and
+                     the mapping of named arguments to parameters.
+BackendDiagnostics.h/.cpp
+                     Routes LLVM's own diagnostics (verifier, passes, isel,
+                     linker) into MemoLang's DiagnosticEngine.
+Linker.h/.cpp        Thin wrapper over llvm::Linker::linkModules. Written but
+                     not used yet (see section 10).
+Runtime/runtime_abi.h/.cpp
+                     The extern "C" functions compiled code calls.
+
+The class split copies clang on purpose (CodeGenAction, ModuleBuilder,
+CodeGenModule, CodeGenFunction, BackendConsumer's diagnostic handler).
+When something is unclear, the matching clang file is a good reference.
+
+
+-----------------------------------------------------------------------------
+3. CodegenAction: running the back end
+-----------------------------------------------------------------------------
+
+CodegenAction::execute(ast, outputPath) does, in order:
+
+1. Installs BackendDiagnostics on the LLVMContext with an RAII guard
+   (InstallGuard). The previous handler comes back when execute() returns.
+2. Runs ModuleBuilder: handleModule(), then handleTranslationUnit(), then
+   takes the module.
+3. prepareTarget(): initializes the native target once per prprocess, looks up
+   the triple, creates a TargetMachine, and stamps the triple and data
+   layout on the module.
+4. optimize() if optLevel > 0.
+5. emitOutput().
+
+Success means "no new errors since execute() started". The code counts
+errors before and after rather than threading bool results everywhere.
+
+Decisions and the LLVM APIs behind them:
+
+- Native target only. llvm::InitializeNativeTarget(),
+  InitializeNativeTargetAsmPrinter() and InitializeNativeTargetAsmParser()
+  run once, guarded by a function-local static. Cross-compiling needs
+  InitializeAllTargets() and friends, plus linking the "all-targets"
+  components instead of "native".
+
+- Target triple. Empty CodegenOptions::targetTriple means
+  llvm::sys::getDefaultTargetTriple(). In LLVM 21+ the APIs take an
+  llvm::Triple object, not a string: TargetRegistry::lookupTarget(Triple,
+  Error), Target::createTargetMachine(Triple, ...), and
+  Module::setTargetTriple(Triple). Older tutorials pass strings and will not
+  compile.
+
+- TargetMachine settings. CPU is "generic" and the feature string is empty,
+  so output runs on any x86-64 machine but does not use AVX and similar.
+  Relocation model is Reloc::PIC_, because modern Linux toolchains link
+  position-independent executables by default and a non-PIC .o would fail to
+  link. Code model is left at the default (std::nullopt).
+
+- Opt level mapping. The same -O number drives two separate LLVM knobs:
+      -O1 -> OptimizationLevel::O1 and CodeGenOptLevel::Less
+      -O2 -> OptimizationLevel::O2 and CodeGenOptLevel::Default
+      -O3 -> OptimizationLevel::O3 and CodeGenOptLevel::Aggressive
+  OptimizationLevel controls the IR pipeline. CodeGenOptLevel controls
+  instruction selection, register allocation and scheduling. CodeGenOptLevel
+  is an enum class in recent LLVM (formerly CodeGenOpt::Level).
+
+- IR outputs also get the triple and data layout when a target is
+  available. A .ll file can then be fed to llc or clang as-is. If no target
+  can be created, .ll and .bc output still succeed. Assembly and object
+  output fail.
+
+- Two pass managers, on purpose. The IR optimization pipeline uses the NEW
+  pass manager (PassBuilder). Machine code emission uses the LEGACY pass
+  manager, because TargetMachine::addPassesToEmitFile() still only accepts
+  legacy::PassManager. This is the same split clang uses. Do not try to
+  "clean it up" into one.
+
+- New pass manager boilerplate. All four analysis managers must exist and
+  be cross-registered, or passes crash on missing proxies:
+
+      LoopAnalysisManager LAM; FunctionAnalysisManager FAM;
+      CGSCCAnalysisManager CGAM; ModuleAnalysisManager MAM;
+      PassBuilder PB(TM);
+      PB.registerModuleAnalyses(MAM);   PB.registerCGSCCAnalyses(CGAM);
+      PB.registerFunctionAnalyses(FAM); PB.registerLoopAnalyses(LAM);
+      PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+      PB.buildPerModuleDefaultPipeline(OptimizationLevel::O2).run(M, MAM);
+
+  Passing the TargetMachine to PassBuilder gives the passes target cost
+  models (TargetTransformInfo). Without it, the vectorizer and inliner use
+  generic costs. The analysis managers must be declared before the
+  PassBuilder that uses them, and destroyed after any pipeline that runs.
+  The local declaration order in optimize() is correct.
+
+- Output files. raw_fd_ostream with OF_Text for .ll and .s, OF_None for
+  binary. Module::print() writes .ll and WriteBitcodeToFile() writes .bc.
+  addPassesToEmitFile() returns true on FAILURE, which is the opposite of
+  what the name suggests. EmitCodeGenOnly writes into raw_null_ostream, so
+  the whole back end runs but nothing is kept. That is useful for timing and
+  for catching isel errors.
+
+- Write errors. raw_fd_ostream remembers I/O errors and calls
+  report_fatal_error in its destructor if nobody checked them. emitOutput()
+  checks has_error() and then calls clear_error(). Keep that pattern for any
+  new output stream.
+
+
+-----------------------------------------------------------------------------
+4. ModuleBuilder: two phases, many modules, one llvm::Module
+-----------------------------------------------------------------------------
+
+handleModule(ast, imported) works in two phases:
+
+    1. declareModule() for every imported module, then for `ast`.
+    2. emitTopLevel() for every statement of every imported module, then
+       for every statement of `ast`.
+
+Declaring everything first means a body can call any function, in any
+order, including mutual recursion, without forward declarations.
+
+`ast` is declared last so that its main() is the one the entry point calls.
+Imports are lowered into the SAME llvm::Module rather than one module per
+file plus a link step. That is simpler and lets the optimizer see
+everything. The Linker class exists for the day separate compilation is
+needed.
+
+Module-level statements of imports run before those of `ast`, in the order
+the imports were given.
+
+
+-----------------------------------------------------------------------------
+5. CodegenModule: layout of a generated module
+-----------------------------------------------------------------------------
+
+A generated module contains:
+
+    memo.<name>   One function per MemoLang function. External linkage.
+    <extern C>    `extern def` functions keep their own (C) name.
+    memo.g.<name> One internal global per module-level variable,
+                  zero-initialized.
+    .str, .str.1  Private constant strings, unnamed_addr, align 1.
+    memo.init     Internal. Runs the module-level statements in order.
+    memo.fini     Internal. Releases module-level matrix globals.
+    main          Only if emitEntryPoint and a main() exists. Calls
+                  memolang_rt_begin, memo.init, memo.main, the matching
+                  memolang_rt_print_*, memo.fini, and returns
+                  memolang_rt_end()'s value as the exit code.
+    memolang_rt_* Runtime declarations, added on first use.
+
+Naming decisions:
+
+- The "memo." prefix keeps MemoLang names out of the C namespace. A
+  MemoLang function called main, abs or printf would otherwise collide with
+  libc or with the generated C main. A dot is legal in LLVM and ELF symbol
+  names but not in C identifiers, so no C code can collide by accident.
+  BackendDiagnostics strips the prefix when it prints a function name.
+- Externs keep their C name and the C ABI so they can be implemented in C
+  or C++. Declaring the same extern twice with different types is an error.
+  getOrCreateFunction() returns the first declaration, and declareModule()
+  compares FunctionType pointers. LLVM uniques types per context, so
+  pointer equality is type equality.
+- Four externs are recognized by name and arity and lowered to runtime calls
+  instead of real calls: random_matrix(r, c), zeros_matrix(r, c),
+  identity_matrix(n) and matrix_sum(m). See isRuntimeExtern(). These get a
+  null entry in lowered_.
+
+Type lowering (lowerType):
+
+    bool              i1
+    iN / uN           iN (LLVM integers have no sign; signedness lives in
+                      the instructions: sdiv vs udiv, sext vs zext, ...)
+    f32 / float       float / double
+    str               ptr  (NUL-terminated const char *)
+    matrix<T>         ptr  (opaque MemoMatrix * handle)
+    void              void
+    anything else     null, which is reported as "not supported"
+
+All pointers are the single opaque `ptr` type, from
+PointerType::getUnqual(context) or IRBuilder::getPtrTy(). Typed pointers
+(i8*, %struct*) were removed in LLVM 17. Loads, stores, GEPs and calls must
+name the value type explicitly, which is why every CreateLoad passes the
+lowered slot type.
+
+Bool is i1 in registers and in allocas. When bool crosses the C ABI
+(memolang_rt_print_bool) it is zero-extended to i32. This avoids depending
+on how a C compiler passes `bool`.
+
+Runtime declarations (runtime()). Each function is declared lazily with
+Function::Create and cached in a map keyed by the RuntimeFn enum.
+memolang_rt_panic and memolang_rt_shift_error are marked noreturn and cold.
+noreturn lets LLVM delete code after the call. cold moves the panic blocks
+out of the hot path. The signatures here must match runtime_abi.h by hand.
+Nothing checks this at compile time, so change both together.
+
+String constants (stringConstant()). Equal literals share one global. They
+are marked unnamed_addr, which lets LLVM and the linker merge identical
+strings. That is safe because the runtime compares strings by content
+(strcmp), never by address. ConstantDataArray::getString(..., true) adds the
+terminating NUL.
+
+Finishing (release(), called once from handleTranslationUnit()):
+
+1. Closes memo.init by adding a `ret void` after the last statement.
+2. Builds memo.fini. For each matrix global it loads, releases and stores
+   null.
+3. Builds the C `main` if requested.
+4. Runs llvm::verifyModule() when CodegenOptions::verify is set and no errors
+   were reported yet. verifyModule returns TRUE when the module is BROKEN,
+   and writes details to the given stream. Any verifier failure is a bug in
+   code generation, never in the user's program, so it is reported as an
+   "internal error". Verification is skipped after earlier errors because a
+   partly lowered module is expected to be broken.
+
+The entry point prints the value main() returned through the runtime
+("main() returned 4"), in exactly the interpreter's format. That lets tests
+compare `MemoLang --run` with a compiled binary line for line.
+
+
+-----------------------------------------------------------------------------
+6. CodegenFunction: statements and expressions
+-----------------------------------------------------------------------------
+
+The guiding rule: a compiled program must return exactly what
+`MemoLang --run` prints. Every lowering decision below follows the
+interpreter (Interp/interpreter.cpp), not C or LLVM defaults.
+
+6.1 Variables: allocas in the entry block
+-----------------------------------------
+Every local and parameter gets an alloca. createEntryAlloca() always inserts
+at the start of the entry block, using a separate short-lived IRBuilder so
+the main builder's position is not disturbed.
+
+Why the entry block. mem2reg/SROA only promote STATIC allocas, meaning ones
+in the entry block with a constant size. An alloca inside a loop body would
+also allocate fresh stack on every iteration. Writing to memory and letting
+SROA build SSA is the standard frontend approach (clang does the same). It
+avoids building phi nodes by hand for variables.
+
+Side effect: because each new alloca goes at the very start of the block,
+allocas appear in REVERSE declaration order in the IR. That is harmless.
+
+Parameters are stored into their own allocas in emitPrologue(). That lets
+parameters be reassigned and consumed like any other variable.
+
+Module-level variables are globals, not allocas. slotFor() looks up locals
+first, then globals, and returns the address and semantic type for either.
+Code that loads and stores does not care which kind it got.
+
+At -O0 this produces the textbook load/store pattern. Real output for the
+main() of examples/basicadd.memo:
+
+    define i64 @memo.main() {
+    entry:
+      %total = alloca i64, align 8
+      %0 = call i64 @memo.basicadd(i64 2, i64 3)
+      call void @llvm.lifetime.start.p0(ptr %total)
+      store i64 %0, ptr %total, align 4
+      %total1 = load i64, ptr %total, align 4
+      %1 = icmp sgt i64 %total1, 4
+      br i1 %1, label %if.then, label %if.else
+    if.then:
+      ...
+    if.end:
+      %total4 = load i64, ptr %total, align 4
+      call void @llvm.lifetime.end.p0(ptr %total)
+      ret i64 %total4
+    }
+
+At -O2 the whole program folds to a constant:
+
+    define i32 @main() local_unnamed_addr {
+    entry:
+      tail call void @memolang_rt_begin()
+      tail call void @memolang_rt_print_int(i64 4)
+      %0 = tail call i32 @memolang_rt_end()
+      ret i32 %0
+    }
+
+(Note: `align 4` on an i64 store is what IRBuilder produces when no data
+layout was set at the time the instruction was created. The module only gets
+its data layout in prepareTarget(), after lowering. It is correct, just
+conservative. Setting the data layout on the module before lowering would
+give natural alignments.)
+
+6.2 Control flow
+----------------
+The builder always has a current block. "Reachable" means that block does
+not end in a terminator yet. After `return` or `break` the current block is
+terminated, and emitBody() stops emitting the rest of the statements, since
+they are dead. LLVM requires that every block ends in exactly one
+terminator, and nothing may follow it. Section 0 is the bug in this check.
+
+if:     if.then / if.else / if.end blocks. The else block is always created,
+        even for an empty else, which keeps the code uniform. SimplifyCFG
+        removes it. If neither branch reaches if.end (both returned or broke
+        out), if.end has no predecessors and gets an `unreachable`
+        terminator. That keeps it well formed, and later passes delete it.
+while:  while.cond / while.body / while.end. The loop body opens a fresh
+        scope each iteration, so cleanups run at the end of each iteration.
+        `while true` with no break leaves while.end without predecessors and
+        it gets `unreachable`.
+break:  Runs the cleanups of every scope opened since the loop began, then
+        branches to while.end. The Loop record stores the scope depth.
+return: Evaluates the value FIRST, then runs every scope's cleanups, then
+        returns. The order matters for matrices: returning a consumed
+        variable has already moved its reference out (the slot is null), so
+        the cleanup's release(null) is a no-op and the caller receives a
+        live matrix.
+falling off the end: finish() runs all cleanups and returns a default value
+        (0, 0.0, false, "" or null). Like the interpreter, a missing
+        `return` in a non-void function is not diagnosed yet.
+and/or: Short-circuit with a phi. The phi's incoming block for the
+        right-hand side is taken from GetInsertBlock() AFTER emitting the
+        right side, not from the block that was created for it. Emitting the
+        right side may create new blocks (a nested `and`, a panic check), and
+        a phi must name its actual predecessors.
+
+6.3 Arithmetic semantics
+------------------------
+Integers. Both operands are widened to i64 (sext for signed, zext for
+unsigned and bool), the operation is done in i64, and the result is
+truncated to the expression's type. That reproduces the interpreter, which
+computes in int64_t, and it gives wrap-around for narrow types.
+
+- add/sub/mul are plain, with NO `nsw`/`nuw` flags. Those flags tell LLVM
+  that overflow is undefined behavior. MemoLang defines overflow as
+  wrap-around, so adding the flags would let the optimizer break programs.
+- `/` is TRUE division: integers convert to double and the result is a
+  float, as in Python. It panics on a zero divisor.
+- `//` rounds toward minus infinity. sdiv rounds toward zero, so the code
+  subtracts 1 when the remainder is nonzero and the operand signs differ.
+  INT64_MIN // -1 is undefined behavior for LLVM's sdiv (it traps on x86).
+  The divisor is swapped for 1 in that one case, which yields INT64_MIN,
+  the wrap-around answer.
+- `%` takes the divisor's sign, so a == (a // b) * b + a % b. srem with -1
+  has the same INT64_MIN problem, so a divisor of -1 is replaced by 1 (the
+  answer is 0 either way).
+- `**` on integers calls memolang_rt_ipow (wrap-around, panics on a
+  negative exponent). There is no LLVM integer power intrinsic.
+- Shifts: LLVM's shl/ashr return POISON when the amount is >= the bit
+  width. The code checks `amount >u 63`. The unsigned compare also catches
+  negative amounts. Out-of-range amounts call memolang_rt_shift_error.
+  `>>` is arithmetic (ashr) because values are signed i64 at this point.
+- Comparisons use signed predicates (icmp slt and so on) on the i64 values.
+
+Floats. Operands convert to double, the operation is done in double, and
+the result converts back. f32 results round once, at the end.
+
+- `//` is floor(a / b) with the llvm.floor intrinsic, and `%` is
+  a - floor(a / b) * b. This is Python-style, not C's fmod.
+- `**` is the llvm.pow intrinsic. It lowers to the C library's pow(), so the
+  final link needs libm. c++ links it automatically.
+- Comparisons: ordered predicates (oeq, olt, ...) except `!=`, which is
+  unordered (une). Any comparison with NaN is false except `!=`, as in C.
+- Float division by zero follows IEEE (inf or NaN) and does not panic.
+
+Conversions (convert(), mirroring the interpreter's convertTo):
+
+- float -> int: fptosi returns POISON if the value does not fit, and NaN
+  never fits. The code first checks -2^63 <= d < 2^63. Both comparisons are
+  ordered, so NaN fails them. Out-of-range values panic.
+- int -> float: sitofp on the i64 value. bool -> float: uitofp, giving 0.0
+  or 1.0.
+- to bool: `!= 0` for integers. For floats it is `une 0.0`, so NaN counts as
+  true, as in C.
+- Matrices and strings are passed through unchanged. Matrix shapes are
+  checked by the runtime, not here.
+
+Panics. panicIf(cond, msg) branches to a "panic" block that calls
+memolang_rt_panic and ends in `unreachable`. The branch carries
+MDBuilder::createUnlikelyBranchWeights() metadata (the `!prof` you see in
+the IR), so block placement keeps panic paths out of the hot loop. If cond is
+the constant false, nothing is emitted. Matrices still held when a panic
+fires are not released. The process exits right away, so that does not
+matter.
+
+6.4 Long expression chains
+--------------------------
+`a @ b @ c @ ...` parses as a left-nested tree. emitBinary() walks the left
+spine with a loop instead of recursing, so a chain of thousands of operators
+cannot overflow the compiler's stack. Sema and the interpreter do the same.
+Right operands are still emitted recursively.
+
+6.5 Calls
+---------
+- Arguments are evaluated left to right, in source order, always. This is a
+  language rule, not an ABI choice. Destructive reads make order
+  observable: in f(a @ b, g(a)) the order decides which use consumes `a`.
+  CallUtils.h states it, and an assert in emitCall() checks it.
+- Named arguments: mapCallArguments() gives each argument its parameter
+  index. Values are evaluated in source order and stored at their
+  parameter's position.
+- Each argument is converted to the parameter's type before the call.
+- copy(x) is a builtin. On a matrix it calls memolang_rt_copy and releases
+  the original reference. On anything else it returns the value unchanged.
+
+6.6 Matrices and reference counting
+-----------------------------------
+Matrices are handles (ptr) to reference-counted runtime objects. The rules:
+
+1. Every matrix-valued expression produces ONE reference, owned by whoever
+   uses the value.
+2. Reading a variable:
+   - If destructive analysis marked this read as consumed, the variable
+     hands its reference over: the slot is set to null and no retain is
+     done. This is a move.
+   - Otherwise, retain(): the reader gets its own reference.
+   - Either way, a null slot first panics with "'x' has no value".
+3. Operations (matmul, add, scale, sum, copy) release their matrix operands
+   after the runtime call. So a consumed matrix is freed the moment the
+   operation using it finishes, which is the whole point of destructive
+   reads.
+4. Assigning to a matrix variable loads the old value, stores the new one,
+   then releases the old one. Doing it in that order is safe for `m = m`.
+5. A matrix expression statement whose result is unused is released at
+   once.
+6. At scope exit, each matrix variable releases what it still holds.
+   Releasing null is a no-op, so consumed variables cost nothing.
+7. `m op= v` reads m WITHOUT consuming it (retain), as the interpreter does.
+
+Real -O0 output for `matrix<f32> h1 = x @ w1;`, where both reads are
+consuming:
+
+      %x6 = load ptr, ptr %x
+      %2 = icmp eq ptr %x6, null
+      br i1 %2, label %panic, label %ok, !prof !0
+    ok:
+      store ptr null, ptr %x              ; x hands its reference over
+      %w17 = load ptr, ptr %w1
+      ...                                 ; same null check for w1
+      store ptr null, ptr %w1
+      %4 = call ptr @memolang_rt_matmul(ptr %x6, ptr %w17)
+      call void @memolang_rt_release(ptr %x6)   ; freed now, not at scope end
+      call void @memolang_rt_release(ptr %w17)
+      store ptr %4, ptr %h1
+
+memolang_rt_end() compares allocations with frees and exits with status 3
+if any matrix leaked. Every compiled run therefore doubles as a leak check
+for these rules.
+
+
+-----------------------------------------------------------------------------
+7. Lifetimes and scope cleanups (LifetimeUtils)
+-----------------------------------------------------------------------------
+
+LifetimeScope records the variables of one lexical scope, in declaration
+order. emitCleanups() runs in reverse order. For a matrix variable it loads
+the slot and releases it. For every variable it then emits
+llvm.lifetime.end. Each declaration emits llvm.lifetime.start before its
+first store.
+
+Why lifetime markers. They tell the stack coloring pass in the back end that
+two allocas are never live at the same time, so they can share a stack
+slot. They are also why the slots are fine to declare in the entry block yet
+"live" only in their scope.
+
+emitCleanups() does not close the scope. `return` and `break` emit cleanups
+for the scopes they leave without popping them, because code after the jump
+in the same scope (on another path) still uses them. Each control flow path
+runs each cleanup once. Cleanups only cover variables tracked so far, which
+in structured code are exactly the ones whose declaration dominates the
+jump.
+
+LLVM API change: in LLVM 22, llvm.lifetime.start/end lost their size
+operand. They used to be (i64 size, ptr), and are now just (ptr), with
+the size coming from the alloca. IRBuilder::CreateLifetimeStart(ptr) now
+takes only the pointer. Lifetime intrinsics must also point directly at an
+alloca, not at a GEP or a cast. The helpers in LifetimeUtils.h already
+follow both rules.
+
+
+-----------------------------------------------------------------------------
+8. The runtime ABI (Runtime/runtime_abi.h)
+-----------------------------------------------------------------------------
+
+Generated code calls plain extern "C" functions named memolang_rt_*. They
+are implemented in C++ on top of the same runtime::Runtime the interpreter
+uses, so memory statistics from compiled and interpreted runs are directly
+comparable.
+
+Why a C ABI. C symbols have no name mangling and a simple, stable calling
+convention, so IR declarations stay readable and any language can provide
+them. Only fixed-width types cross the boundary: int64_t, int32_t, double
+and pointers. bool goes as i32 on purpose.
+
+Ownership contract:
+- Functions returning a matrix return a NEW reference that the caller owns.
+- Functions taking a matrix only BORROW it.
+- memolang_rt_release(NULL) does nothing.
+Codegen's "operations release their operands" rule (section 6.6) is the
+caller's side of this contract.
+
+Errors: the runtime's C++ RuntimeError exceptions are caught inside the
+runtime and turned into memolang_rt_panic(). No C++ exception ever unwinds
+through generated code, which has no unwind tables or landing pads. Keep it
+that way. Adding a runtime function that can throw without `guarded()`
+would terminate the program.
+
+Strings returned by memolang_rt_str_concat live until memolang_rt_end().
+They are never freed earlier. That is simple, and acceptable for now.
+
+Element type flag: the `f32` int32 argument is 1 for matrix<f32> and 0 for
+matrix<float> (f64). It comes from the expression's semantic type.
+
+Adding a runtime function:
+1. Declare and implement it in runtime_abi.h/.cpp.
+2. Add a RuntimeFn enumerator in CodegenModule.h.
+3. Add its name and LLVM signature to the switch in CodegenModule::runtime().
+   The types must match the C declaration exactly.
+4. Call it via builder_.CreateCall(cgm_.runtime(RuntimeFn::X), {...}).
+
+
+-----------------------------------------------------------------------------
+9. BackendDiagnostics: LLVM's errors as MemoLang diagnostics
+-----------------------------------------------------------------------------
+
+LLVM reports problems (verifier, failed optimizations, unsupported
+instructions, stack frames too large, inline-asm errors, linker conflicts)
+through the LLVMContext's DiagnosticHandler. The default handler prints to
+stderr, and on DS_Error it calls exit(). That is unacceptable inside a
+compiler that wants all its messages in one format.
+
+BackendDiagnostics installs its own llvm::DiagnosticHandler subclass for the
+duration of CodegenAction::execute():
+
+- handleDiagnostics() returns true, meaning "handled". LLVM then neither
+  prints it nor exits.
+- Dispatch is on DiagnosticInfo::getKind() (DK_SrcMgr, DK_StackSize,
+  DK_Unsupported, DK_DontCall, DK_MisExpect, DK_OptimizationFailure, ...),
+  then llvm::cast<> to the concrete class. Unknown kinds are formatted by
+  LLVM itself with DiagnosticPrinterRawOStream.
+- Severities map DS_Error -> Error, DS_Warning -> Warning, DS_Remark and
+  DS_Note -> Note. Messages are prefixed "LLVM: ".
+- Optimization remarks are opt-in with CodegenOptions::optimizationRemarks.
+  The handler overrides isAnalysisRemarkEnabled, isMissedOptRemarkEnabled,
+  isPassedOptRemarkEnabled and isAnyRemarkEnabled. Passes ask these BEFORE
+  building a remark, so with remarks off they cost nothing. "Optimization
+  failure" (for example a requested vectorization that could not happen)
+  is always reported, as a warning.
+- InstallGuard takes the previous handler with getDiagnosticHandler()
+  (which moves it out) and puts it back in the destructor. That makes the
+  handler safe to install on a context that someone else configured, such as
+  a test harness.
+
+Diagnostics carry no source position, because generated code has no debug
+locations yet. Adding DILocation (see section 11) would let these map back
+to MemoLang source lines.
+
+
+-----------------------------------------------------------------------------
+10. Linker (not wired in)
+-----------------------------------------------------------------------------
+
+Linker::linkInModule() wraps llvm::Linker::linkModules(dest, std::move(src)).
+Watch out for these API details:
+- It returns TRUE on error.
+- It takes the source module by unique_ptr and destroys it, even on
+  failure.
+- Both modules must share the same LLVMContext.
+- The details of a failure (for example "symbol multiply defined") go
+  through the context's diagnostic handler. The wrapper only adds which
+  modules were involved.
+
+Nothing calls it today. ModuleBuilder lowers imports straight into one
+module, and BackendDiagnostics::SetCurrentLink() is never called. It is the
+hook for separate compilation or for linking a bitcode build of the runtime
+(which would let LTO-style inlining of memolang_rt_* happen).
+
+
+-----------------------------------------------------------------------------
+11. General LLVM API notes for this codebase
+-----------------------------------------------------------------------------
+
+LLVMContext
+- Owns all types, constants and metadata. Modules from different contexts
+  cannot be mixed. The context must outlive every Module created in it.
+  The driver creates one per compilation, on the stack.
+- It is not thread safe. Use one context per thread.
+
+IRBuilder
+- Holds an insertion point (block plus position). SetInsertPoint(BB) means
+  "append at the end of BB".
+- It constant-folds: CreateAdd(const, const) returns a Constant, not an
+  instruction. Never assume a Create* call returned an Instruction. Use
+  dyn_cast<Instruction> if you need one.
+- Creating a cast to the same type returns the input value unchanged. That
+  is why convert() can call CreateTrunc(i64 -> i64) safely.
+- Value names (the last argument) are only for readable IR. Names are made
+  unique by adding numbers (%total1, %total2). They cost memory, and release
+  builds of clang discard them. A context option can do the same here if
+  compile time matters.
+
+Basic blocks and terminators
+- Every block must end in exactly one terminator (ret, br, switch,
+  unreachable, ...), with no instructions after it.
+- LLVM 23: getTerminator() assumes the block is well formed. Use
+  hasTerminator() or getTerminatorOrNull() while building. See section 0.
+- A block with no predecessors still needs a terminator. `unreachable` is
+  the usual choice.
+- pred_empty(BB) (llvm/IR/CFG.h) tests for "no predecessors".
+
+Phi nodes
+- Must be at the top of a block, with exactly one incoming value per
+  predecessor edge. Use the block the value was CREATED in at the time of
+  the branch (GetInsertBlock() after emitting the operand), not the block
+  you started emitting it in.
+- Prefer allocas plus SROA over hand-written phis for variables. Use phis
+  only for expression-level merges like and/or.
+
+Poison and undefined behavior that matters here
+- add/sub/mul with nsw or nuw flags: overflow is poison. We do not use them.
+- sdiv/srem by zero, or INT_MIN / -1: undefined behavior (not just poison).
+  We guard against both.
+- shl/lshr/ashr by >= bit width: poison. We guard.
+- fptosi/fptoui of an out-of-range value or NaN: poison. We guard.
+- A load from null is UB. Matrix null checks happen before any use.
+
+Intrinsics
+- Overloaded intrinsics such as llvm.floor and llvm.pow are created with
+  IRBuilder::CreateUnaryIntrinsic(Intrinsic::floor, V) or
+  CreateBinaryIntrinsic(Intrinsic::pow, A, B). The overload type is taken
+  from the operands.
+- Declarations are added to the module automatically, under mangled names
+  like llvm.floor.f64 and llvm.lifetime.start.p0.
+
+Verifier
+- verifyModule(M, &OS) and verifyFunction(F, &OS) return TRUE if BROKEN.
+- Always verify before optimizing. Passes assume valid IR and crash on
+  invalid IR in unhelpful ways.
+- Run against an assertions-enabled LLVM build when developing codegen if
+  you can. The section 0 bug would have shown up as an immediate assert
+  instead of a confusing verifier message.
+
+Debugging generated code
+- Dump the IR:       MemoLang --emit-llvm -o - prog.memo
+- After optimizing:  MemoLang --emit-llvm -O2 -o - prog.memo
+- Re-run pieces with the LLVM tools:
+      opt -passes=verify prog.ll -S
+      opt -passes='default<O2>' -print-after-all prog.ll -S 2>&1 | less
+      llc -O2 prog.ll -o prog.s
+- From a debugger: M->print(llvm::errs(), nullptr), F->print(...),
+  V->dump() (dump() only exists in builds with LLVM_ENABLE_DUMP).
+
+
+-----------------------------------------------------------------------------
+12. Known gaps and future work
+-----------------------------------------------------------------------------
+
+Bugs
+- Section 0: reachable() uses getTerminator(). Must be fixed for LLVM 23.
+
+Not supported yet (reported as "code generation doesn't support ..."):
+- Interpolated strings.
+- Functions defined inside other code (nested functions).
+- Pointer, vector, generic and function-typed values.
+- Assigning to anything other than a plain variable.
+- Calling anything other than a named function.
+
+Language-level gaps that codegen inherits from the interpreter:
+- A missing `return` in a non-void function is not diagnosed. The function
+  silently returns a default value.
+
+Quality and performance ideas:
+- Set the data layout before lowering so IRBuilder picks natural
+  alignments. It is currently set after, in prepareTarget().
+- Mark memo.* functions and runtime declarations `nounwind`. No exception
+  ever unwinds through them, and the attribute lets the optimizer drop
+  unwind bookkeeping.
+- Add `noalias`/`nonnull` return attributes to the runtime allocation
+  functions, and `memory(...)` effects to pure helpers like str_compare.
+- Debug info (DIBuilder) for source-level debugging and positioned backend
+  diagnostics.
+- Target CPU and features from the host (sys::getHostCPUName(),
+  sys::getHostCPUFeatures()) behind a -march=native style flag.
+- A JIT path. orcjit is already linked (see CMakeLists.txt), but no code
+  uses LLJIT yet. runtime_abi's lastResult() and setEchoResult() exist for
+  running compiled code in-process from tests.
+- Use the Linker for per-file compilation once modules get large.

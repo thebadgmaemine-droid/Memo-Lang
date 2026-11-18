@@ -41,7 +41,12 @@ if(MEMOLANG_USE_LLVM)
   separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
   add_definitions(${LLVM_DEFINITIONS_LIST})
 
-  llvm_map_components_to_libnames(llvm_libs support core irreader)
+  # Code generation (Include/Codegen): IR, the O1-O3 pipelines, bitcode,
+  # module linking, and the host target for assembly/object files. orcjit runs
+  # compiled programs in-process for the tests (MemoLangTests codegen ...).
+  llvm_map_components_to_libnames(llvm_libs support core irreader analysis
+                                  passes bitwriter linker target mc native
+                                  orcjit)
 endif()
 
 set(MEMOLANG_INCLUDE_DIRS
@@ -57,6 +62,15 @@ foreach(entry ${MEMOLANG_INCLUDE_ENTRIES})
   endif()
 endforeach()
 
+# The matrix runtime, on its own so compiled programs can link it:
+#   MemoLang -c prog.memo && c++ prog.o libMemoLangRuntime.a -o prog
+# runtime_abi.cpp is the C interface generated code calls.
+add_library(MemoLangRuntime STATIC
+    Include/Runtime/runtime.cpp
+    Include/Runtime/runtime_abi.cpp
+)
+target_include_directories(MemoLangRuntime PUBLIC ${MEMOLANG_INCLUDE_DIRS})
+
 # The front-end as a library, so the compiler and the test runner share it.
 # Paths updated 2026-11-06 after the 2026-11-02 reorganization moved each .cpp
 # next to its header. When a file moves, update this list too.
@@ -70,7 +84,6 @@ add_library(MemoLangFrontend STATIC
     Include/Lex/lexer.cpp
     Include/Lex/token.cpp
     Include/Parser/parser.cpp
-    Include/Runtime/runtime.cpp
     Include/Semantics/Scope.cpp
     Include/Semantics/sema.cpp
     Include/Source/SourceManager.cpp
@@ -80,7 +93,9 @@ add_library(MemoLangFrontend STATIC
 if(MEMOLANG_USE_LLVM)
   target_sources(MemoLangFrontend PRIVATE
       Include/IR/IRBuilder.cpp
+      Include/Codegen/BackendDiagnostics.cpp
       Include/Codegen/CodegenAction.cpp
+      Include/Codegen/CodegenFunction.cpp
       Include/Codegen/CodegenModule.cpp
       Include/Codegen/LifetimeUtils.cpp
       Include/Codegen/Linker.cpp
@@ -88,6 +103,13 @@ if(MEMOLANG_USE_LLVM)
   )
 endif()
 target_include_directories(MemoLangFrontend PUBLIC ${MEMOLANG_INCLUDE_DIRS})
+target_link_libraries(MemoLangFrontend PUBLIC MemoLangRuntime)
+if(MEMOLANG_USE_LLVM)
+  # Code generation is part of the front-end library, so everything linking
+  # it needs LLVM; MEMOLANG_HAS_LLVM turns on the driver's codegen options.
+  target_link_libraries(MemoLangFrontend PUBLIC ${llvm_libs})
+  target_compile_definitions(MemoLangFrontend PUBLIC MEMOLANG_HAS_LLVM=1)
+endif()
 target_compile_definitions(MemoLangFrontend PRIVATE MEMOLANG_VERSION="${PROJECT_VERSION}")
 
 add_executable(MemoLang main.cpp)
@@ -105,7 +127,7 @@ function(memolang_use_big_stack target)
 endfunction()
 memolang_use_big_stack(MemoLang)
 
-foreach(target MemoLangFrontend MemoLang)
+foreach(target MemoLangRuntime MemoLangFrontend MemoLang)
   if(MSVC)
     target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
   else()
@@ -113,16 +135,11 @@ foreach(target MemoLangFrontend MemoLang)
   endif()
 endforeach()
 
-if(MEMOLANG_USE_LLVM)
-  # Include dirs and definitions come from include_directories() and
-  # add_definitions() above. Adding the unsplit LLVM_DEFINITIONS here again
-  # produced -D_GLIBCXX_USE_CXX11_ABI="1 -D..." (the "macro redefined" warning).
-  # llvm_libs comes from llvm_map_components_to_libnames above and works with
-  # every LLVM CMake package. If a Frontend source file ever includes LLVM
-  # headers and uses LLVM symbols, link this to MemoLangFrontend (PUBLIC)
-  # instead.
-  target_link_libraries(MemoLang PRIVATE ${llvm_libs})
-endif()
+# LLVM's include dirs and definitions come from include_directories() and
+# add_definitions() above (adding the unsplit LLVM_DEFINITIONS again produced
+# -D_GLIBCXX_USE_CXX11_ABI="1 -D..."). The libraries are linked to
+# MemoLangFrontend (PUBLIC) since 2026-11-17, when code generation started
+# using LLVM symbols, so MemoLang and MemoLangTests both get them.
 
 if(MEMOLANG_BUILD_TESTS)
   enable_testing()
