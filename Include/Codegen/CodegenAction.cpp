@@ -56,26 +56,33 @@ std::string CodegenAction::defaultOutputPath(std::string_view inputPath,
 // optimize() if opt level > 0 ( as said before, loops until no longer zero )
 // emitOutput() to file.
 bool CodegenAction::execute(const Module &ast, const std::string &outputPath) {
+  targetMachine_.reset();
+
   std::size_t errorsBefore = inputs_.diags.errorCount();
   auto failed = [&] { return inputs_.diags.errorCount() != errorsBefore; };
   // LLVM's own diagnostics (verifier, linker, passes, isel) go to the
   // DiagnosticEngine while this runs.
   auto guard = backendDiagnostics_.install(context_);
+  
 
   ModuleBuilder builder(context_, inputs_, options_, ast.name);
   builder.handleModule(ast);
   builder.handleTranslationUnit();
   module_ = builder.releaseModule();
+   bool needsTarget = action_ == BackendAction::EmitAssembly ||
+                     action_ == BackendAction::EmitObject ||
+                     action_ == BackendAction::EmitCodeGenOnly;
+  if (!prepareTarget(*module_) && needsTarget)
+    return false; 
+  
   if (failed() || !module_)
     return false;
 
-  bool needsTarget = action_ == BackendAction::EmitAssembly ||
-                     action_ == BackendAction::EmitObject ||
-                     action_ == BackendAction::EmitCodeGenOnly;
+   
   // IR outputs also get the target's triple and data layout when they're
   // available, so the IR can be compiled as-is.
-  if (!prepareTarget(*module_) && needsTarget)
-    return false;
+  
+
   if (options_.optLevel > 0)
     optimize(*module_);
   return emitOutput(*module_, outputPath) && !failed();

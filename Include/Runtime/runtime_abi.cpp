@@ -63,7 +63,9 @@ template <typename F> auto guarded(F &&f) {
     return f();
   } catch (const RuntimeError &error) {
     memolang_rt_panic(error.message.c_str());
-  }
+  } 
+
+
 }
 
 void result(std::string text) {

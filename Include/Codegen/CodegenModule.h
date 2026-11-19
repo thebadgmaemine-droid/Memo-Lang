@@ -96,7 +96,7 @@ public:
   [[nodiscard]] llvm::LLVMContext &getLLVMContext() const { return context_; }
   [[nodiscard]] TypeContext &getTypes() const { return inputs_.types; }
   [[nodiscard]] DiagnosticEngine &getDiags() const { return inputs_.diags; }
-  [[nodiscard]] const sema::SemanticAnalyzer &getSema() const {
+  [[nodiscard]]  const sema::SemanticAnalyzer &getSema() const {
     return inputs_.sema;
   }
   [[nodiscard]] const Destructive &getDestructive() const {

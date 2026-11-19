@@ -16,13 +16,15 @@
 namespace llvm {
 class LLVMContext;
 class Module;
+class TargetMachine;
 } // namespace llvm
 namespace MemoLang {
 struct Module; // One parsed file (AST.h).
 class ModuleBuilder {
 public:
   ModuleBuilder(llvm::LLVMContext &context, const CodegenInputs &inputs,
-                const CodegenOptions &options, std::string moduleName);
+                const CodegenOptions &options, std::string moduleName,
+                const llvm::TargetMachine *target = nullptr);
   ~ModuleBuilder();
   ModuleBuilder(const ModuleBuilder &) = delete;
   ModuleBuilder &operator=(const ModuleBuilder &) = delete;

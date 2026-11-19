@@ -72,6 +72,7 @@ private:
   DiagnosticEngine &Diags;
   const CodegenOptions &CodeGenOpts;
   llvm::Module *CurrentLinkedModule = nullptr;
+  
 
   void report(int llvmSeverity, std::string message);
   // Inline-asm / source manager messages.

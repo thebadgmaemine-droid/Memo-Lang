@@ -2,7 +2,7 @@
 #define CODEGEN_FUNCTION_H_
 // Lowers the statements and expressions of one function (or of the module-
 // level code in memo.init) to LLVM IR.
-//
+//--------------------------------------------------------------------------
 // Values follow the interpreter (Interp/interpreter.cpp) exactly, so a
 // compiled program returns what `MemoLang --run` prints:
 //   - Arithmetic is done in i64 (both operands integers) or double, then
@@ -16,7 +16,7 @@
 //     release their operands, so a consumed matrix is freed the moment the
 //     operation using it is done. Scopes release what their variables still
 //     hold when they end (LifetimeUtils.h).
-//
+//--------------------------------------------------------------------------
 // 2026-11-17: added.
 #include <cstdint>
 #include <memory>

@@ -10,10 +10,11 @@ namespace MemoLang {
 ModuleBuilder::ModuleBuilder(llvm::LLVMContext &context,
                              const CodegenInputs &inputs,
                              const CodegenOptions &options,
-                             std::string moduleName)
+                             std::string moduleName,
+                             const llvm::TargetMachine *target)
     : diagnostics_(inputs.diags), moduleName_(std::move(moduleName)),
       codegen_(std::make_unique<CodegenModule>(context, inputs, options,
-                                               moduleName_)) {}
+                                               moduleName_, target)) {}
 
 ModuleBuilder::~ModuleBuilder() = default;
 

@@ -5,7 +5,10 @@
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/InstIterator.h>
+#include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
@@ -140,7 +143,7 @@ llvm::GlobalVariable *CodegenModule::globalFor(std::uint32_t symbol) const {
   auto it = globals_.find(symbol);
   return it == globals_.end() ? nullptr : it->second;
 }
-
+// For module edeclaration, also looks for memo.---
 void CodegenModule::declareModule(const Module &ast) {
   for (const auto &stmt : ast.body) {
     if (stmt->kind() == NodeKind::FunctionDef) {
@@ -354,6 +357,9 @@ llvm::FunctionCallee CodegenModule::runtime(RuntimeFn fn) {
   }
   llvm::Function *function = llvm::Function::Create(
       signature, llvm::Function::ExternalLinkage, name, module_.get());
+  // The runtime turns every error into memolang_rt_panic(); nothing it
+  // throws reaches generated code (docs/codegen-internals, runtime ABI).
+  function->setDoesNotThrow();
   if (noReturn) {
     function->setDoesNotReturn();
     function->addFnAttr(llvm::Attribute::Cold);
@@ -428,12 +434,54 @@ void CodegenModule::emitEntryPoint(const FunctionDef &mainFunction) {
   }
   builder.CreateCall(module_->getFunction("memo.fini"));
   builder.CreateRet(builder.CreateCall(runtime(RuntimeFn::End)));
+
+// Marks generated functions (memo.*, the entry point) nounwind 
+// call something that may unwind, until nothing changes.
+  llvm::SmallPtrSet<const llvm::Function *, 32> mayUnwind;
+  auto callMayUnwind = [&](const llvm::CallBase &call) {
+    if (call.doesNotThrow()) // Call-site or callee attribute.
+      return false;
+    const llvm::Function *callee = call.getCalledFunction();
+    if (!callee || callee->isDeclaration())
+      return true;
+    return mayUnwind.contains(callee);
+  };
+  auto anyCallMayUnwind = [&](llvm::Function &function) {
+    for (llvm::Instruction &inst : llvm::instructions(function))
+      if (auto *call = llvm::dyn_cast<llvm::CallBase>(&inst);
+          call && callMayUnwind(*call))
+        return true;
+    return false;
+  };
+
+  for (bool changed = true; changed;) {
+    changed = false;
+    for (llvm::Function &function : *module_)
+      if (!function.isDeclaration() && !mayUnwind.contains(&function) &&
+          anyCallMayUnwind(function)) {
+        mayUnwind.insert(&function);
+        changed = true;
+      }
+  }
+ // Sets
+  for (llvm::Function &function : *module_) {
+    if (function.isDeclaration())
+      continue;
+    if (!mayUnwind.contains(&function))
+      function.setDoesNotThrow();
+    for (llvm::Instruction &inst : llvm::instructions(function))
+      if (auto *call = llvm::dyn_cast<llvm::CallBase>(&inst);
+          call && !callMayUnwind(*call))
+        call->setDoesNotThrow();
+  }
 }
+
 // Marks release for module when called ( use paired with consume flags )
 void CodegenModule::release() {
   if (released_)
     return;
   released_ = true;
+
 
   // memo.init: the module-level code.
   initFunction().finish();
@@ -458,6 +506,8 @@ void CodegenModule::release() {
   if (options_.emitEntryPoint && mainFunction_)
     emitEntryPoint(*mainFunction_);
 
+  markNoUnwind(*module_);
+
   if (options_.verify && !hadErrors()) {
     std::string problems;
     llvm::raw_string_ostream out(problems);
@@ -467,6 +517,16 @@ void CodegenModule::release() {
                                problems);
   }
 }
+void markNoUnwind(llvm::Module &Module) {
+  for (llvm::Function &F : Module) {
+    F.setDoesNotThrow();
+    // Alternatively:
+    // F.addFnAttr(llvm::Attribute::NoUnwind);
+  }
+
+
+}
+
 
 std::unique_ptr<llvm::Module> CodegenModule::takeModule() {
   return std::move(module_);

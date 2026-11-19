@@ -26,7 +26,10 @@ std::string displayFunctionName(llvm::StringRef name) {
   // returns the function after memo.
     return name.drop_front(5).str();
   // if no memo -> returns all
+
   return name.str();
+
+
 }
 /* 
 Example code:

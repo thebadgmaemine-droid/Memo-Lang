@@ -70,6 +70,8 @@ public:
                                                      BackendAction action);
 
 private:
+  // Creates targetMachine_. ModuleBuilder stamps its triple and data layout
+  // on the module before lowering.
   bool prepareTarget(llvm::Module &module);
   void optimize(llvm::Module &module);
   bool emitOutput(llvm::Module &module, const std::string &outputPath);
