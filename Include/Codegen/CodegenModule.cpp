@@ -476,8 +476,18 @@ void CodegenModule::emitEntryPoint(const FunctionDef &mainFunction) {
   }
 }
 
+void markNoUnwind(llvm::Module &Module) {
+  for (llvm::Function &F : Module) {
+    if (F.isDeclaration())
+      continue;               // don't assert things about external code
+    F.setDoesNotThrow();
+  }
+}
+
+}
+
 // Marks release for module when called ( use paired with consume flags )
-void CodegenModule::release() {
+void MemoLang::CodegenModule::release() {
   if (released_)
     return;
   released_ = true;
@@ -507,7 +517,6 @@ void CodegenModule::release() {
     emitEntryPoint(*mainFunction_);
 
   markNoUnwind(*module_);
-
   if (options_.verify && !hadErrors()) {
     std::string problems;
     llvm::raw_string_ostream out(problems);
@@ -516,20 +525,9 @@ void CodegenModule::release() {
                            "LLVM IR:\n" +
                                problems);
   }
-}
-void markNoUnwind(llvm::Module &Module) {
-  for (llvm::Function &F : Module) {
-    F.setDoesNotThrow();
-    // Alternatively:
-    // F.addFnAttr(llvm::Attribute::NoUnwind);
-  }
+} // namespace MemoLang
 
-
-}
-
-
-std::unique_ptr<llvm::Module> CodegenModule::takeModule() {
+std::unique_ptr<llvm::Module> MemoLang::CodegenModule::takeModule() {
   return std::move(module_);
 }
 
-} // namespace MemoLang

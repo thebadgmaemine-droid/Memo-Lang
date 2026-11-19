@@ -143,6 +143,7 @@ public:
   void release();
   // Hands the finished module to the caller; getModule() is null afterwards.
   [[nodiscard]] std::unique_ptr<llvm::Module> takeModule();
+  void markNoUnwind(llvm::Module &Module);
 
 private:
   void emitEntryPoint(const FunctionDef &mainFunction);

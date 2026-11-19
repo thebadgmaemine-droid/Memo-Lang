@@ -205,3 +205,14 @@ and i think check the report folder and update the content inside there, keep .t
 check the whole folder and give me a list on what is left until finish the whole thing
 note: if i prompt this consider this as full evaluation on progress check of the prototype
 Result: Claude copied both reports to docs/reports/legacy/, updated the English and Vietnamese reports (source folders, testing table, benchmark results, progress, future work), added these prompts here, wrote the Word log docs/16-11-2026.docx and listed the work left.
+
+#---------------------------------------------------------------Prompt to claude 19/11/2026-------------------------------------------------------------
+19-11-22026:
+Prompt was to fix this snippet: 
+"void markNoUnwind(llvm::Module &Module) {
+  for (llvm::Function &F : Module) {
+    F.setDoesNotThrow();
+    
+  }
+  "
+"markNoUnwind(*module_);"
