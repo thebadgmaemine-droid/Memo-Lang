@@ -768,9 +768,9 @@ Language-level gaps that codegen inherits from the interpreter:
 Quality and performance ideas:
 - / D / Set the data layout before lowering so IRBuilder picks natural
   / D /alignments. It is currently set after, in prepareTarget().
-- Mark memo.* functions and runtime declarations `nounwind`. No exception
-  ever unwinds through them, and the attribute lets the optimizer drop
-  unwind bookkeeping.
+- / D /Mark memo.* functions and runtime declarations `nounwind`. No exception
+  / D /ever unwinds through them, and the attribute lets the optimizer drop
+  / D /unwind bookkeeping.
 - Add `noalias`/`nonnull` return attributes to the runtime allocation
   functions, and `memory(...)` effects to pure helpers like str_compare.
 - Debug info (DIBuilder) for source-level debugging and positioned backend

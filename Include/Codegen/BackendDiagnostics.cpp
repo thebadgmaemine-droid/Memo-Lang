@@ -40,6 +40,7 @@ def memo.Add(params)
       V
 the name is found with memo so it will move to Add using drop_front
 displayFunctionName returns function name without memo.
+Removes it from the C namespace.
 
 */
 
