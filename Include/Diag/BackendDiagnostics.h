@@ -3,8 +3,15 @@
 //---------------------------------------------------------------------------
 // Converts diagnostics emitted by LLVM's back end (the verifier, the linker,
 // optimization passes, instruction selection, ...) into MemoLang
-// diagnostics. Only the message carries over: generated code has no debug
-// locations yet, so they are reported without a source position.
+// diagnostics.
+//
+// Locations: an llvm::DiagnosticLocation is file + line + column, taken from
+// the debug info (DILocation) of the instruction or function involved. It is
+// not a packed 32-bit value like Clang's SourceLocation. toSourceRange() maps
+// it to a MemoLang SourceRange per diagnostic, filling in the byte offset
+// from the DiagnosticEngine's SourceManager. Codegen emits no debug info yet,
+// so for now every location is invalid and diagnostics are reported without
+// a position.
 //
 // Install it on the LLVMContext for as long as code generation runs
 // (CodegenAction::execute does): see BackendDiagnostics::install().
@@ -12,11 +19,17 @@
 // 2026-11-17: implemented. CodeGenerationType  is now
 // CodegenOptions; SetCurrrentLink is SetCurrentLink; EmitOptimizationMessage
 // takes a MemoLang Severity instead of a clang-style DiagID.
+// 2026-11-20: LLVM locations are converted to SourceRanges (toSourceRange).
+// The DIlocation member was removed: each diagnostic carries its own
+// location, so the conversion is a function, not stored state.
 //---------------------------------------------------------------------------
 #include <memory>
+#include <string>
+#include <utility>
 
 #include "Codegen/CodegenOptions.h"
 #include "Diag/diag.h"
+#include "Source/SourceLocation.h"
 
 namespace llvm {
 class DiagnosticHandler;
@@ -28,6 +41,7 @@ class DiagnosticInfoOptimizationFailure;
 class DiagnosticInfoSrcMgr;
 class DiagnosticInfoStackSize;
 class DiagnosticInfoUnsupported;
+class DiagnosticLocation;
 class LLVMContext;
 class Module;
 class OptimizationRemarkAnalysisAliasing;
@@ -68,13 +82,22 @@ public:
     return CodeGenOpts.optimizationRemarks;
   }
 
+  // Maps an LLVM location to a range in Diags' source file. Returns an
+  // invalid range (reported without a position) if the location is invalid,
+  // in another file, or past the end of the file. The range covers one
+  // character: LLVM only gives a start.
+  [[nodiscard]] SourceRange
+  toSourceRange(const llvm::DiagnosticLocation &Loc) const;
+
 private:
   DiagnosticEngine &Diags;
   const CodegenOptions &CodeGenOpts;
   llvm::Module *CurrentLinkedModule = nullptr;
-  
 
-  void report(int llvmSeverity, std::string message);
+  void report(int llvmSeverity, SourceRange range, std::string message);
+  void report(int llvmSeverity, std::string message) {
+    report(llvmSeverity, SourceRange{}, std::move(message));
+  }
   // Inline-asm / source manager messages.
   void SrcMgrDiagHandler(const llvm::DiagnosticInfoSrcMgr &D);
   // A function's stack frame is too large. Returns false if not handled.

@@ -1,9 +1,11 @@
 // ---------------------------------------------------------------------------
 // BackendDiagnostics.cpp: LLVM diagnostics -> MemoLang diagnostics
 // ---------------------------------------------------------------------------
-#include "Codegen/BackendDiagnostics.h"
+#include "BackendDiagnostics.h"
 
+#include <filesystem>
 #include <string>
+#include <system_error>
 
 #include <llvm/IR/DiagnosticHandler.h>
 #include <llvm/IR/DiagnosticInfo.h>
@@ -15,6 +17,7 @@
 #include <llvm/Support/raw_ostream.h>
 
 #include "Diag/diagengine.h"
+#include "Source/SourceManager.h"
 
 namespace MemoLang {
 namespace {
@@ -42,6 +45,16 @@ the name is found with memo so it will move to Add using drop_front
 displayFunctionName returns function name without memo.
 
 */
+
+// Whether `llvmPath` (from debug info) names the file `ours`.
+bool sameFile(const std::string &llvmPath, const std::string &ours) {
+  if (llvmPath == ours)
+    return true;
+  std::error_code ec1, ec2;
+  auto a = std::filesystem::weakly_canonical(llvmPath, ec1);
+  auto b = std::filesystem::weakly_canonical(ours, ec2);
+  return !ec1 && !ec2 && a == b;
+}
 
 // The LLVM-side handler: forwards everything to BackendDiagnostics.
 class Handler final : public llvm::DiagnosticHandler {
@@ -81,11 +94,30 @@ BackendDiagnostics::InstallGuard::InstallGuard(llvm::LLVMContext &context,
   context.setDiagnosticHandler(std::make_unique<Handler>(diagnostics));
 }
 
+
 BackendDiagnostics::InstallGuard::~InstallGuard() {
   context_.setDiagnosticHandler(std::move(previous_));
 }
+SourceRange
+BackendDiagnostics::toSourceRange(const llvm::DiagnosticLocation &Loc) const {
+  if (!Loc.isValid() || Loc.getLine() == 0)
+    return {};
+  const SourceManager &sources = Diags.sources();
+  if (!sameFile(Loc.getRelativePath().str(), sources.fileName()) &&
+      !sameFile(Loc.getAbsolutePath(), sources.fileName()))
+    return {};
+  SourceLocation begin = sources.locationFor(Loc.getLine(), Loc.getColumn());
+  if (!begin.isValid())
+    return {};
+  SourceLocation end = begin;
+  ++end.offset;
+  ++end.column;
+  return {begin, end};
+}
+
 // Reports using LLVM diagnostics.
-void BackendDiagnostics::report(int llvmSeverity, std::string message) {
+void BackendDiagnostics::report(int llvmSeverity, SourceRange range,
+                                std::string message) {
   Severity severity = Severity::Note;
   switch (static_cast<llvm::DiagnosticSeverity>(llvmSeverity)) {
   case llvm::DS_Error: severity = Severity::Error; break;
@@ -96,7 +128,7 @@ void BackendDiagnostics::report(int llvmSeverity, std::string message) {
   if (CurrentLinkedModule)
     message += " (while linking '" +
                CurrentLinkedModule->getModuleIdentifier() + "')";
-  Diags.report(severity, SourceRange{}, "LLVM: " + message);
+  Diags.report(severity, range, "LLVM: " + message);
 }
 // Implementation of LLVm diagnostic pass to Memolang's.
 void BackendDiagnostics::HandleDiagnostics(const llvm::DiagnosticInfo &DI) {
@@ -153,7 +185,7 @@ bool BackendDiagnostics::StackSizeDiagHandler (
     const llvm::DiagnosticInfoStackSize &D) {
   if (D.getSeverity() != llvm::DS_Warning && D.getSeverity() != llvm::DS_Error)
     return false;
-  report(D.getSeverity(),
+  report(D.getSeverity(), toSourceRange(D.getLocation()),
          "stack frame size (" + std::to_string(D.getResourceSize()) +
              " bytes) exceeds the limit (" + std::to_string(D.getResourceLimit()) +
              " bytes) in function '" +
@@ -163,7 +195,7 @@ bool BackendDiagnostics::StackSizeDiagHandler (
 
 void BackendDiagnostics::UnsupportedDiagHandler(
     const llvm::DiagnosticInfoUnsupported &D) {
-  report(D.getSeverity(),
+  report(D.getSeverity(), toSourceRange(D.getLocation()),
          D.getMessage().str() + " (in function '" +
              displayFunctionName(D.getFunction().getName()) + "')");
 }
@@ -171,11 +203,8 @@ void BackendDiagnostics::UnsupportedDiagHandler(
 void BackendDiagnostics::EmitOptimizationMessage(
     const llvm::DiagnosticInfoOptimizationBase &D, Severity severity) {
   std::string message = D.getMsg();
-  std::string where;
-  if (const auto *located =
-          llvm::dyn_cast<llvm::DiagnosticInfoWithLocationBase>(&D))
-    where = displayFunctionName(located->getFunction().getName());
-  Diags.report(severity, SourceRange{},
+  std::string where = displayFunctionName(D.getFunction().getName());
+  Diags.report(severity, toSourceRange(D.getLocation()),
                "LLVM [" + D.getPassName().str() + "]: " + message +
                    (where.empty() ? "" : " (in function '" + where + "')"));
 }
@@ -219,7 +248,7 @@ void BackendDiagnostics::DontCallDiagHandler(
 
 void BackendDiagnostics::MisExpectDiagHandler(
     const llvm::DiagnosticInfoMisExpect &D) {
-  report(D.getSeverity(), D.getMsg().str());
+  report(D.getSeverity(), toSourceRange(D.getLocation()), D.getMsg().str());
 }
 
 } // namespace MemoLang

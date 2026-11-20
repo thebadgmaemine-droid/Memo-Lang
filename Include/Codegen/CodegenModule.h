@@ -15,6 +15,7 @@
 //
 // 2026-11-17: implemented.
 #include <cstdint>
+#include <llvm-23/llvm/IR/DerivedTypes.h>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -25,6 +26,7 @@
 #include "Source/SourceLocation.h"
 
 namespace llvm {
+class TargetMachine;
 class Constant;
 class Function;
 class FunctionCallee;
@@ -88,7 +90,8 @@ enum class RuntimeFn {
 class CodegenModule {
 public:
   CodegenModule(llvm::LLVMContext &context, const CodegenInputs &inputs,
-                const CodegenOptions &options, std::string_view moduleName);
+                const CodegenOptions &options, std::string_view moduleName,
+                const llvm::TargetMachine *target = nullptr);
   ~CodegenModule(); // Out of line: llvm::Module is incomplete here.
   CodegenModule(const CodegenModule &) = delete;
   CodegenModule &operator=(const CodegenModule &) = delete;
@@ -129,8 +132,12 @@ public:
   // Declares (once) and returns a runtime function.
   llvm::FunctionCallee runtime(RuntimeFn fn);
   // A private constant for a string literal (shared by equal literals).
-  llvm::Constant *stringConstant(std::string_view text);
-
+  llvm::Constant *stringConstant(std::string_view text);  
+  // Nested functions struct to capture value pointers incase of mutations
+  llvm::StructType *capturedVariables(llvm::PointerType Capturednest);
+  // Nested function type
+llvm::FunctionType* nestedFunctions(llvm::StructType* EnvTy,
+                                    const llvm::FunctionType& OrigFnTy);
   // Is `function` one of the externs the runtime implements (random_matrix,
   // zeros_matrix, identity_matrix, matrix_sum)?
   [[nodiscard]] static bool isRuntimeExtern(const FunctionDef &function);

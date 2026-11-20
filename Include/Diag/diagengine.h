@@ -33,6 +33,11 @@ public:
     report(Severity::Note, range, std::move(message));
   }
 
+  // The file these diagnostics point into.
+  [[nodiscard]] const SourceManager &sources() const noexcept {
+    return sources_;
+  }
+
   [[nodiscard]] std::size_t errorCount() const noexcept { return errorCount_; }
   [[nodiscard]] std::size_t warningCount() const noexcept {
     return warningCount_;

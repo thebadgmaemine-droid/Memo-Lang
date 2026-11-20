@@ -21,7 +21,7 @@
 #include <string>
 #include <string_view>
 
-#include "Codegen/BackendDiagnostics.h"
+#include "Diag/BackendDiagnostics.h"
 #include "Codegen/CodegenModule.h"
 #include "Codegen/CodegenOptions.h"
 
@@ -57,8 +57,9 @@ public:
   // Takes in output path and the module to output the corresponding module to the output.
   // Execution takes the module parameter and runs it through:
   // + BackendDiagnostgic/LLVMContext(If MemoLang back end is not available)
-  // + ModuleBuilder: handleModule() -> handle TranslationUnit() intaking the module
-  // + prepareTarget() 
+  // + prepareTarget(): the target machine, created first
+  // + ModuleBuilder: handleModule() -> handleTranslationUnit(), with the
+  //   target's triple and data layout already on the module
   bool execute(const Module &ast, const std::string &outputPath);
 
   [[nodiscard]] BackendAction getAction() const noexcept { return action_; }
@@ -72,7 +73,7 @@ public:
 private:
   // Creates targetMachine_. ModuleBuilder stamps its triple and data layout
   // on the module before lowering.
-  bool prepareTarget(llvm::Module &module);
+  bool prepareTarget();
   void optimize(llvm::Module &module);
   bool emitOutput(llvm::Module &module, const std::string &outputPath);
 // action_ determines emit success

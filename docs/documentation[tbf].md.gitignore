@@ -1,0 +1,154 @@
+MemoLang reference
+Nov 20, 2026 · @QC+CBSX
+Build and run
+You need a C++20 compiler (MSVC 2022+, GCC 11+ or Clang 14+). Code generation also needs LLVM: configure with -DMEMOLANG_USE_LLVM=ON, plus -DLLVM_DIR=<path to LLVMConfig.cmake> if CMake doesn't find it.
+cmake -S . -B build -DMEMOLANG_BUILD_TESTS=ON
+cmake --build build --config Debug
+ctest --test-dir build -C Debug
+
+build/Debug/MemoLang examples/matmul_chain.memo          # full check
+build/Debug/MemoLang --dump-ast examples/matmul_chain.memo
+build/Debug/MemoLang --dump-symbols examples/basicadd.memo
+build/Debug/MemoLang --dump-tokens examples/basicadd.memo
+build/Debug/MemoLang --parse-only examples/basicadd.memo # syntax only
+build/Debug/MemoLang examples/errors.memo                # shows diagnostics
+
+# Running programs (interpreter + CPU matrix runtime); use a Release build:
+build/Release/MemoLang --run benchmarks/named_chain.memo
+build/Release/MemoLang --run --no-destructive benchmarks/named_chain.memo
+build/Release/MemoLang --compare benchmarks/named_chain.memo
+build/Release/MemoLangTests membench          # the table for every benchmark
+build/Release/MemoLangTests membench --save   # ...and record it in docs/results/
+build/Release/MemoLangTests bench             # compile time per stage
+
+# Code generation (LLVM builds only):
+build/Release/MemoLang --emit-llvm -O2 -o - prog.memo   # also --emit-bc, -S, -c
+• Put machine-specific settings such as LLVM_DIR in your own CMakeUserPresets.json (ignored by git), not in CMakePresets.json.
+• If Windows Smart App Control blocks the freshly built, unsigned .exe files, run the tests in WSL, on another machine, or in CI.
+Team notes: add comments here.
+Grammar
+This is what the parser accepts today:
+module         := { statement }
+statement      := function_def | extern_def | var_decl | return_stmt
+                | if_stmt | while_stmt | 'break' ';' | expr_or_assign | ';'
+function_def   := 'def' IDENT '(' params ')' [ '->' type ] block
+extern_def     := 'extern' 'def' IDENT '(' params ')' [ '->' type ] ';'
+params         := [ type IDENT { ',' type IDENT } ]
+type           := TYPE_NAME [ '<' type { ',' type } '>' ]
+block          := '{' { statement } '}'
+var_decl       := [ 'static' ] [ 'const' ] [ type ] IDENT [ '=' expr ] ';'
+return_stmt    := 'return' [ expr ] ';'
+if_stmt        := 'if' expr block [ 'else' ( if_stmt | block ) ]
+while_stmt     := 'while' expr block
+expr_or_assign := expr [ ( '=' | '+=' | '-=' | '*=' | '/=' | '%=' ) expr ] ';'
+
+expr           := 'not' expr | unary { binary_op unary }
+unary          := ( '-' | '+' | '~' | '++' | '--' ) unary | power
+power          := postfix [ '**' unary ]
+postfix        := primary { '(' args ')' | 'as' type | '++' | '--' }
+args           := [ [ IDENT '=' ] expr { ',' [ IDENT '=' ] expr } ]
+primary        := INTEGER | FLOAT | STRING | 'true' | 'false' | IDENT
+                | '(' expr ')' | type '(' expr ')'
+• TYPE_NAME is one of int i32 i64 float f32 f64 bool str byte void matrix. int is i64, float is f64, byte is an unsigned 8-bit integer.
+• Comments start with #, or are /* ... */. // is floor division.
+• A def without -> type gets return type auto, inferred by semantic analysis. An extern without one gets void.
+• if and while conditions don't need parentheses.
+• Nesting deeper than 256 levels (brackets, blocks, prefix and postfix operators, type arguments) is an error, and parsing stops there.
+Binary operator precedence, lowest first. All are left-associative except **.
+Level
+Operators
+1
+or
+2
+and
+3
+not (prefix)
+4
+==  !=  <  <=  >  >=  is  is not  in  not in
+5
+|
+6
+^
+7
+&
+8
+<<  >>
+9
++  -
+10
+*  /  //  %  @
+11
+unary -  +  ~  ++  --
+12
+** (right-associative)
+13
+call f(x), cast x as float, postfix ++ --
+The lexer recognizes for, import, try, catch, throw, case and none, but the parser rejects them as "not supported yet". Semantic analysis also rejects is, is not, in and not in.
+Team notes: add comments here.
+Semantic rules
+• Names must be declared before use; an inner block may shadow an outer name.
+• Integers convert to any integer or float type; floats convert to floats.
+• / on integers gives a float; // keeps integers.
+• a @ b needs two matrices with the same element type (and matching inner dimensions, once shapes are known). A matrix may be multiplied or divided by a number, and added to or subtracted from a matrix of the same type.
+• if and while conditions must be bool. break must be inside a loop.
+• A def without -> type gets its return type from its return statements. A function that calls itself needs an explicit -> type.
+• Arguments may be named (f(x = 1)) after the positional ones.
+• Functions can only be defined at the top level.
+Team notes: add comments here.
+Consumption rules (destructive read)
+A matrix variable is consumed when it is an operand of @, an argument of a function call, moved into another variable (b = a), or returned. After that it can't be used until it gets a new value.
+• Reading it in m * 2.0, -m or m + n doesn't consume it.
+• copy(m) gives a fresh matrix without consuming m.
+• A matrix consumed on only one branch of an if, or in an earlier loop iteration, counts as "maybe consumed". Using it is an error too.
+Details are in Include/Analysis/destructive.h. These rules are a first version; change them there as the design evolves.
+Team notes: add comments here.
+Tests
+ctest runs build/<Config>/MemoLangTests once per file.
+Folder
+What it checks
+tests/ast/*.memo
+Parses with no errors; --dump-ast output must equal the .ast file next to it
+tests/tokens/*.memo
+Lexes with no errors; token list must equal the .tokens file
+tests/errors/*.memo
+Parse errors: every error matches an # expect-error: <col>: <text> comment on its line (or # expect-error@+N: for N lines below), and there are no other errors
+tests/check/*.memo
+The whole front-end (parse, semantic and consumption analysis), with the same # expect-error comments. A file with none must come through with no errors
+tests/run/*.memo
+Runs main() with and without destructive reads: both must return the same value (# expect-result: <value>) or fail with # expect-runtime-error: <text>, and both must free every matrix
+benchmarks/*.memo
+The same check for each benchmark program
+stress (built in)
+Empty/huge/1 MB inputs, NUL bytes, CRLF, 100000-deep nesting of every kind, 10000-term chains (also through the analyses), 100 nested loops, throughput
+fuzz (built in)
+9000 random, token-soup and mutated inputs through every stage: no crash, no hang, same result every run
+To add a test, drop a .memo file in the right folder and re-run CMake. For ast/tokens, the first run creates the expected-output file and fails until you have reviewed it. After an intended output change, regenerate it with MemoLangTests ast tests/ast/<name>.memo --update and check the diff.
+Team notes: add comments here.
+Benchmark numbers (2026-11-12)
+Destructive reads cut peak memory in three of four workloads, by up to 82.4%. Measured with MemoLangTests membench: CPU runtime, 256x256 f32 matrices (0.25 MiB each), Intel Core i7-1185G7, MSVC 19.51 Release. "Base" frees a named matrix when its scope ends or it is reassigned (like C++ / Rust), temporaries at once, and copy() costs nothing. "Destr" frees each matrix when it is consumed.
+Workload
+Peak memory base → destr (MiB)
+Change
+Allocations base → destr
+named_chain
+4.25 → 0.75
+-82.4%
+17 → 17
+layer_loop
+1.25 → 0.75
+-40.0%
+65 → 65
+single_expression
+2.50 → 2.25
+-10.0%
+15 → 15
+power_iteration
+0.75 → 1.00
++33.3%
+19 → 35 (+84.2%): the cost of copy()
+• Memory numbers are exact and carry over to a GPU. CPU times vary by about ±15% between identical runs, so they don't show a speed difference either way.
+• Against native C++ (benchmarks/cpp/, same matrix runtime): plain C++ uses exactly the memory of MemoLang base in all four workloads. C++ with every matrix freed by hand after its last use matches MemoLang destructive in three. The exception is power_iteration, where MemoLang needs copy() and C++ doesn't.
+Team notes: add comments here.
+
+
+https://claude.ai/artifact/TN2VNpkzRt5rJhZyx8zv3v?sk=Ys6mn-pcCl9dX77tTol7Ww#b323f62d-a7e5.mpkcxa0m4s4.6862 TAKEN FROM HERE: TO BE REWRITTEN BY HUMAN

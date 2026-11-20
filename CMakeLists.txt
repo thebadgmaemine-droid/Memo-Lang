@@ -93,7 +93,7 @@ add_library(MemoLangFrontend STATIC
 if(MEMOLANG_USE_LLVM)
   target_sources(MemoLangFrontend PRIVATE
       Include/IR/IRBuilder.cpp
-      Include/Codegen/BackendDiagnostics.cpp
+      Include/Diag/BackendDiagnostics.cpp
       Include/Codegen/CodegenAction.cpp
       Include/Codegen/CodegenFunction.cpp
       Include/Codegen/CodegenModule.cpp

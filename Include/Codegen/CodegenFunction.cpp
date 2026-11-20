@@ -446,6 +446,7 @@ void CodegenFunction::emitWhile(const WhileStmt &loop) {
     builder_.CreateUnreachable(); // `while true` without `break`.
 }
 
+
 void CodegenFunction::emitBreak(const BreakStmt &stmt) {
   if (loops_.empty()) {
     cgm_.error(stmt.range(), "'break' outside a loop");
@@ -489,9 +490,11 @@ llvm::Value *CodegenFunction::emitExpr(const Expr &expr) {
     return convert(emitExpr(cast.value()), cast.value().resolvedType(),
                    cast.target().resolvedType());
   }
+  case NodeKind::InterpolatedString: {
+    // add
+  }
   default:
-    cgm_.error(expr.range(), "code generation doesn't support interpolated "
-                             "strings yet");
+    cgm_.error(expr.range(), "code generation doesn't support this type! ");
     return defaultValue(types_.strType());
   }
 }
