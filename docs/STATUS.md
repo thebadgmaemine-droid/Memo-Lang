@@ -1,233 +1,57 @@
-# MemoLang: project status
+# MemoLang: remaining work
 
-Last updated: 2026-11-12
+Last updated: 2026-11-20. Done: source/diag, lexer, parser, AST, types, sema,
+destructive-read analysis, driver, interpreter, CPU runtime, benchmarks,
+codegen core (`--emit-llvm/-bc/-S/-c`, `-O0..3`, `nounwind`, data layout).
 
-This file tracks what exists in the code, what is a stub, and what is still
-missing, so anyone picking up the project knows where to start. Update it
-whenever a component changes state.
+## 0. Fix now (build broken)
+- [ ] `#include "Codegen/BackendDiagnostics.h"` → `"Diag/BackendDiagnostics.h"`, because the file was moved to `Include/Diag/` — `Include/Codegen/CodegenAction.h:24`
+- [ ] Commit the move (old `Include/Codegen/BackendDiagnostics.*` deleted, new `Include/Diag/` files untracked) + `CMakeLists.txt`
+- [ ] SourceLocation ↔ LLVM 32-bit loc conversion for backend diagnostics (20-11 log) — `Include/Source/SourceLocation.h`, `Include/Diag/BackendDiagnostics.{h,cpp}`
 
-## Build and run
+## 1. Codegen: unsupported constructs
+Files: `Include/Codegen/CodegenFunction.cpp`, `CodegenModule.cpp`
+- [ ] Interpolated strings (`CodegenFunction.cpp:493`)
+- [ ] Nested function definitions (`CodegenFunction.cpp:307`)
+- [ ] Pointer / vector / generic / function-typed values (`CodegenModule.cpp:81,97,107,183`)
+- [ ] Assignment to non-variable targets
+- [ ] Calls through non-named callees
+- [ ] Missing int/float/matrix ops (`CodegenFunction.cpp:691,771,802,839`)
 
-```sh
-cmake -S . -B build -DMEMOLANG_BUILD_TESTS=ON
-cmake --build build --config Debug
-ctest --test-dir build -C Debug
+## 2. Codegen: quality / features
+- [ ] `noalias`/`nonnull` returns on runtime alloc fns; `memory(...)` on pure helpers — `CodegenModule.cpp`, `Include/Runtime/runtime_abi.h`
+- [ ] Debug info (DIBuilder) + positioned backend diagnostics — `CodegenModule.cpp`, `CodegenFunction.cpp`, `Diag/BackendDiagnostics.cpp`
+- [ ] Host CPU/features (`-march=native`) instead of `"generic"` — `CodegenAction.cpp:120`, `CodegenOptions.h`, `Driver/driver.cpp`
+- [ ] JIT path (LLJIT; orcjit already linked) using `runtime_abi` `lastResult()`/`setEchoResult()` — `CodegenAction.{h,cpp}`, `Driver/driver.cpp`
+- [ ] Use `Linker` for per-file modules (implemented, never called) — `Codegen/Linker.{h,cpp}`, `ModuleBuilder.cpp`
+- [ ] Remove or finish legacy `IRGenerator` stub — `Include/IR/IRBuilder.{h,cpp}`
 
-build/Debug/MemoLang examples/matmul_chain.memo          # full check
-build/Debug/MemoLang --dump-ast examples/matmul_chain.memo
-build/Debug/MemoLang --dump-symbols examples/basicadd.memo
-build/Debug/MemoLang --dump-tokens examples/basicadd.memo
-build/Debug/MemoLang --parse-only examples/basicadd.memo # syntax only
-build/Debug/MemoLang examples/errors.memo                # shows diagnostics
+## 3. Codegen tests / CI
+- [ ] `MemoLangTests codegen`: compile `tests/run/*.memo` + benchmarks, result must match interpreter — `tests/runner.cpp`, `CMakeLists.txt`
+- [ ] CI job with `-DMEMOLANG_USE_LLVM=ON` — `.github/workflows/ci.yml`
 
-# Running programs (interpreter + CPU matrix runtime); use a Release build:
-build/Release/MemoLang --run benchmarks/named_chain.memo
-build/Release/MemoLang --run --no-destructive benchmarks/named_chain.memo
-build/Release/MemoLang --compare benchmarks/named_chain.memo
-build/Release/MemoLangTests membench      # the table for every benchmark
-build/Release/MemoLangTests membench --save   # ...and record it in docs/results/
-build/Release/MemoLangTests bench         # compile time per stage
-```
+## 4. Language / front-end gaps
+- [ ] Missing-return check on non-void functions — `Semantics/sema.cpp`
+- [ ] Matrix shapes in syntax (`matrix<float, R, C>`) + compile-time `@` check — `Parser/parser.cpp`, `Types/Typecontext.cpp`, `Semantics/sema.cpp`
+- [ ] Lexer syntax for interpolated / byte / regex strings — `Lex/lexer.cpp`, `Lex/tokenkind.h`
+- [ ] Parser: `for`, `import`, `try`/`catch`/`throw`, `case`, `none` — `Parser/parser.cpp`, `AST/AST.h`
+- [ ] Sema: `is`, `is not`, `in`, `not in` — `Semantics/sema.cpp`
+- [ ] `LambdaExpr`, `MacroDef` — `AST/AST.h:59`, `Include/Macro/` (notes only)
+- [ ] Remove the empty `Include/AST/ASTContext.h` or fill it in
 
-This needs a C++20 compiler: MSVC 2022+, GCC 11+ or Clang 14+. LLVM isn't
-needed until code generation exists. To build with it, configure with
-`-DMEMOLANG_USE_LLVM=ON`, plus `-DLLVM_DIR=<path to LLVMConfig.cmake>` if
-CMake doesn't find it. Put machine-specific settings like `LLVM_DIR` in your
-own `CMakeUserPresets.json` (ignored by git), not in `CMakePresets.json`.
+## 5. GPU runtime (plan: `docs/gpu-runtime.md` §6)
+- [ ] `~Runtime()` + `#if` blocks, CPU unchanged — `Runtime/runtime.h`
+- [ ] `MEMOLANG_RUNTIME=cuda` CMake switch + throwing `runtime_cuda.cu` stub — `CMakeLists.txt`, `Include/Runtime/runtime_cuda.cu` (new)
+- [ ] alloc/release, zeros, copy, random, identity (needs a GPU)
+- [ ] matmul (cuBLAS gemm), add/scale (geam), sum (CUB) (needs a GPU)
+- [ ] Per-op timing with sync; `membench` CPU vs CUDA memory must match — `tests/runner.cpp`
+- [ ] `--version` prints the runtime; separate CUDA results file — `Driver/driver.cpp`, `docs/results/`
+- [ ] Later: fused element-wise NVPTX kernels — `Include/IR/IRBuilder_GPU.{h,cpp}` (empty), `CodegenAction::prepareTarget()`
+- [ ] `STL/libmat.{h,cc}` (empty)
 
-If Windows Smart App Control is on, it can block the freshly built,
-unsigned `.exe` files ("An Application Control policy has blocked this file").
-In that case, run the tests in WSL, on another machine, or in CI.
-
-## Pipeline status
-
-The stages follow the pipeline figure in the report.
-
-| Stage | Status | Files |
-|---|---|---|
-| Source / locations | Done | `Include/Source/SourceLocation.h`, `SourceManager.h/.cpp` |
-| Diagnostics | Done | `Include/Diag/diag.h`, `diagengine.h`, `diags.cpp` |
-| Lexer | Done | `Include/Lex/tokenkind.h`, `token.h`, `token.cpp`, `lexer.h`, `lexer.cpp` |
-| Parser | Done, for the grammar below | `Include/Parser/parser.h`, `parser.cpp` |
-| AST | Done; every node has a source range | `Include/AST/AST.h`, `AST.cpp`, `ASTPrinter.h/.cpp`, `query.h` |
-| Types | Done for MemoLang's types | `Include/Types/Typecontext.h`, `Typecontext.cpp` |
-| Semantic analysis | Done (names, types, `auto` return types) | `Include/Semantics/sema.h`, `sema.cpp`, `Scope.h`, `Scope.cpp` |
-| Consumption analysis (destructive read) | Done (rules below) | `Include/Analysis/destructive.h`, `destructive.cpp` |
-| Driver | Done | `Include/Driver/driver.h`, `driver.cpp`, `main.cpp` |
-| Interpreter | Done: runs `main()` with or without destructive reads | `Include/Interp/interpreter.h`, `interpreter.cpp` |
-| Matrix runtime (CPU) | Done: allocates, multiplies, frees, measures memory | `Include/Runtime/runtime.h`, `runtime.cpp` |
-| LLVM IR generation | **Interface only**: `IRGenerator` returns a null module. Not needed for the memory measurements (the interpreter runs programs) | `Include/IR/IRBuilder.h`, `IRBuilder.cpp`, `IRGenerator.h` |
-| Optimization passes | **Missing** | none |
-| JIT / AOT | **Missing** | none |
-| cuBLAS runtime (GPU) | **Missing**: needs an NVIDIA GPU to build and run (the report lists `CuBLASRuntime.cpp`) | none |
-| CUTLASS GEMM kernel | **Missing** | none |
-| Macros | **Notes only** | `Include/Macro/read.md` |
-| Tests | Front-end, semantic and consumption analysis | `tests/` (see "Tests" below), `examples/*.memo` |
-
-### Known gaps
-
-- Programs run in the interpreter, on the CPU. GPU timing needs the cuBLAS
-  runtime on a machine with an NVIDIA GPU. `Destructive::consumeFlags()` gives
-  each `@` its consume_a / consume_b flags for it.
-- Matrix shapes: `matrix<float>` has no shape in the syntax, so shapes are
-  unknown and `@` can't check them yet. `MatrixType` and the `@` check already
-  support known shapes.
-- Semantic analysis doesn't check that every path of a function returns a
-  value.
-- `InterpolatedString` and the `isByte` / `isRegex` flags exist in the AST, but
-  the lexer has no syntax for them yet.
-- The report's "Main Source Files" table (`Lexer.h/.cpp`, `ExprAST.h`,
-  `CodeGen.cpp`, `CuBLASRuntime.cpp`) doesn't match the real file names. Update
-  it before the next submission.
-- Credit: `Include/Types/Typecontext.h` is based on the Sere compiler's
-  TypeContext. Check Sere's license and credit it in the report.
-
-## Semantic rules
-
-- Names must be declared before use; an inner block may shadow an outer name.
-- Integers convert to any integer or float type; floats convert to floats.
-- `/` on integers gives a float; `//` keeps integers.
-- `a @ b` needs two matrices with the same element type (and matching inner
-  dimensions, once shapes are known). A matrix may be multiplied or divided by
-  a number, and added to or subtracted from a matrix of the same type.
-- `if` and `while` conditions must be `bool`. `break` must be inside a loop.
-- A `def` without `-> type` gets its return type from its `return`
-  statements. A function that calls itself needs an explicit `-> type`.
-- Arguments may be named (`f(x = 1)`) after the positional ones.
-- Functions can only be defined at the top level.
-
-## Consumption rules (destructive read)
-
-A matrix variable is **consumed** when it is an operand of `@`, an argument of
-a function call, moved into another variable (`b = a`), or returned. After that
-it can't be used until it gets a new value. Reading it in `m * 2.0`, `-m` or
-`m + n` doesn't consume it. `copy(m)` gives a fresh matrix without consuming
-`m`. A matrix consumed on only one branch of an `if`, or in an earlier loop
-iteration, counts as "maybe consumed", and using it is an error too. See
-`Include/Analysis/destructive.h` for the details. These rules are a first
-version; change them there as the design evolves.
-
-## Tests
-
-`ctest` runs `build/<Config>/MemoLangTests.exe` once per file:
-
-| Folder | What it checks |
-|---|---|
-| `tests/ast/*.memo` | Parses with no errors; `--dump-ast` output must equal the `.ast` file next to it |
-| `tests/tokens/*.memo` | Lexes with no errors; token list must equal the `.tokens` file |
-| `tests/errors/*.memo` | Parse errors: every error matches an `# expect-error: <col>: <text>` comment on its line (or `# expect-error@+N:` for N lines below), and there are no other errors |
-| `tests/check/*.memo` | The whole front-end (parse, semantic and consumption analysis), with the same `# expect-error` comments. A file with none must come through with no errors |
-| `tests/run/*.memo` | Runs `main()` with and without destructive reads: both must return the same value (`# expect-result: <value>`) or fail with `# expect-runtime-error: <text>`, and both must free every matrix |
-| `benchmarks/*.memo` | The same check for each benchmark program |
-| `stress` (built in) | Empty/huge/1 MB inputs, NUL bytes, CRLF, 100000-deep nesting of every kind, 10000-term chains (also through the analyses), 100 nested loops, throughput |
-| `fuzz` (built in) | 9000 random, token-soup and mutated inputs through every stage: no crash, no hang, same result every run |
-
-To add a test, drop a `.memo` file in the right folder and re-run CMake. For
-`ast`/`tokens`, the first run creates the expected-output file and fails until
-you have reviewed it. After an intended output change, regenerate it with
-`MemoLangTests ast tests/ast/<name>.memo --update` and check the diff.
-
-## Grammar (what the parser accepts today)
-
-```
-module         := { statement }
-statement      := function_def | extern_def | var_decl | return_stmt
-                | if_stmt | while_stmt | 'break' ';' | expr_or_assign | ';'
-function_def   := 'def' IDENT '(' params ')' [ '->' type ] block
-extern_def     := 'extern' 'def' IDENT '(' params ')' [ '->' type ] ';'
-params         := [ type IDENT { ',' type IDENT } ]
-type           := TYPE_NAME [ '<' type { ',' type } '>' ]
-block          := '{' { statement } '}'
-var_decl       := [ 'static' ] [ 'const' ] [ type ] IDENT [ '=' expr ] ';'
-return_stmt    := 'return' [ expr ] ';'
-if_stmt        := 'if' expr block [ 'else' ( if_stmt | block ) ]
-while_stmt     := 'while' expr block
-expr_or_assign := expr [ ( '=' | '+=' | '-=' | '*=' | '/=' | '%=' ) expr ] ';'
-
-expr           := 'not' expr | unary { binary_op unary }
-unary          := ( '-' | '+' | '~' | '++' | '--' ) unary | power
-power          := postfix [ '**' unary ]
-postfix        := primary { '(' args ')' | 'as' type | '++' | '--' }
-args           := [ [ IDENT '=' ] expr { ',' [ IDENT '=' ] expr } ]
-primary        := INTEGER | FLOAT | STRING | 'true' | 'false' | IDENT
-                | '(' expr ')' | type '(' expr ')'
-```
-
-- `TYPE_NAME` is one of `int i32 i64 float f32 f64 bool str byte void matrix`.
-  `int` is `i64`, `float` is `f64`, `byte` is an unsigned 8-bit integer.
-- Comments start with `#`, or are `/* ... */`. `//` is floor division.
-- A `def` without `-> type` gets return type `auto`, inferred by semantic
-  analysis. An `extern` without one gets `void`.
-- `if` and `while` conditions don't need parentheses.
-- Nesting deeper than 256 levels (brackets, blocks, prefix and postfix
-  operators, type arguments) is an error, and parsing stops there.
-
-Binary operator precedence, lowest first. All are left-associative except `**`.
-
-| Level | Operators |
-|---|---|
-| 1 | `or` |
-| 2 | `and` |
-| 3 | `not` (prefix) |
-| 4 | `==  !=  <  <=  >  >=  is  is not  in  not in` |
-| 5 | `\|` |
-| 6 | `^` |
-| 7 | `&` |
-| 8 | `<<  >>` |
-| 9 | `+  -` |
-| 10 | `*  /  //  %  @` |
-| 11 | unary `-  +  ~  ++  --` |
-| 12 | `**` (right-associative) |
-| 13 | call `f(x)`, cast `x as float`, postfix `++ --` |
-
-Keywords the lexer recognizes but the parser rejects with "not supported yet":
-`for`, `import`, `try`, `catch`, `throw`, `case`, `none`. Semantic analysis
-also rejects `is`, `is not`, `in` and `not in` as not supported yet.
-
-## Project layout
-
-| Folder | Contents |
-|---|---|
-| `Include/` | The compiler, one folder per stage (headers and `.cpp` side by side) |
-| `tests/`, `examples/` | Tests and example programs |
-| `benchmarks/` | Programs for measuring memory with and without destructive reads |
-| `docs/` | This file, dev logs (`dev-log.md`, dated `.docx` logs), `promptdump.md` |
-| `docs/reports/drafts/` | Earlier report drafts (`.tex` / `.pdf`) |
-| `docs/legacy/` | Notes and code from the first, Kaleidoscope-style front-end |
-| `submission-online-final/` | The submission package: final reports, `.docx` files, its own README and dev log |
-
-## Measured so far (2026-11-12)
-
-`MemoLangTests membench`, CPU runtime, 256x256 f32 matrices (0.25 MiB each),
-Intel Core i7-1185G7, MSVC 19.51 Release. "Base" frees a named matrix when
-its scope ends or it is reassigned (like C++ / Rust), temporaries at once, and
-copy() costs nothing; "destr" frees each matrix when it is consumed.
-
-| Workload | Peak memory base -> destr | Allocations base -> destr |
-|---|---|---|
-| `named_chain` | 4.25 -> 0.75 MiB (-82.4%) | 17 -> 17 |
-| `layer_loop` | 1.25 -> 0.75 MiB (-40.0%) | 65 -> 65 |
-| `single_expression` | 2.50 -> 2.25 MiB (-10.0%) | 15 -> 15 |
-| `power_iteration` | 0.75 -> 1.00 MiB (+33.3%) | 19 -> 35 (+84.2%): the cost of copy() |
-
-Memory numbers are exact and carry over to a GPU. CPU times vary by about
-±15% between identical runs, so they don't show a speed difference either way.
-
-Against native C++ compiled with MSVC (`benchmarks/cpp/`, same matrix
-runtime): plain C++ (freeing at the end of scope) uses exactly the memory of
-MemoLang base in all four workloads, and C++ with every matrix freed by hand
-after its last use matches MemoLang destructive in three. So destructive reads
-reach hand-tuned C++ memory use automatically, except where reuse needs
-copy() (`power_iteration`, where C++ needs no copy).
-
-## Suggested next steps
-
-1. **cuBLAS runtime**: a GPU version of `Include/Runtime/` (same interface),
-   built and run on a machine with an NVIDIA GPU (lab machine, Colab or
-   Kaggle), for real GPU memory and timing.
-2. **More benchmark workloads**, closer to real models (bigger matrices,
-   longer programs), and the cuBLAS-only reference from the report.
-3. **Codegen**: lower the checked AST to LLVM IR that calls the runtime, using
-   `Destructive::consumeFlags()` for the consume flags.
-4. **Shapes in the syntax** (e.g. `matrix<float, 4, 4>`), so `@` can check
-   dimensions at compile time.
+## 6. Benchmarks / docs / report
+- [ ] Bigger, model-like workloads + cuBLAS-only reference — `benchmarks/`, `benchmarks/cpp/`
+- [ ] Update the report's "Main Source Files" table to the real file names — `submission-online-final/*.tex`
+- [ ] Credit Sere's TypeContext (check its license) — report, `Types/Typecontext.h`
+- [ ] Finish `docs/codegen-internals [ WRITE LATER ].txt`; update `CHANGELOG.md` for codegen (11-17 → 11-20)
+- [ ] Link instructions incl. CUDA libs — `CMakeLists.txt` comment, this file

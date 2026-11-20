@@ -26,6 +26,12 @@ public:
   [[nodiscard]] std::string_view text() const noexcept { return text_; }
 
   [[nodiscard]] SourceLocation locationAt(std::uint32_t offset) const;
+  // The reverse: a 1-based line:column to a full location, offset included.
+  // Returns an invalid location if `line` is out of range. `column` 0 means
+  // the start of the line; past the end, it is clamped to just after the last
+  // character.
+  [[nodiscard]] SourceLocation locationFor(std::uint32_t line,
+                                           std::uint32_t column) const;
   // Text of a 1-based line, without the line break.
   [[nodiscard]] std::string_view lineText(std::uint32_t line) const;
 

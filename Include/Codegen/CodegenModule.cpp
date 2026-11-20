@@ -15,6 +15,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Target/TargetMachine.h>
 
 #include "AST/AST.h"
 #include "Codegen/CodegenFunction.h"
@@ -34,10 +35,18 @@ const FunctionType *signatureOf(const FunctionDef &function) {
 CodegenModule::CodegenModule(llvm::LLVMContext &context,
                              const CodegenInputs &inputs,
                              const CodegenOptions &options,
-                             std::string_view moduleName)
+                             std::string_view moduleName,
+                             const llvm::TargetMachine *target)
     : context_(context), inputs_(inputs), options_(options),
       errorsAtStart_(inputs.diags.errorCount()),
-      module_(std::make_unique<llvm::Module>(moduleName, context)) {}
+      module_(std::make_unique<llvm::Module>(moduleName, context)) {
+  // Before anything is lowered, so IRBuilder picks the target's natural
+  // alignments and type sizes.
+  if (target) {
+    module_->setTargetTriple(target->getTargetTriple());
+    module_->setDataLayout(target->createDataLayout());
+  }
+}
 
 CodegenModule::~CodegenModule() = default;
 
@@ -82,7 +91,9 @@ llvm::Type *CodegenModule::lowerType(const Type *type) {
   }
 }
 
-llvm::FunctionType *
+CodegenModule::nestedFunctions(llvm::Function*) {
+  
+}
 CodegenModule::lowerFunctionType(const FunctionDef &function) {
   const FunctionType *signature = signatureOf(function);
   if (!signature) {
@@ -382,6 +393,7 @@ llvm::Constant *CodegenModule::stringConstant(std::string_view text) {
   strings_.emplace(std::move(key), global);
   return global;
 }
+
 
 // ---------------------------------------------------------------------------
 // Finishing

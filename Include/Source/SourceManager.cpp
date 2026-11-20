@@ -48,6 +48,15 @@ SourceLocation SourceManager::locationAt(std::uint32_t offset) const {
   return {offset, line, offset - lineStarts_[line - 1] + 1};
 }
 
+SourceLocation SourceManager::locationFor(std::uint32_t line,
+                                          std::uint32_t column) const {
+  if (line == 0 || line > lineStarts_.size())
+    return {};
+  auto length = static_cast<std::uint32_t>(lineText(line).size());
+  column = std::clamp<std::uint32_t>(column, 1, length + 1);
+  return {lineStarts_[line - 1] + column - 1, line, column};
+}
+
 std::string_view SourceManager::lineText(std::uint32_t line) const {
   if (line == 0 || line > lineStarts_.size())
     return {};

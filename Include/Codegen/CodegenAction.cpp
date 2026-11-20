@@ -65,23 +65,21 @@ bool CodegenAction::execute(const Module &ast, const std::string &outputPath) {
   auto guard = backendDiagnostics_.install(context_);
   
 
-  ModuleBuilder builder(context_, inputs_, options_, ast.name);
+  // The target comes first so the module is lowered with its data layout.
+  // IR outputs (.ll/.bc) still work without one; they just carry no triple.
+  bool needsTarget = action_ == BackendAction::EmitAssembly ||
+                     action_ == BackendAction::EmitObject ||
+                     action_ == BackendAction::EmitCodeGenOnly;
+  if (!prepareTarget() && needsTarget)
+    return false;
+
+  ModuleBuilder builder(context_, inputs_, options_, ast.name,
+                        targetMachine_.get());
   builder.handleModule(ast);
   builder.handleTranslationUnit();
   module_ = builder.releaseModule();
-   bool needsTarget = action_ == BackendAction::EmitAssembly ||
-                     action_ == BackendAction::EmitObject ||
-                     action_ == BackendAction::EmitCodeGenOnly;
-  if (!prepareTarget(*module_) && needsTarget)
-    return false; 
-  
   if (failed() || !module_)
     return false;
-
-   
-  // IR outputs also get the target's triple and data layout when they're
-  // available, so the IR can be compiled as-is.
-  
 
   if (options_.optLevel > 0)
     optimize(*module_);
@@ -89,7 +87,7 @@ bool CodegenAction::execute(const Module &ast, const std::string &outputPath) {
 }
 
 // Explicitly lambda for thread safety, if optpasses force this more than once then only one pass is done
-bool CodegenAction::prepareTarget(llvm::Module &module) {
+bool CodegenAction::prepareTarget() {
   static const bool initialized = [] {
     // Initialize native to make sure it is linked in
     llvm::InitializeNativeTarget();
@@ -126,8 +124,6 @@ bool CodegenAction::prepareTarget(llvm::Module &module) {
                                            triple.str() + "'");
     return false;
   }
-  module.setTargetTriple(triple);
-  module.setDataLayout(targetMachine_->createDataLayout());
   return true;
 }
 // For optimization passes
