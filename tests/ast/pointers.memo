@@ -1,0 +1,18 @@
+# Pointer types (`T*` is printed as written) and the '&' / '*' prefixes.
+def pointers(int* p, float** pp, matrix<float>* mp) -> int* {
+    int x = 1;
+    int* q = &x;
+    int** qq = &q;
+    matrix<int*> cells;
+    *q = 2;
+    **qq += 3;
+    int a = *p ** 2;        # (*p) ** 2: pointer prefixes bind tighter than '**'.
+    int b = 2 ** *p;
+    int c = x * *q;         # Binary '*', then a dereference.
+    int d = x***q;          # x ** (*q)
+    int e = x & &x;         # Binary '&', then an address-of.
+    int f = -*q;
+    float g = (*q) as float;
+    int h = x as int * 2;   # Casts take no '*' suffix: (x as int) * 2.
+    return &*q;
+}

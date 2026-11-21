@@ -85,6 +85,7 @@ llvm::Type *CodegenModule::lowerType(const Type *type) {
   // fitted for project
   case Type::Kind::Str:    // const char *
   case Type::Kind::Matrix: // MemoMatrix *
+  case Type::Kind::Pointer: // *
     return llvm::PointerType::getUnqual(context_);
   default:
     return nullptr; // Error, Auto, Function, Pointer, Generic, Vector.

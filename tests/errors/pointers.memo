@@ -1,0 +1,8 @@
+# Pointer syntax errors (parse only).
+def f(int x) {
+    &x = 3;                     # expect-error: 8: left side of '=' must be a variable or '*pointer'
+}
+
+def g(int x) {
+    int y = x as int*;          # expect-error: 22: expected an expression
+}

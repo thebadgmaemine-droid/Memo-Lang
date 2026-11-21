@@ -125,6 +125,9 @@ enum class UnaryOp {
   Neg,
   Inv,
   Not,
+  AddressOf,
+  Deref,
+  SizeOf,
 };
 
 enum class AssignOp { Assign, Add, Sub, Mul, Div, Mod };
@@ -377,6 +380,8 @@ private:
 // ---------------------------------------------------------------------------
 // Literals
 // ---------------------------------------------------------------------------
+
+
 class IntegerLiteral final : public Expr {
 public:
   // Range validation (int64 overflow, byte range) belongs in the parser;
@@ -485,6 +490,8 @@ public:
 private:
   bool value_;
 };
+
+
 
 // ---------------------------------------------------------------------------
 // Operators

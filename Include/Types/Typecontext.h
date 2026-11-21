@@ -75,6 +75,10 @@ public:
   [[nodiscard]] bool isConsumable() const noexcept {
     return kind_ == Kind::Matrix;
   }
+  [[nodiscard]] bool isOpAsterisk() const noexcept {
+    return kind_ == Kind::Pointer;
+
+  }
 
 protected:
   explicit Type(Kind k) noexcept : kind_(k) {}

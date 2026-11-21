@@ -136,7 +136,6 @@ const PointerType *TypeContext::pointerType(const Type *pointee) {
   Detail::appendPtr(key, pointee);
   return intern<PointerType>(std::move(key), pointee);
 }
-
 const GenericType *
 TypeContext::genericType(std::string_view ctor,
                          const std::vector<const Type *> &args) {

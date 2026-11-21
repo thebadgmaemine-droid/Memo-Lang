@@ -38,6 +38,8 @@
 #include <limits>
 #include <system_error>
 
+#include <optional>
+
 #include "Diag/diagengine.h"
 #include "Lex/lexer.h"
 #include "Parser/parser.h"
@@ -486,8 +488,11 @@ bool Parser::parseParams(std::vector<FunctionDef::Param> &params) {
   return expect(TokenKind::TOK_RPAREN, "after parameter list");
 }
 
-// type := TYPE_NAME [ '<' type { ',' type } '>' ]      e.g. int, matrix<float>
-std::unique_ptr<TypeExpr> Parser::parseType() {
+// type      := base_type { '*' | '**' }                 e.g. int, float**
+// base_type := TYPE_NAME [ '<' type { ',' type } '>' ]  e.g. matrix<float>
+// `T*` becomes the internal TypeExpr `ptr<T>`. Casts pass allowPointer =
+// false so `x as int * 2` stays a multiplication.
+std::unique_ptr<TypeExpr> Parser::parseType(bool allowPointer) {
   NestingGuard guard(depth_);
   if (tooDeep())
     return nullptr;
@@ -520,8 +525,38 @@ std::unique_ptr<TypeExpr> Parser::parseType() {
       return nullptr;
     }
   }
-  return make<TypeExpr>(nameTok.location(), std::string(nameTok.spelling()),
-                        std::move(args));
+  auto type = make<TypeExpr>(nameTok.location(),
+                             std::string(nameTok.spelling()), std::move(args));
+  if (!allowPointer)
+    return type;
+
+  // Each '*' wraps the type one level deeper; count it toward the nesting
+  // limit as parsePostfix() does, since later passes recurse over it.
+  struct RestoreDepth {
+    int &depth;
+    int added = 0;
+    ~RestoreDepth() { depth -= added; }
+  } pointerDepth{depth_};
+  auto wrap = [&] {
+    std::vector<std::unique_ptr<TypeExpr>> inner;
+    inner.push_back(std::move(type));
+    type = make<TypeExpr>(nameTok.location(), "ptr", std::move(inner));
+    ++depth_;
+    ++pointerDepth.added;
+  };
+  for (;;) {
+    if (accept(TokenKind::TOK_STARMULT)) {
+      wrap();
+    } else if (accept(TokenKind::TOK_STARSTAR)) { // `int**` is one token.
+      wrap();
+      wrap();
+    } else {
+      break;
+    }
+    if (tooDeep())
+      return nullptr;
+  }
+  return type;
 }
 
 // block := '{' { statement } '}'
@@ -629,12 +664,13 @@ std::unique_ptr<Statement> Parser::parseExprOrAssign() {
   auto expr = parseExpression();
   if (!expr)
     return nullptr;
-
   if (auto op = assignOp(tok_.kind())) {
     Token opTok = consume();
-    if (expr->kind() != NodeKind::NameExpr) {
+    bool isDeref = expr->kind() == NodeKind::UnaryExpr &&
+                   static_cast<const UnaryExpr &>(*expr).op() == UnaryOp::Deref;
+    if (expr->kind() != NodeKind::NameExpr && !isDeref) {
       error(opTok.range(), "left side of '" + std::string(opTok.spelling()) +
-                               "' must be a variable name");
+                               "' must be a variable or '*pointer'");
       return nullptr;
     }
     auto value = parseExpression();
@@ -742,6 +778,52 @@ std::optional<Parser::BinaryOpInfo> Parser::currentBinaryOp() {
   }
 }
 
+// pointer := ( '*' | '&' ) pointer | '**' pointer | postfix
+// Binds tighter than power, so `*p ** 2` is `(*p) ** 2`. A prefix `**` can't
+// be the power operator, so it means two dereferences: `**pp`.
+std::unique_ptr<Expr> Parser::parsePointerPrefix() {
+  SourceLocation loc = tok_.location();
+  UnaryOp op = UnaryOp::Deref;
+  bool doubleDereference = false;
+  // & and *
+  switch(tok_.kind()) {
+    case MemoLang::TokenKind::TOK_AMP:
+      op = UnaryOp::AddressOf;
+      break;
+    case MemoLang::TokenKind::TOK_STARMULT:
+      break;
+    case MemoLang::TokenKind::TOK_STARSTAR:
+      doubleDereference = true;
+      break;
+    default:
+      return parsePostfix();
+  }
+  consume();
+  // raise the guard depth for pointers if found
+  NestingGuard guard(depth_);
+  std::optional<NestingGuard> innerguard;
+  if (doubleDereference) {
+    // Place it directly on innter guard class
+    innerguard.emplace(depth_);
+  }
+  // case of *************************************************int ex;
+  if (tooDeep()) {
+    return nullptr;
+  }
+  auto operand = parsePointerPrefix();
+  if (!operand) {
+    return nullptr;
+  }
+  if (doubleDereference) {
+    // Inner * means the preceeding token
+    SourceLocation inner = loc;
+    inner.offset++;
+    inner.column++;
+    operand = make<UnaryExpr>(inner, UnaryOp::Deref, std::move(operand));
+  }
+  return make<UnaryExpr>(loc, op, std::move(operand));
+}
+
 // unary := ( '-' | '+' | '~' | '++' | '--' ) unary | power
 std::unique_ptr<Expr> Parser::parseUnary() {
   SourceLocation loc = tok_.location();
@@ -793,9 +875,9 @@ std::unique_ptr<Expr> Parser::parseUnary() {
   return make<UnaryExpr>(loc, op, std::move(operand));
 }
 
-// power := postfix [ '**' unary ]      Right-associative; -2**2 is -(2**2).
+// power := pointer [ '**' unary ]      Right-associative; -2**2 is -(2**2).
 std::unique_ptr<Expr> Parser::parsePower() {
-  auto base = parsePostfix();
+  auto base = parsePointerPrefix();
   if (!base || !check(TokenKind::TOK_STARSTAR))
     return base;
   SourceLocation start = base->range().begin;
@@ -830,7 +912,7 @@ std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> primary) {
     if (accept(TokenKind::TOK_LPAREN)) {
       expr = parseCallArgs(std::move(expr), start);
     } else if (accept(TokenKind::TOK_AS)) {
-      auto target = parseType();
+      auto target = parseType(/*allowPointer=*/false);
       if (!target)
         return nullptr;
       expr = make<CastExpr>(start, std::move(expr), std::move(target));
@@ -914,7 +996,7 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
   }
   case TokenKind::TOK_KEYWORDTYPE: {
     // Call-style cast: `float(x)` means `x as float`.
-    auto target = parseType();
+    auto target = parseType(/*allowPointer=*/false);
     if (!target)
       return nullptr;
     if (!expect(TokenKind::TOK_LPAREN, "after type name in a cast"))

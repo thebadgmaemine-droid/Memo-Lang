@@ -82,6 +82,9 @@ std::string_view binaryOpSpelling(BinaryOp op) {
 
 std::string_view unaryOpSpelling(UnaryOp op) {
   switch (op) {
+  case UnaryOp::AddressOf: return "&";
+  case UnaryOp::Deref: return "*";
+  case UnaryOp::SizeOf: return "sizeof";
   case UnaryOp::PreInc:
   case UnaryOp::PostInc: return "++";
   case UnaryOp::PreDec:
@@ -277,6 +280,14 @@ const Type *SemanticAnalyzer::resolveType(const TypeExpr &node) {
       else if (!element->isError())
         type = types_.matrixType(element);
     }
+  } else if (name == "ptr") {
+    // Only the parser builds this, from `T*`, so it always has one argument.
+    const TypeExpr &pointeeNode = *node.args()[0];
+    const Type *pointee = resolveType(pointeeNode);
+    if (pointee->kind() == Type::Kind::Void)
+      error(node, "can't point to 'void'");
+    else if (!pointee->isError())
+      type = types_.pointerType(pointee);
   } else if (const Type *primitive = types_.primitive(name)) {
     if (!node.args().empty())
       error(node,
@@ -579,48 +590,91 @@ void SemanticAnalyzer::analyzeDeclareVar(const DeclareVar &decl) {
   declarations_[&decl] = id;
 }
 
-void SemanticAnalyzer::analyzeAssign(const AssignStmt &assign) {
-  const Type *value = inferExpressionType(assign.value());
-  const Expr &target = assign.target();
+const Type *SemanticAnalyzer::checkLValue(const Expr &target,
+                                          std::string_view action) {
+  std::string verb(action);
+  if (target.kind() == NodeKind::UnaryExpr &&
+      static_cast<const UnaryExpr &>(target).op() == UnaryOp::Deref)
+    return inferExpressionType(target); // `*p`: inferUnary checks `p`.
   if (target.kind() != NodeKind::NameExpr) {
-    error(target, "the left side of an assignment must be a variable name");
-    return;
+    inferExpressionType(target); // Still check what's inside.
+    error(target, "cannot " + verb +
+                      " this expression; it needs a variable or '*pointer'");
+    return types_.errorType();
   }
   const auto &name = static_cast<const NameExpr &>(target);
   auto id = lookup(name.name());
   if (!id) {
     error(name, "use of undeclared name " + quoteForMessage(name.name()));
     name.setResolvedType(types_.errorType());
-    return;
+    return types_.errorType();
   }
   resolutions_[&name] = *id;
   const Symbol &symbol = symbols_[id->value];
   name.setResolvedType(symbol.type);
   if (symbol.isFunction) {
-    error(name, "cannot assign to function " + quoteForMessage(name.name()));
-    return;
+    error(name, "cannot " + verb + " function " + quoteForMessage(name.name()));
+    return types_.errorType();
   }
   if (symbol.isConst) {
-    error(name, "cannot assign to constant " + quoteForMessage(name.name()));
+    error(name, "cannot " + verb + " constant " + quoteForMessage(name.name()));
     note(symbol.location,
          quoteForMessage(name.name()) + " is declared 'const' here");
-    return;
+    return types_.errorType();
   }
+  return symbol.type;
+}
+
+const Symbol *SemanticAnalyzer::addressedLocal(const Expr &value) const {
+  if (value.kind() != NodeKind::UnaryExpr)
+    return nullptr;
+  const auto &unary = static_cast<const UnaryExpr &>(value);
+  if (unary.op() != UnaryOp::AddressOf ||
+      unary.operand().kind() != NodeKind::NameExpr)
+    return nullptr;
+  auto id = symbolFor(static_cast<const NameExpr &>(unary.operand()));
+  if (!id)
+    return nullptr;
+  const Symbol &symbol = symbols_[id->value];
+  return symbol.isLocal || symbol.isParameter ? &symbol : nullptr;
+}
+
+void SemanticAnalyzer::analyzeAssign(const AssignStmt &assign) {
+  const Type *value = inferExpressionType(assign.value());
+  const Expr &target = assign.target();
+  const Type *targetType = checkLValue(target, "assign to");
+  if (targetType->isError())
+    return;
+  std::string targetName =
+      target.kind() == NodeKind::NameExpr
+          ? quoteForMessage(static_cast<const NameExpr &>(target).name())
+          : std::string("the dereferenced pointer");
   const Type *result = value;
   if (assign.op() != AssignOp::Assign) {
     BinaryOp op = compoundToBinary(assign.op());
-    result = checkArithmetic(op, *symbol.type, *value);
+    result = checkArithmetic(op, *targetType, *value);
     if (!result) {
       error(assign, "invalid operands to '" +
                         std::string(binaryOpSpelling(op)) + "=': " +
-                        typeName(symbol.type) + " and " + typeName(value));
+                        typeName(targetType) + " and " + typeName(value));
       return;
     }
   }
-  if (!checkAssignment(*symbol.type, *result))
+  if (!checkAssignment(*targetType, *result)) {
     error(assign.value(), "cannot assign a value of type " + typeName(result) +
-                              " to " + quoteForMessage(name.name()) +
-                              " of type " + typeName(symbol.type));
+                              " to " + targetName + " of type " +
+                              typeName(targetType));
+    return;
+  }
+  // A global outlives every local, so it can't hold a local's address.
+  if (target.kind() == NodeKind::NameExpr) {
+    auto id = symbolFor(static_cast<const NameExpr &>(target));
+    if (const Symbol *local = addressedLocal(assign.value());
+        local && id && symbols_[id->value].scopeDepth == 0)
+      error(assign.value(), "global " + targetName +
+                                " can't hold the address of local " +
+                                quoteForMessage(local->name));
+  }
 }
 
 void SemanticAnalyzer::analyzeReturn(const ReturnStmt &ret) {
@@ -633,6 +687,12 @@ void SemanticAnalyzer::analyzeReturn(const ReturnStmt &ret) {
   }
   std::string function = quoteForMessage(context.function->name());
   const Type *declared = context.declaredReturn;
+  // The local's storage ends when the function returns.
+  if (ret.value())
+    if (const Symbol *local = addressedLocal(*ret.value()))
+      error(*ret.value(), "returning the address of local " +
+                              quoteForMessage(local->name) + " from " +
+                              function);
 
   if (declared->kind() == Type::Kind::Auto) {
     const Type *type = value ? value : types_.voidType();
@@ -747,10 +807,27 @@ const Type *SemanticAnalyzer::inferName(const NameExpr &name) {
 }
 
 const Type *SemanticAnalyzer::inferUnary(const UnaryExpr &unary) {
+  // `&x` checks its operand as an assignment target, not as a value.
+  if (unary.op() == UnaryOp::AddressOf) {
+    const Type *target = checkLValue(unary.operand(), "take the address of");
+    return target->isError() ? target : types_.pointerType(target);
+  }
+
   const Type *operand = inferExpressionType(unary.operand());
   if (operand->isError())
-    return operand;
+    return operand; // Already reported; don't cascade.
   switch (unary.op()) {
+  case UnaryOp::AddressOf:
+    break; // Handled above.
+  case UnaryOp::Deref:
+    if (operand->isOpAsterisk())
+      return static_cast<const PointerType *>(operand)->pointee();
+    error(unary, "can't dereference a value of type " + typeName(operand) +
+                     "; it isn't a pointer");
+    return types_.errorType();
+  case UnaryOp::SizeOf:
+    error(unary, "'sizeof' is not supported yet");
+    return types_.errorType();
   case UnaryOp::Neg:
     if (operand->isNumeric() || operand->kind() == Type::Kind::Matrix)
       return operand;

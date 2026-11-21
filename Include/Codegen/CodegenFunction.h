@@ -19,7 +19,7 @@
 //--------------------------------------------------------------------------
 // 2026-11-17: added.
 #include <cstdint>
-#include <llvm-21/llvm/IR/DerivedTypes.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <memory>
 #include <span>
 #include <string>

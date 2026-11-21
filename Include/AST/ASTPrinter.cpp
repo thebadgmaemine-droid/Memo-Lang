@@ -77,6 +77,8 @@ std::string_view binaryOpSpelling(BinaryOp op) {
 
 std::string_view unaryOpSpelling(UnaryOp op) {
   switch (op) {
+  case UnaryOp::SizeOf:
+    return "sizeof";
   case UnaryOp::PreInc:
     return "++ (prefix)";
   case UnaryOp::PostInc:
@@ -91,6 +93,10 @@ std::string_view unaryOpSpelling(UnaryOp op) {
     return "~";
   case UnaryOp::Not:
     return "not";
+  case UnaryOp::AddressOf:
+    return "&";
+  case UnaryOp::Deref:
+    return "*";
   }
   return "?";
 }
@@ -114,6 +120,9 @@ std::string_view assignOpSpelling(AssignOp op) {
 }
 
 std::string typeToString(const TypeExpr &type) {
+  // The parser desugars `T*` to an internal `ptr<T>`; print it as written.
+  if (type.name() == "ptr" && type.args().size() == 1)
+    return typeToString(*type.args()[0]) + "*";
   std::string text = type.name();
   if (!type.args().empty()) {
     text += '<';

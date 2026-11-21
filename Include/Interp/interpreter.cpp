@@ -366,6 +366,8 @@ Interpreter::Flow Interpreter::exec(const Statement &stmt) {
   }
   case NodeKind::AssignStmt: {
     const auto &assign = static_cast<const AssignStmt &>(stmt);
+    if (assign.target().kind() != NodeKind::NameExpr)
+      fail("assigning through a pointer isn't supported at run time yet");
     const auto &target = static_cast<const NameExpr &>(assign.target());
     std::uint32_t id = symbolOf(target);
     const Type *type = sema_.symbol(SymbolId{id}).type;

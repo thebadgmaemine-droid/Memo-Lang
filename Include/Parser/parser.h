@@ -70,13 +70,15 @@ private:
   std::unique_ptr<Statement> parseFunctionDef(SourceLocation loc,
                                               bool isExtern);
   bool parseParams(std::vector<FunctionDef::Param> &params);
-  std::unique_ptr<TypeExpr> parseType();
+  // allowPointer = false in casts, so `x as int * 2` is a multiplication.
+  std::unique_ptr<TypeExpr> parseType(bool allowPointer = true);
   bool parseBlock(StmtList &body);
   std::unique_ptr<Statement> parseVarDecl(SourceLocation loc, DeclFlags flags);
   std::unique_ptr<Statement> parseReturn();
   std::unique_ptr<Statement> parseIf();
   std::unique_ptr<Statement> parseWhile();
   std::unique_ptr<Statement> parseExprOrAssign();
+
 
   // Expressions
   std::unique_ptr<Expr> parseExpression(int minPrecedence = 1);
@@ -89,6 +91,7 @@ private:
                                       SourceLocation loc);
   std::unique_ptr<Expr> parseIntegerLiteral(const Token &tok);
   std::unique_ptr<Expr> parseFloatLiteral(const Token &tok);
+  std::unique_ptr<Expr> parsePointerPrefix();
 
   Lexer &lexer_;
   DiagnosticEngine &diags_;

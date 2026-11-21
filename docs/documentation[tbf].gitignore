@@ -34,7 +34,8 @@ statement      := function_def | extern_def | var_decl | return_stmt
 function_def   := 'def' IDENT '(' params ')' [ '->' type ] block
 extern_def     := 'extern' 'def' IDENT '(' params ')' [ '->' type ] ';'
 params         := [ type IDENT { ',' type IDENT } ]
-type           := TYPE_NAME [ '<' type { ',' type } '>' ]
+type           := base_type { '*' | '**' }
+base_type      := TYPE_NAME [ '<' type { ',' type } '>' ]
 block          := '{' { statement } '}'
 var_decl       := [ 'static' ] [ 'const' ] [ type ] IDENT [ '=' expr ] ';'
 return_stmt    := 'return' [ expr ] ';'
@@ -44,12 +45,16 @@ expr_or_assign := expr [ ( '=' | '+=' | '-=' | '*=' | '/=' | '%=' ) expr ] ';'
 
 expr           := 'not' expr | unary { binary_op unary }
 unary          := ( '-' | '+' | '~' | '++' | '--' ) unary | power
-power          := postfix [ '**' unary ]
-postfix        := primary { '(' args ')' | 'as' type | '++' | '--' }
+power          := pointer [ '**' unary ]
+pointer        := ( '&' | '*' | '**' ) pointer | postfix
+postfix        := primary { '(' args ')' | 'as' base_type | '++' | '--' }
 args           := [ [ IDENT '=' ] expr { ',' [ IDENT '=' ] expr } ]
 primary        := INTEGER | FLOAT | STRING | 'true' | 'false' | IDENT
-                | '(' expr ')' | type '(' expr ')'
+                | '(' expr ')' | base_type '(' expr ')'
 • TYPE_NAME is one of int i32 i64 float f32 f64 bool str byte void matrix. int is i64, float is f64, byte is an unsigned 8-bit integer.
+• A '*' after a type makes a pointer type: int*, float**, matrix<float>*, matrix<int*>. int** is one '**' token and means two levels. Casts (x as T, T(x)) take no '*' suffix, so x as int * 2 is (x as int) * 2.
+• In expressions, prefix & takes an address and prefix * dereferences: &x, *p, **pp. These never clash with binary & and *, because the parser only reads a prefix where an operand starts: a * *p is a times *p, and a & &b is a bitwise-and with &b.
+• The left side of an assignment is a variable or a dereference: x = 1; *p = 2; **pp += 3;
 • Comments start with #, or are /* ... */. // is floor division.
 • A def without -> type gets return type auto, inferred by semantic analysis. An extern without one gets void.
 • if and while conditions don't need parentheses.
@@ -82,7 +87,9 @@ unary -  +  ~  ++  --
 12
 ** (right-associative)
 13
-call f(x), cast x as float, postfix ++ --
+pointer prefix &  *  (so *p ** 2 is (*p) ** 2, and -*p is -(*p))
+14
+call f(x), cast x as float, postfix ++ --  (so *f() is *(f()), and *p as float is *(p as float): write (*p) as float)
 The lexer recognizes for, import, try, catch, throw, case and none, but the parser rejects them as "not supported yet". Semantic analysis also rejects is, is not, in and not in.
 Team notes: add comments here.
 Semantic rules
@@ -94,6 +101,18 @@ Semantic rules
 • A def without -> type gets its return type from its return statements. A function that calls itself needs an explicit -> type.
 • Arguments may be named (f(x = 1)) after the positional ones.
 • Functions can only be defined at the top level.
+Team notes: add comments here.
+Pointers
+Pointer support covers syntax and type checking only so far. The interpreter and code generation don't run pointer programs yet. The tests are tests/ast/pointers, tests/tokens/pointers, tests/errors/pointers, tests/check/pointers_ok and tests/check/pointer_errors.
+• &x needs something assignable: a variable (not a function or a const) or a dereference *p. It gives T* where x has type T. &3, &f() and &(a + b) are errors.
+• *p needs a pointer. *p of type T* gives T, and *p can be assigned to (*p = v, *p += v).
+• A pointer converts only to the identical pointer type: int* to int* is fine; int* to float*, or matrix<float, 3, 3>* to matrix<float>*, is not.
+• Pointers support only == and !=. There is no pointer arithmetic (p + 1), ordering (p < q), or cast (p as int).
+• void* is an error.
+• Returning the address of a local variable or parameter (return &x;) is an error, and so is storing it in a global (g = &x;). Only this direct form is caught: q = &x; return q; is not.
+• (*p)++ and (*p)-- aren't allowed yet; write *p += 1.
+• Matrices: taking a matrix's address doesn't yet stop destructive reads from consuming it, so *p may point at a freed matrix. Avoid &m on matrices you later consume until the consumption analysis handles it.
+• sizeof isn't supported yet.
 Team notes: add comments here.
 Consumption rules (destructive read)
 A matrix variable is consumed when it is an operand of @, an argument of a function call, moved into another variable (b = a), or returned. After that it can't be used until it gets a new value.

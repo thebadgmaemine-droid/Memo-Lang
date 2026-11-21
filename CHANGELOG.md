@@ -5,6 +5,23 @@ All notable changes to MemoLang. Versions follow `project(VERSION ...)` in
 
 ## [Unreleased]
 
+### Added (2026-11-21)
+- Pointers, parsing and type checking only: `T*` types (`int*`, `float**`,
+  `matrix<float>*`), `&x` and `*p` / `**pp` in expressions, and assignment
+  through `*p`. Pointer prefixes bind tighter than `**`, so `*p ** 2` is
+  `(*p) ** 2`. Casts take no `*` suffix, so `x as int * 2` is unchanged.
+- Semantic checks: `&` needs a non-const variable or `*p`; `*` needs a
+  pointer; pointers allow only `==` / `!=`; `void*` is an error; returning
+  `&local` or storing it in a global is an error.
+- Tests: `tests/{ast,tokens,errors}/pointers`, `tests/check/pointers_ok`,
+  `tests/check/pointer_errors`.
+
+### Changed (2026-11-21)
+- The assignment error for an invalid left side now says "must be a variable
+  or '*pointer'".
+- The interpreter stops with an error, not a crash, on assignment through a
+  pointer. It doesn't run pointer programs yet; neither does codegen.
+
 ### Added (2026-11-12, later)
 - Programs can run: an interpreter (`Include/Interp/`) and a CPU matrix
   runtime (`Include/Runtime/`) that counts allocations, frees and peak memory.

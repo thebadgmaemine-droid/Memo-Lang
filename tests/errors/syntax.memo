@@ -19,7 +19,7 @@ def unknown_type(number x) {    # expect-error: 18: unknown type name 'number'
 }
 
 def bad_assign() {
-    f() = 3;                    # expect-error: 9: left side of '=' must be a variable name
+    f() = 3;                    # expect-error: 9: left side of '=' must be a variable or '*pointer'
 }
 
 def named_then_positional() {

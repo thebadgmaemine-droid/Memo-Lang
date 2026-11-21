@@ -7,14 +7,16 @@ codegen core (`--emit-llvm/-bc/-S/-c`, `-O0..3`, `nounwind`, data layout).
 ## 0. Fix now (build broken)
 - [ ] `#include "Codegen/BackendDiagnostics.h"` → `"Diag/BackendDiagnostics.h"`, because the file was moved to `Include/Diag/` — `Include/Codegen/CodegenAction.h:24`
 - [ ] Commit the move (old `Include/Codegen/BackendDiagnostics.*` deleted, new `Include/Diag/` files untracked) + `CMakeLists.txt`
+- [ ] `MemoLang` doesn't link: `markNoUnwind` is defined as a free function, not `CodegenModule::markNoUnwind` — `Include/Codegen/CodegenModule.cpp:499`
 - [ ] SourceLocation ↔ LLVM 32-bit loc conversion for backend diagnostics (20-11 log) — `Include/Source/SourceLocation.h`, `Include/Diag/BackendDiagnostics.{h,cpp}`
 
 ## 1. Codegen: unsupported constructs
 Files: `Include/Codegen/CodegenFunction.cpp`, `CodegenModule.cpp`
 - [ ] Interpolated strings (`CodegenFunction.cpp:493`)
 - [ ] Nested function definitions (`CodegenFunction.cpp:307`)
-- [ ] Pointer / vector / generic / function-typed values (`CodegenModule.cpp:81,97,107,183`)
-- [ ] Assignment to non-variable targets
+- [ ] Pointer values: `lowerType` → opaque `ptr`, `&x` → slot/global address, `*p` → load (`CodegenModule.cpp:90`, `CodegenFunction.cpp` `emitUnary`)
+- [ ] Vector / generic / function-typed values (`CodegenModule.cpp:81,97,107,183`)
+- [ ] Assignment to non-variable targets: `*p = v` needs an lvalue-address helper in `emitAssign`; stores through `matrix<…>*` need retain/release
 - [ ] Calls through non-named callees
 - [ ] Missing int/float/matrix ops (`CodegenFunction.cpp:691,771,802,839`)
 
@@ -38,6 +40,17 @@ Files: `Include/Codegen/CodegenFunction.cpp`, `CodegenModule.cpp`
 - [ ] Sema: `is`, `is not`, `in`, `not in` — `Semantics/sema.cpp`
 - [ ] `LambdaExpr`, `MacroDef` — `AST/AST.h:59`, `Include/Macro/` (notes only)
 - [ ] Remove the empty `Include/AST/ASTContext.h` or fill it in
+
+## 4a. Pointers (parse + sema done 2026-11-21; see the Pointers section of the reference doc)
+- [x] `T*` types, `&x` / `*p` / `**pp`, `*p = v` targets — `Parser/parser.cpp`
+- [x] Type checks, `checkLValue`, escape checks for `return &local` / `global = &local` — `Semantics/sema.cpp`
+- [ ] Interpreter: pointer `Value` alternative with stable cells; `&`/`*` in `evalUnary`; assignment through `*p` — `Interp/interpreter.{h,cpp}`
+- [ ] Codegen (see §1)
+- [ ] Destructive reads: a variable whose address is taken must not be consumable — `Analysis/destructive.cpp`
+- [ ] `(*p)++` / `(*p)--` (interpreter and codegen assume a `NameExpr`) — `Semantics/sema.cpp`, `Interp/interpreter.cpp`, `Codegen/CodegenFunction.cpp`
+- [ ] Indirect escapes (`q = &x; return q;`) need a flow pass; static locals wrongly flagged (no static flag on `Symbol`) — `Semantics/sema.{h,cpp}`
+- [ ] `sizeof(T)` as its own node (now a placeholder `UnaryOp::SizeOf`) — `AST/AST.h`
+- [ ] Null pointer (`none`)
 
 ## 5. GPU runtime (plan: `docs/gpu-runtime.md` §6)
 - [ ] `~Runtime()` + `#if` blocks, CPU unchanged — `Runtime/runtime.h`

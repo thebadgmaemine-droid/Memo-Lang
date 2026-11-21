@@ -1,0 +1,62 @@
+Module pointers
+  FunctionDef pointers(int* p, float** pp, matrix<float>* mp) -> int*
+    DeclareVar x : int
+      Integer 1
+    DeclareVar q : int*
+      Unary &
+        Name x
+    DeclareVar qq : int**
+      Unary &
+        Name q
+    DeclareVar cells : matrix<int*>
+    Assign =
+      Unary *
+        Name q
+      Integer 2
+    Assign +=
+      Unary *
+        Unary *
+          Name qq
+      Integer 3
+    DeclareVar a : int
+      Binary **
+        Unary *
+          Name p
+        Integer 2
+    DeclareVar b : int
+      Binary **
+        Integer 2
+        Unary *
+          Name p
+    DeclareVar c : int
+      Binary *
+        Name x
+        Unary *
+          Name q
+    DeclareVar d : int
+      Binary **
+        Name x
+        Unary *
+          Name q
+    DeclareVar e : int
+      Binary &
+        Name x
+        Unary &
+          Name x
+    DeclareVar f : int
+      Unary -
+        Unary *
+          Name q
+    DeclareVar g : float
+      Cast to float
+        Unary *
+          Name q
+    DeclareVar h : int
+      Binary *
+        Cast to int
+          Name x
+        Integer 2
+    Return
+      Unary &
+        Unary *
+          Name q

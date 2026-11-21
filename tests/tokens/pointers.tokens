@@ -1,0 +1,27 @@
+2:1	&
+2:2	identifier	'x'
+2:4	*
+2:5	identifier	'p'
+2:7	**
+2:9	identifier	'pp'
+2:12	type name	'int'
+2:15	*
+2:17	identifier	'p'
+2:18	;
+2:20	type name	'int'
+2:23	**
+2:26	identifier	'pp'
+2:28	;
+2:30	identifier	'a'
+2:31	&
+2:32	&
+2:33	identifier	'b'
+2:35	identifier	'a'
+2:36	**
+2:38	*
+2:39	identifier	'b'
+2:41	*
+2:42	identifier	'p'
+2:43	*=
+2:45	integer literal	'2'
+3:1	end of file

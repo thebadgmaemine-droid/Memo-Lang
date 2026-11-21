@@ -115,6 +115,13 @@ private:
   void analyzeAssign(const AssignStmt &assign);
   void analyzeReturn(const ReturnStmt &ret);
   void checkCondition(const Expr &condition, std::string_view what);
+  // The type of something that can be assigned to or have its address taken
+  // (a variable or `*pointer`), or errorType() after reporting why not.
+  // `action` completes "cannot ...": "assign to", "take the address of".
+  const Type *checkLValue(const Expr &target, std::string_view action);
+  // If `value` is `&x` with x a local or parameter, x's symbol; else null.
+  // Only the direct form: `q = &x; return q;` isn't caught.
+  [[nodiscard]] const Symbol *addressedLocal(const Expr &value) const;
 
   // Expressions
   const Type *inferName(const NameExpr &name);

@@ -1,0 +1,37 @@
+# Pointer programs that must pass semantic analysis with no errors.
+extern def zeros_matrix(int rows, int cols) -> matrix<float>;
+
+int counter = 0;
+
+def bump(int* p) {
+    *p += 1;
+    *p = *p * 2;
+}
+
+def through_two(int** pp) -> int {
+    **pp = 5;
+    return **pp + 1;
+}
+
+def same(int* a, int* b) -> bool {
+    return a == b or a != b;
+}
+
+def global_address() -> int* {
+    return &counter;              # Globals outlive the call.
+}
+
+def param_pointer(int* p) -> int* {
+    return p;                     # Returning a pointer we were given is fine.
+}
+
+def main() -> int {
+    int x = 1;
+    int* p = &x;
+    int** pp = &p;
+    bump(p);
+    float f = (*p) as float;
+    matrix<float> m = zeros_matrix(2, 2);
+    matrix<float>* mp = &m;
+    return *p + through_two(pp) + int(f);
+}
