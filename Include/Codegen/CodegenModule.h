@@ -134,10 +134,8 @@ public:
   // A private constant for a string literal (shared by equal literals).
   llvm::Constant *stringConstant(std::string_view text);  
   // Nested functions struct to capture value pointers incase of mutations
-  llvm::StructType *capturedVariables(llvm::PointerType Capturednest);
-  // Nested function type
-llvm::FunctionType* nestedFunctions(llvm::StructType* EnvTy,
-                                    const llvm::FunctionType& OrigFnTy);
+
+
   // Is `function` one of the externs the runtime implements (random_matrix,
   // zeros_matrix, identity_matrix, matrix_sum)?
   [[nodiscard]] static bool isRuntimeExtern(const FunctionDef &function);

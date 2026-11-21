@@ -68,6 +68,7 @@ enum class NodeKind {
   UnaryExpr,
   BinaryExpr,
   CallExpr,
+  Pointer,
   CastExpr,
   FirstExpr = NameExpr,
   LastExpr = CastExpr,
