@@ -447,6 +447,7 @@ void CodegenFunction::emitWhile(const WhileStmt &loop) {
 }
 
 
+
 void CodegenFunction::emitBreak(const BreakStmt &stmt) {
   if (loops_.empty()) {
     cgm_.error(stmt.range(), "'break' outside a loop");

@@ -19,6 +19,7 @@
 //--------------------------------------------------------------------------
 // 2026-11-17: added.
 #include <cstdint>
+#include <llvm-21/llvm/IR/DerivedTypes.h>
 #include <memory>
 #include <span>
 #include <string>
@@ -29,6 +30,7 @@
 
 #include "AST/AST.h"
 #include "Codegen/LifetimeUtils.h"
+#include "Typecontext.h"
 
 namespace MemoLang {
 class CodegenModule;
@@ -117,6 +119,8 @@ private:
   TypeContext &types_;
   llvm::Function *function_;
   const FunctionDef *definition_;
+  llvm::Type* GetFunctionLLVMType(const Type *type);
+  
   llvm::IRBuilder<> builder_;
   llvm::BasicBlock *entry_ = nullptr;
   std::vector<LifetimeScope> scopes_{};

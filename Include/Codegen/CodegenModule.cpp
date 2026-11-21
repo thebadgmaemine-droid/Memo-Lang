@@ -89,18 +89,15 @@ llvm::Type *CodegenModule::lowerType(const Type *type) {
   default:
     return nullptr; // Error, Auto, Function, Pointer, Generic, Vector.
   }
-}
-
-CodegenModule::nestedFunctions(llvm::Function*) {
-  
-}
-CodegenModule::lowerFunctionType(const FunctionDef &function) {
+} 
+llvm::FunctionType* CodegenModule::lowerFunctionType(const FunctionDef &function) {
   const FunctionType *signature = signatureOf(function);
   if (!signature) {
     error(function.range(),
           "internal error: function '" + function.name() + "' has no type");
     return nullptr;
   }
+
   std::vector<llvm::Type *> params;
   for (const Type *param : signature->params()) {
     llvm::Type *lowered = lowerType(param);
@@ -206,6 +203,17 @@ void CodegenModule::declareModule(const Module &ast) {
     }
   }
 }
+// I don't think this will be used since Nested functions aren't that commonly used.
+class Nested {
+  public:
+  llvm::StructType *capturedVariables(llvm::PointerType Capturednest);
+  private:
+  llvm::FunctionType* nestedFunctions(llvm::StructType* EnvTy,
+                                    const llvm::FunctionType& OrigFnTy);
+  llvm::PointerType* passedFunctions(const llvm::FunctionType& passedFunction);
+  
+  };
+
 
 // ---------------------------------------------------------------------------
 // Bodies
