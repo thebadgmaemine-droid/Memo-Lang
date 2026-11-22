@@ -43,11 +43,13 @@ public:
   [[nodiscard]] llvm::Module *getModule() const;
   // Hands the finished module to the caller.
   [[nodiscard]] std::unique_ptr<llvm::Module> releaseModule();
+  void prepareImportedModule(const Module &module);
 
 private:
   DiagnosticEngine &diagnostics_;
   std::string moduleName_;
   std::unique_ptr<CodegenModule> codegen_;
+  [[maybe_unused]] std::vector<const Module*> importedFiles_{};
 };
 
 } // namespace MemoLang

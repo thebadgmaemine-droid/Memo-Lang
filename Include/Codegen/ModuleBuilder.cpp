@@ -17,9 +17,18 @@ ModuleBuilder::ModuleBuilder(llvm::LLVMContext &context,
                                                moduleName_, target)) {}
 
 ModuleBuilder::~ModuleBuilder() = default;
+void ModuleBuilder::prepareImportedModule(const Module &module) {
+  if(std::ranges::find(importedFiles_, &module) != importedFiles_.end()) {
+    return;
+  }
+  importedFiles_.push_back(&module);
+  codegen_->declareModule(module);
+}
 
 bool ModuleBuilder::handleModule(const Module &ast,
                                  const std::vector<const Module *> &imported) {
+  ModuleBuilder::importedFiles_ = imported;
+  codegen_->declareModule(ast);
   std::size_t before = diagnostics_.errorCount();
   // Declare everything first, so any body can call any function.
   for (const Module *module : imported)

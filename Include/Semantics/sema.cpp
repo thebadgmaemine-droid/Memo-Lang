@@ -411,6 +411,21 @@ void SemanticAnalyzer::declareFunctionSignature(const FunctionDef &function) {
   symbol.location = function.range();
   symbol.function = &function;
   symbol.type = types_.functionType(info->paramTypes, info->returnType);
+  const Type *type = types_.functionType(info->paramTypes, info->returnType);
+  function.setResolvedType(type); // set resolved type of the resolved params to handle extern clashes
+  if(function.isExtern() && localScopes_.empty()) {
+    if(auto prev=  global_.lookupLocal(function.name())) {
+      const Symbol &p = symbols_[prev->value]; // p is the previous extern
+      if(p.function&&p.function->isExtern() && p.function->externName() == function.externName() && p.type == type) {
+        info->symbol = *prev; // Reuse symbol for the same function, previous symbol take priority
+        functions_.emplace(&function, std::move(info));
+        return;
+      }
+      // Reports different type as normal after
+
+
+    }
+  }
   function.setResolvedType(symbol.type);
   info->symbol = addSymbol(std::move(symbol));
   declare(function.name(), info->symbol, function);

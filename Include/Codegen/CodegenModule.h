@@ -148,10 +148,12 @@ public:
   void release();
   // Hands the finished module to the caller; getModule() is null afterwards.
   [[nodiscard]] std::unique_ptr<llvm::Module> takeModule();
-  void markNoUnwind(llvm::Module &Module);
 
 private:
   void emitEntryPoint(const FunctionDef &mainFunction);
+  // Called by release(): marks generated functions and calls nounwind where
+  // nothing they reach can throw.
+  void markNoUnwind(llvm::Module &module);
   CodegenFunction &initFunction();
 
   llvm::LLVMContext &context_;

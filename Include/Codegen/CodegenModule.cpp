@@ -455,9 +455,15 @@ void CodegenModule::emitEntryPoint(const FunctionDef &mainFunction) {
   }
   builder.CreateCall(module_->getFunction("memo.fini"));
   builder.CreateRet(builder.CreateCall(runtime(RuntimeFn::End)));
+}
 
-// Marks generated functions (memo.*, the entry point) nounwind 
-// call something that may unwind, until nothing changes.
+// Marks each generated function (memo.*, memo.init/fini, the entry point)
+// nounwind unless it can reach a call that may unwind. A call may unwind if
+// neither the call nor its callee is nounwind and the callee is a declaration
+// (runtime or extern C code, which may throw) or a function already found to
+// unwind. Repeats until nothing changes, so the result follows the call graph.
+// Declarations are left alone: their attributes come from runtime().
+void CodegenModule::markNoUnwind(llvm::Module &module) {
   llvm::SmallPtrSet<const llvm::Function *, 32> mayUnwind;
   auto callMayUnwind = [&](const llvm::CallBase &call) {
     if (call.doesNotThrow()) // Call-site or callee attribute.
@@ -477,15 +483,15 @@ void CodegenModule::emitEntryPoint(const FunctionDef &mainFunction) {
 
   for (bool changed = true; changed;) {
     changed = false;
-    for (llvm::Function &function : *module_)
+    for (llvm::Function &function : module)
       if (!function.isDeclaration() && !mayUnwind.contains(&function) &&
           anyCallMayUnwind(function)) {
         mayUnwind.insert(&function);
         changed = true;
       }
   }
- // Sets
-  for (llvm::Function &function : *module_) {
+  // Mark the functions and the individual calls that can't unwind.
+  for (llvm::Function &function : module) {
     if (function.isDeclaration())
       continue;
     if (!mayUnwind.contains(&function))
@@ -497,18 +503,8 @@ void CodegenModule::emitEntryPoint(const FunctionDef &mainFunction) {
   }
 }
 
-void markNoUnwind(llvm::Module &Module) {
-  for (llvm::Function &F : Module) {
-    if (F.isDeclaration())
-      continue;               // don't assert things about external code
-    F.setDoesNotThrow();
-  }
-}
-
-}
-
 // Marks release for module when called ( use paired with consume flags )
-void MemoLang::CodegenModule::release() {
+void CodegenModule::release() {
   if (released_)
     return;
   released_ = true;
@@ -546,9 +542,11 @@ void MemoLang::CodegenModule::release() {
                            "LLVM IR:\n" +
                                problems);
   }
-} // namespace MemoLang
+}
 
-std::unique_ptr<llvm::Module> MemoLang::CodegenModule::takeModule() {
+std::unique_ptr<llvm::Module> CodegenModule::takeModule() {
   return std::move(module_);
 }
+
+} // namespace MemoLang
 

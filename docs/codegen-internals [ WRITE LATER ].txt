@@ -771,7 +771,7 @@ Quality and performance ideas:
 - / D /Mark memo.* functions and runtime declarations `nounwind`. No exception
   / D /ever unwinds through them, and the attribute lets the optimizer drop
   / D /unwind bookkeeping.
-- Add `noalias`/`nonnull` return attributes to the runtime allocation
+- Add `noalias`nonnull` return attributes to the runtime allocation
   functions, and `memory(...)` effects to pure helpers like str_compare.
 - Debug info (DIBuilder) for source-level debugging and positioned backend
   diagnostics.  

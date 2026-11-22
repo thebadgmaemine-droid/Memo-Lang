@@ -27,6 +27,7 @@
 
 namespace MemoLang {
 // Codegen action constructor
+
 CodegenAction::CodegenAction(BackendAction action, llvm::LLVMContext &context,
                              const CodegenInputs &inputs,
                              CodegenOptions options)
