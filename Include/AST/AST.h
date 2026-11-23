@@ -385,15 +385,19 @@ private:
 class IntegerLiteral final : public Expr {
 public:
   // Range validation (int64 overflow, byte range) belongs in the parser;
-  // the literal `-9223372036854775808` must be handled there.
-  explicit IntegerLiteral(std::int64_t value, bool isByte = false)
-      : Expr(NodeKind::IntegerLiteral), value_(value), isByte_(isByte) {}
+  // the literal `-9223372036854775808` must be handled there. A literal too
+  // large for int64 (up to 2^64 - 1) is a u64, and value() holds its bits.
+  explicit IntegerLiteral(std::int64_t value, bool isByte = false,
+                          bool isU64 = false)
+      : Expr(NodeKind::IntegerLiteral), value_(value), isByte_(isByte),
+        isU64_(isU64) {}
 
   [[nodiscard]] std::int64_t value() const noexcept { return value_; }
   [[nodiscard]] bool isByte() const noexcept { return isByte_; }
+  [[nodiscard]] bool isU64() const noexcept { return isU64_; }
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
-    auto c = std::make_unique<IntegerLiteral>(value_, isByte_);
+    auto c = std::make_unique<IntegerLiteral>(value_, isByte_, isU64_);
     c->setRange(range());
     return c;
   }
@@ -402,6 +406,7 @@ public:
 private:
   std::int64_t value_;
   bool isByte_;
+  bool isU64_;
 };
 
 class FloatLiteral final : public Expr {

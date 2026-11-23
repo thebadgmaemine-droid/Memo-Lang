@@ -90,6 +90,8 @@ private:
   std::unique_ptr<Expr> parseCallArgs(std::unique_ptr<Expr> callee,
                                       SourceLocation loc);
   std::unique_ptr<Expr> parseIntegerLiteral(const Token &tok);
+  // True for a literal past int64's range (it's a u64).
+  static bool integerLiteralIsU64(std::string_view spelling);
   std::unique_ptr<Expr> parseFloatLiteral(const Token &tok);
   std::unique_ptr<Expr> parsePointerPrefix();
 

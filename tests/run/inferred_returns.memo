@@ -1,0 +1,36 @@
+# Inferred return types widen across `return`s, whichever comes first.
+# main() returns how many checks passed.
+# expect-result: 5
+
+def small_or_big(bool big) {
+    u8 s = 200;
+    if big { return 1000; }      # u8 then int: infers int, 1000 survives
+    return s;
+}
+
+def big_first(bool big) {
+    if big { return 1000; }
+    u8 s = 200;
+    return s;
+}
+
+def unsigned_or_int(bool neg) {
+    u32 x = 4000000000;
+    if neg { return -5; }        # u32 and int: infers int, both values fit
+    return x;
+}
+
+def int_then_float(bool f) {
+    if f { return 1; }
+    return 2.5;                  # int then float: infers float
+}
+
+def main() -> int {
+    int score = 0;
+    if small_or_big(true) == 1000 { score++; }
+    if big_first(false) == 200 { score++; }
+    if unsigned_or_int(false) == 4000000000 { score++; }
+    if unsigned_or_int(true) == -5 { score++; }
+    if int_then_float(false) == 2.5 { score++; }
+    return score;
+}

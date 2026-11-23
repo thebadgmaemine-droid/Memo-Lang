@@ -1,0 +1,42 @@
+# u64: values at and above 2^63 compare, divide, shift and convert as
+# unsigned in both the interpreter and compiled code.
+# main() returns the largest u64, so printing it is checked too.
+# expect-result: 18446744073709551615
+
+def halve(u64 x) -> u64 {
+    return x // 2;
+}
+
+def check() -> int {
+    int score = 0;
+    u64 big = 18446744073709551615;                     # a literal past int64
+    u64 top = 0x8000000000000000;                       # 2^63
+    if big > 0 { score++; }                             # compares as unsigned
+    if top > 9223372036854775807 { score++; }
+    if not (big < 1) { score++; }
+    if big // 2 == 9223372036854775807 { score++; }     # unsigned floor division
+    if halve(big) == 9223372036854775807 { score++; }
+    if big % 10 == 5 { score++; }                       # unsigned remainder
+    if big >> 63 == 1 { score++; }                      # no sign bits shifted in
+    if big / 2 == 9223372036854775807.5 { score++; }    # true division (rounds)
+    if (big as float) > 1.8e19 { score++; }             # converts as unsigned
+    if (1.5e19 as u64) > top { score++; }               # float to u64 past 2^63
+    if (2 as u64) ** 64 == 0 { score++; }               # wraps around
+    u64 w = big;
+    w += 1;
+    if w == 0 { score++; }
+    w--;
+    if w == big { score++; }
+    int minusOne = -1;
+    if (minusOne as u64) == big { score++; }            # same bits
+    u32 small = 4294967295;
+    if big > small { score++; }                         # widens without sign
+    return score;
+}
+
+def main() -> u64 {
+    if check() != 15 {
+        return 0;
+    }
+    return 18446744073709551615;
+}

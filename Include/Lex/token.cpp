@@ -33,8 +33,9 @@ TokenKind keywordKind(std::string_view spelling) {
 
   // Built-in type names. The parser turns these into TypeExpr nodes.
   static constexpr std::string_view typeNames[] = {
-      "int",  "i32", "i64",  "float", "f32",    "f64",
-      "bool", "str", "byte", "void",  "matrix", "pointer"
+      "int", "i8", "i16",  "i32", "i64",  "u8",    "u16",    "u32",    "u64",
+      "float", "f32", "f64", "bool",  "str",    "byte",
+      "void", "matrix", "pointer"
   };
   for (std::string_view type : typeNames)
     if (spelling == type)

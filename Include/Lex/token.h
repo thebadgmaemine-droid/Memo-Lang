@@ -1,4 +1,3 @@
-
 #ifndef TOKEN_H_
 #define TOKEN_H_
 #pragma once
@@ -35,7 +34,8 @@ public:
 private:
   TokenKind kind_ = TokenKind::TOK_EOF;
   SourceRange range_{};
-  std::string spelling_;
+  std::string spelling_;  
+  
 };
 }
 #endif // TOKEN_H_

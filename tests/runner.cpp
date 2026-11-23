@@ -399,7 +399,7 @@ std::vector<StressCase> stressCases() {
       {"1 MB line of statements", repeat("x = 1; ", 150000), 0, ""});
   cases.push_back({"1000-digit integer",
                    "int big = " + std::string(1000, '9') + ";", 1,
-                   "too large for int64"});
+                   "too large for u64"});
   // The first inner '{' is an error and the skip runs to EOF; then the body's '}' is missing.
   cases.push_back({"100000 unclosed '{'", "def f() " + repeat("{ ", kDeep), 2,
                    "can't stand on its own"});

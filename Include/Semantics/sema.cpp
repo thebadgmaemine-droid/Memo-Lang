@@ -39,6 +39,7 @@
 #include <sstream>
 #include <utility>
 
+#include "AST.h"
 #include "Diag/diagengine.h"
 #include "Types/Typecontext.h"
 
@@ -116,6 +117,52 @@ bool dimensionsAgree(std::optional<std::int64_t> a,
 std::optional<std::int64_t> mergeDimension(std::optional<std::int64_t> a,
                                            std::optional<std::int64_t> b) {
   return a ? a : b;
+}
+
+// An integer constant as sign + magnitude, so every value from -2^63 to
+// 2^64 - 1 fits without a 128-bit type.
+struct IntegerConstant {
+  bool negative = false;
+  std::uint64_t magnitude = 0;
+};
+
+// The value of an integer literal or a negated one (`-1`), or nullopt for
+// anything else.
+std::optional<IntegerConstant> integerConstant(const Expr &expr) {
+  if (expr.kind() == NodeKind::IntegerLiteral) {
+    const auto &literal = static_cast<const IntegerLiteral &>(expr);
+    auto bits = static_cast<std::uint64_t>(literal.value());
+    // The parser folds -9223372036854775808 into a negative literal.
+    if (!literal.isU64() && literal.value() < 0)
+      return IntegerConstant{true, 0 - bits};
+    return IntegerConstant{false, bits};
+  }
+  if (expr.kind() == NodeKind::UnaryExpr) {
+    const auto &unary = static_cast<const UnaryExpr &>(expr);
+    if (unary.op() != UnaryOp::Neg ||
+        unary.operand().kind() != NodeKind::IntegerLiteral)
+      return std::nullopt;
+    auto inner = integerConstant(unary.operand());
+    // `-` on a u64 literal is already an error in the parser.
+    if (!inner || inner->negative ||
+        static_cast<const IntegerLiteral &>(unary.operand()).isU64())
+      return std::nullopt;
+    return IntegerConstant{inner->magnitude != 0, inner->magnitude};
+  }
+  return std::nullopt;
+}
+
+bool fitsIn(IntegerConstant value, const IntType &type) {
+  unsigned bits = type.bits();
+  if (!type.isSigned())
+    return !value.negative &&
+           (bits >= 64 || value.magnitude <= (std::uint64_t{1} << bits) - 1);
+  std::uint64_t max = (std::uint64_t{1} << (bits - 1)) - 1;
+  return value.negative ? value.magnitude <= max + 1 : value.magnitude <= max;
+}
+
+std::string constantSpelling(IntegerConstant value) {
+  return (value.negative ? "-" : "") + std::to_string(value.magnitude);
 }
 
 } // namespace
@@ -296,6 +343,8 @@ const Type *SemanticAnalyzer::resolveType(const TypeExpr &node) {
   } else {
     error(node, "unknown type " + quoteForMessage(name));
   }
+  
+
   node.setResolvedType(type);
   return type;
 }
@@ -327,7 +376,9 @@ const Type *SemanticAnalyzer::commonNumericType(const Type &lhs,
   const auto &ri = static_cast<const IntType &>(rhs);
   if (li.bits() != ri.bits())
     return li.bits() > ri.bits() ? &li : &ri;
-  return types_.intType(li.bits(), li.isSigned() || ri.isSigned());
+  // Same width: unsigned wins, as in C, so `x + 1` and `x > 0` on a u64 stay
+  // unsigned (the literal is an int).
+  return types_.intType(li.bits(), li.isSigned() && ri.isSigned());
 }
 
 const Type *SemanticAnalyzer::checkArithmetic(BinaryOp op, const Type &lhs,
@@ -708,7 +759,6 @@ void SemanticAnalyzer::analyzeReturn(const ReturnStmt &ret) {
       error(*ret.value(), "returning the address of local " +
                               quoteForMessage(local->name) + " from " +
                               function);
-
   if (declared->kind() == Type::Kind::Auto) {
     const Type *type = value ? value : types_.voidType();
     if (!context.inferredReturn) {
@@ -719,10 +769,16 @@ void SemanticAnalyzer::analyzeReturn(const ReturnStmt &ret) {
     if (type == context.inferredReturn || type->isError() ||
         context.inferredReturn->isError())
       return;
-    // A later `return` may also give a type the first one converts from
-    // (int where the first gave float), but `return;` and `return x;` don't mix.
+    // Numbers widen to a type that holds both (u8 and int give int, int and
+    // float give float), whichever `return` comes first. Other types must
+    // convert to the first one, and `return;` and `return x;` don't mix.
     bool bothHaveValues = type->kind() != Type::Kind::Void &&
                           context.inferredReturn->kind() != Type::Kind::Void;
+    if (bothHaveValues && type->isNumeric() &&
+        context.inferredReturn->isNumeric()) {
+      context.inferredReturn = commonNumericType(*context.inferredReturn, *type);
+      return;
+    }
     if (bothHaveValues && checkAssignment(*context.inferredReturn, *type))
       return;
     error(ret, "inconsistent return types in " + function + ": " +
@@ -741,9 +797,19 @@ void SemanticAnalyzer::analyzeReturn(const ReturnStmt &ret) {
     error(ret, function + " must return a value of type " + typeName(declared));
     return;
   }
-  if (!checkAssignment(*declared, *value))
+  if (!checkAssignment(*declared, *value)) {
     error(*ret.value(), function + " returns " + typeName(declared) +
                             ", but this value is " + typeName(value));
+    return;
+  }
+  // Integers convert by truncating, so a constant that doesn't fit would
+  // come back as a different number (300 as a u8 is 44).
+  if (const auto *target = dynCast<IntType>(declared))
+    if (auto constant = integerConstant(*ret.value());
+        constant && !fitsIn(*constant, *target))
+      error(*ret.value(), function + " returns " + typeName(declared) +
+                              ", which can't hold " +
+                              constantSpelling(*constant));
 }
 
 // ---------------------------------------------------------------------------
@@ -760,9 +826,12 @@ const Type *SemanticAnalyzer::inferExpressionType(const Expr &expr) {
     type = inferName(static_cast<const NameExpr &>(expr));
     break;
   case NodeKind::IntegerLiteral:
-    type = static_cast<const IntegerLiteral &>(expr).isByte()
-               ? static_cast<const Type *>(types_.byteType())
-               : types_.intType();
+    if (static_cast<const IntegerLiteral &>(expr).isByte())
+      type = types_.byteType();
+    else if (static_cast<const IntegerLiteral &>(expr).isU64())
+      type = types_.intType(64, /*isSigned=*/false);
+    else
+      type = types_.intType();
     break;
   case NodeKind::FloatLiteral:
     type = types_.floatType(

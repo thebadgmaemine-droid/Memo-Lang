@@ -1,9 +1,12 @@
 # Literal range limits. The int64 boundaries themselves are valid: see tests/ast/literals.memo.
+# Literals past int64 (up to 2^64 - 1) are u64s.
 def limits() {
-    9223372036854775808;        # expect-error: 5: integer literal '9223372036854775808' is too large for int64
-    -9223372036854775809;       # expect-error: 6: integer literal '9223372036854775809' is too large
-    0x8000000000000000;         # expect-error: 5: integer literal '0x8000000000000000' is too large
-    99999999999999999999999;    # expect-error: 5: is too large for int64
+    9223372036854775808;        # a u64
+    0xFFFFFFFFFFFFFFFF;         # a u64
+    18446744073709551616;       # expect-error: 5: integer literal '18446744073709551616' is too large for u64
+    0x10000000000000000;        # expect-error: 5: integer literal '0x10000000000000000' is too large
+    -9223372036854775809;       # expect-error: 6: integer literal '9223372036854775809' is too large to negate
+    99999999999999999999999;    # expect-error: 5: is too large for u64
     1e999;                      # expect-error: 5: floating-point literal '1e999' is out of range
     1e-999;
 }

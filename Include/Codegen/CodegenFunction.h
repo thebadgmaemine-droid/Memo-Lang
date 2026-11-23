@@ -49,9 +49,7 @@ public:
   void emitPrologue();
   void emitBody(std::span<const std::unique_ptr<Statement>> body);
   void emitStatement(const Statement &stmt);
-  // Falls off the end: runs the cleanups and returns (a default value if
-  // the function has a return type: like the interpreter, a missing
-  // `return` isn't checked yet).
+  
   void finish();
 
 private:
@@ -81,7 +79,7 @@ private:
                             llvm::Value *rhs, const Type *rhsType,
                             const Type *result, const Node &where);
   llvm::Value *emitIntOp(BinaryOp op, llvm::Value *a, llvm::Value *b,
-                         const Node &where);
+                         const Node &where, bool isUnsigned);
   llvm::Value *emitFloatOp(BinaryOp op, llvm::Value *a, llvm::Value *b,
                            const Node &where);
   llvm::Value *emitMatrixOp(BinaryOp op, llvm::Value *lhs, const Type *lhsType,

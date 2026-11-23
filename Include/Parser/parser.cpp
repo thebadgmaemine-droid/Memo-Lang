@@ -842,6 +842,12 @@ std::unique_ptr<Expr> Parser::parseUnary() {
       return parsePostfix(make<IntegerLiteral>(
           loc, std::numeric_limits<std::int64_t>::min()));
     }
+    // Any larger literal is a u64, and negating it would wrap around.
+    if (check(TokenKind::TOK_INTEGER) &&
+        !peekNext().is(TokenKind::TOK_STARSTAR) &&
+        integerLiteralIsU64(tok_.spelling()))
+      error(tok_.range(), "integer literal " + quoteForMessage(tok_.spelling()) +
+                              " is too large to negate");
     op = UnaryOp::Neg;
     break;
   case TokenKind::TOK_PLUS: {
@@ -1019,8 +1025,10 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
   }
 }
 
-std::unique_ptr<Expr> Parser::parseIntegerLiteral(const Token &tok) {
-  std::string_view text = tok.spelling();
+namespace {
+// The value of an integer literal's spelling (decimal, 0x..., 0b...), or
+// nothing if it doesn't fit in 64 bits.
+std::optional<std::uint64_t> integerLiteralValue(std::string_view text) {
   int base = 10;
   if (text.size() > 2 && text[0] == '0') {
     if (text[1] == 'x' || text[1] == 'X')
@@ -1033,14 +1041,32 @@ std::unique_ptr<Expr> Parser::parseIntegerLiteral(const Token &tok) {
   std::uint64_t value = 0;
   auto [end, ec] =
       std::from_chars(text.data(), text.data() + text.size(), value, base);
-  if (ec != std::errc() || end != text.data() + text.size() ||
-      value > static_cast<std::uint64_t>(
-                  std::numeric_limits<std::int64_t>::max())) {
+  if (ec != std::errc() || end != text.data() + text.size())
+    return std::nullopt;
+  return value;
+}
+
+// Past int64's range a literal is a u64 (it keeps the bits).
+bool exceedsInt64(std::uint64_t value) {
+  return value >
+         static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+}
+} // namespace
+
+bool Parser::integerLiteralIsU64(std::string_view spelling) {
+  auto value = integerLiteralValue(spelling);
+  return value && exceedsInt64(*value);
+}
+
+std::unique_ptr<Expr> Parser::parseIntegerLiteral(const Token &tok) {
+  auto value = integerLiteralValue(tok.spelling());
+  if (!value) {
     error(tok.range(), "integer literal " + quoteForMessage(tok.spelling()) +
-                           " is too large for int64");
+                           " is too large for u64");
     return nullptr;
   }
-  return make<IntegerLiteral>(tok.location(), static_cast<std::int64_t>(value));
+  return make<IntegerLiteral>(tok.location(), static_cast<std::int64_t>(*value),
+                              /*isByte=*/false, exceedsInt64(*value));
 }
 
 std::unique_ptr<Expr> Parser::parseFloatLiteral(const Token &tok) {

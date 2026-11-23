@@ -1,0 +1,12 @@
+# Integer constants returned from a function with a declared integer type
+# must fit that type.
+def ok_u8() -> u8 { return 255; }
+def ok_i32() -> i32 { return -2147483648; }
+def ok_u64() -> u64 { return 18446744073709551615; }
+def ok_int() -> int { return -9223372036854775808; }
+def ok_float() -> float { return 300; }
+
+def too_big() -> u8 { return 256; }          # expect-error: 30: 'too_big' returns 'byte', which can't hold 256
+def negative() -> u32 { return -1; }         # expect-error: 32: 'negative' returns 'u32', which can't hold -1
+def too_small() -> i32 { return -2147483649; }   # expect-error: 33: 'too_small' returns 'i32', which can't hold -2147483649
+def u64_in_int() -> int { return 9223372036854775808; }  # expect-error: 34: which can't hold 9223372036854775808

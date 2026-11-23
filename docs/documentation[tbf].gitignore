@@ -51,7 +51,7 @@ postfix        := primary { '(' args ')' | 'as' base_type | '++' | '--' }
 args           := [ [ IDENT '=' ] expr { ',' [ IDENT '=' ] expr } ]
 primary        := INTEGER | FLOAT | STRING | 'true' | 'false' | IDENT
                 | '(' expr ')' | base_type '(' expr ')'
-• TYPE_NAME is one of int i32 i64 float f32 f64 bool str byte void matrix. int is i64, float is f64, byte is an unsigned 8-bit integer.
+• TYPE_NAME is one of int i32 i64 u8 u16 u32 u64 float f32 f64 bool str byte void matrix. int is i64, float is f64, byte is u8 (an unsigned 8-bit integer).
 • A '*' after a type makes a pointer type: int*, float**, matrix<float>*, matrix<int*>. int** is one '**' token and means two levels. Casts (x as T, T(x)) take no '*' suffix, so x as int * 2 is (x as int) * 2.
 • In expressions, prefix & takes an address and prefix * dereferences: &x, *p, **pp. These never clash with binary & and *, because the parser only reads a prefix where an operand starts: a * *p is a times *p, and a & &b is a bitwise-and with &b.
 • The left side of an assignment is a variable or a dereference: x = 1; *p = 2; **pp += 3;

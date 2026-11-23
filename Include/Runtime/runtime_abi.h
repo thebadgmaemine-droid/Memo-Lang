@@ -55,12 +55,15 @@ std::int32_t memolang_rt_str_compare(const char *a, const char *b);
 
 // Integer power with wrap-around; panics on a negative exponent.
 std::int64_t memolang_rt_ipow(std::int64_t base, std::int64_t exponent);
+// u64 power with wrap-around; every exponent is valid.
+std::uint64_t memolang_rt_upow(std::uint64_t base, std::uint64_t exponent);
 
 [[noreturn]] void memolang_rt_panic(const char *message);
 [[noreturn]] void memolang_rt_shift_error(std::int64_t amount);
 
 // Printing the value main() returned: "main() returned <value>".
 void memolang_rt_print_int(std::int64_t value);
+void memolang_rt_print_uint(std::uint64_t value);
 void memolang_rt_print_float(double value);
 void memolang_rt_print_bool(std::int32_t value);
 void memolang_rt_print_str(const char *value);

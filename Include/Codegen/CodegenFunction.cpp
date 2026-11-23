@@ -38,6 +38,13 @@ bool isKind(const Type *type, Type::Kind kind) {
   return type && type->kind() == kind;
 }
 
+// Integer math runs in i64. Narrower unsigned types zero-extend into it and
+// stay non-negative, so only u64 needs the unsigned instructions.
+bool isU64(const Type *type) {
+  const auto *intType = dynCast<IntType>(type);
+  return intType && intType->bits() == 64 && !intType->isSigned();
+}
+
 // matrix<f32> -> 1, matrix<float> -> 0 (the runtime's element type flag).
 int f32Flag(const Type *matrixType) {
   if (const auto *m = dynCast<MatrixType>(matrixType))
@@ -164,7 +171,8 @@ llvm::Value *CodegenFunction::toF64(llvm::Value *value, const Type *from) {
   llvm::Type *f64 = builder_.getDoubleTy();
   switch (from->kind()) {
   case Type::Kind::Int:
-    return builder_.CreateSIToFP(toI64(value, from), f64);
+    return isU64(from) ? builder_.CreateUIToFP(value, f64)
+                       : builder_.CreateSIToFP(toI64(value, from), f64);
   case Type::Kind::Float:
     return builder_.CreateFPExt(value, f64);
   default:
@@ -184,15 +192,23 @@ llvm::Value *CodegenFunction::convert(llvm::Value *value, const Type *from,
     llvm::Value *wide = nullptr;
     if (from->kind() == Type::Kind::Float) {
       llvm::Value *d = toF64(value, from);
-      // In range iff -2^63 <= d < 2^63; NaN and infinities fail both tests.
-      llvm::Value *inRange = builder_.CreateAnd(
-          builder_.CreateFCmpOLT(
-              d, llvm::ConstantFP::get(d->getType(), 9.2233720368547758e18)),
-          builder_.CreateFCmpOGE(
-              d, llvm::ConstantFP::get(d->getType(), -9.2233720368547758e18)));
+      // In range iff -2^63 <= d < 2^63, or -1 < d < 2^64 for u64 (it
+      // truncates toward zero, so -0.5 gives 0); NaN and infinities fail.
+      bool toU64 = isU64(to);
+      auto constant = [&](double c) {
+        return llvm::ConstantFP::get(d->getType(), c);
+      };
+      llvm::Value *inRange =
+          toU64 ? builder_.CreateAnd(
+                      builder_.CreateFCmpOLT(d, constant(1.8446744073709552e19)),
+                      builder_.CreateFCmpOGT(d, constant(-1.0)))
+                : builder_.CreateAnd(
+                      builder_.CreateFCmpOLT(d, constant(9.2233720368547758e18)),
+                      builder_.CreateFCmpOGE(d, constant(-9.2233720368547758e18)));
       panicIf(builder_.CreateNot(inRange),
               "float value out of range for an integer");
-      wide = builder_.CreateFPToSI(d, builder_.getInt64Ty());
+      wide = toU64 ? builder_.CreateFPToUI(d, builder_.getInt64Ty())
+                   : builder_.CreateFPToSI(d, builder_.getInt64Ty());
     } else {
       wide = toI64(value, from);
     }
@@ -671,11 +687,14 @@ llvm::Value *CodegenFunction::emitBinaryOp(BinaryOp op, llvm::Value *lhs,
   } else if (isKind(lhsType, Type::Kind::Int) &&
              isKind(rhsType, Type::Kind::Int)) {
     // Integer math in i64, then converted to the result type.
-    llvm::Value *raw =
-        emitIntOp(op, toI64(lhs, lhsType), toI64(rhs, rhsType), where);
+    // u64 against any other int is u64 math (sema's commonNumericType).
+    bool isUnsigned = isU64(lhsType) || isU64(rhsType);
+    llvm::Value *raw = emitIntOp(op, toI64(lhs, lhsType), toI64(rhs, rhsType),
+                                 where, isUnsigned);
     if (!raw)
       return defaultValue(result);
-    const Type *rawType = types_.intType();
+    const Type *rawType =
+        isUnsigned ? types_.intType(64, /*isSigned=*/false) : types_.intType();
     if (isComparison(op))
       rawType = types_.boolType();
     else if (op == BinaryOp::Div)
@@ -699,10 +718,35 @@ llvm::Value *CodegenFunction::emitBinaryOp(BinaryOp op, llvm::Value *lhs,
 }
 
 llvm::Value *CodegenFunction::emitIntOp(BinaryOp op, llvm::Value *a,
-                                        llvm::Value *b, const Node &where) {
+                                        llvm::Value *b, const Node &where,
+                                        bool isUnsigned) {
   llvm::Type *i64 = builder_.getInt64Ty();
   llvm::Value *zero = builder_.getInt64(0);
   llvm::Value *minusOne = llvm::ConstantInt::getSigned(i64, -1);
+  if (isUnsigned) {
+    // Add, Sub, Mul, the bitwise ops, Shl, Eq and Ne are the same bits
+    // either way; the rest have unsigned forms. `//` and `%` need no
+    // rounding fix: nothing is negative.
+    switch (op) {
+    case BinaryOp::Div:
+      panicIf(builder_.CreateICmpEQ(b, zero), "division by zero");
+      return builder_.CreateFDiv(builder_.CreateUIToFP(a, builder_.getDoubleTy()),
+                                 builder_.CreateUIToFP(b, builder_.getDoubleTy()));
+    case BinaryOp::FloorDiv:
+      panicIf(builder_.CreateICmpEQ(b, zero), "integer division by zero");
+      return builder_.CreateUDiv(a, b);
+    case BinaryOp::Mod:
+      panicIf(builder_.CreateICmpEQ(b, zero), "integer modulo by zero");
+      return builder_.CreateURem(a, b);
+    case BinaryOp::Pow:
+      return builder_.CreateCall(cgm_.runtime(RuntimeFn::UPow), {a, b});
+    case BinaryOp::Lt: return builder_.CreateICmpULT(a, b);
+    case BinaryOp::Le: return builder_.CreateICmpULE(a, b);
+    case BinaryOp::Gt: return builder_.CreateICmpUGT(a, b);
+    case BinaryOp::Ge: return builder_.CreateICmpUGE(a, b);
+    default: break; // Shr is handled below.
+    }
+  }
   switch (op) {
   // Wrap-around arithmetic: LLVM's add/sub/mul without nsw.
   case BinaryOp::Add: return builder_.CreateAdd(a, b);
@@ -762,8 +806,9 @@ llvm::Value *CodegenFunction::emitIntOp(BinaryOp op, llvm::Value *a,
     builder_.CreateCall(cgm_.runtime(RuntimeFn::ShiftError), {b});
     builder_.CreateUnreachable();
     builder_.SetInsertPoint(ok);
-    return op == BinaryOp::Shl ? builder_.CreateShl(a, b)
-                               : builder_.CreateAShr(a, b);
+    if (op == BinaryOp::Shl)
+      return builder_.CreateShl(a, b);
+    return isUnsigned ? builder_.CreateLShr(a, b) : builder_.CreateAShr(a, b);
   }
   case BinaryOp::Eq: return builder_.CreateICmpEQ(a, b);
   case BinaryOp::Ne: return builder_.CreateICmpNE(a, b);

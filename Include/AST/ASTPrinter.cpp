@@ -191,8 +191,12 @@ public:
     indent() << "Name " << n.name() << '\n';
   }
   void visit(const IntegerLiteral &n) override {
-    indent() << "Integer " << n.value() << (n.isByte() ? " (byte)" : "")
-             << '\n';
+    indent() << "Integer ";
+    if (n.isU64())
+      out_ << static_cast<std::uint64_t>(n.value()) << " (u64)";
+    else
+      out_ << n.value() << (n.isByte() ? " (byte)" : "");
+    out_ << '\n';
   }
   void visit(const FloatLiteral &n) override {
     indent() << "Float " << formatDouble(n.value())

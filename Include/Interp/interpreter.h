@@ -85,10 +85,14 @@ private:
   Value evalUnary(const UnaryExpr &unary);
   Value evalCall(const CallExpr &call);
   Value evalCast(const CastExpr &cast);
-  Value applyBinary(BinaryOp op, const Value &lhs, const Value &rhs);
+  // The operand types tell u64 bits apart from int64 ones.
+  Value applyBinary(BinaryOp op, const Value &lhs, const Value &rhs,
+                    const Type *lhsType, const Type *rhsType);
   // Converts a value to a declared type (int to float, i32 wrap-around, ...),
-  // as semantic analysis allows. Also used for casts.
-  static Value convertTo(Value value, const Type *type);
+  // as semantic analysis allows. Also used for casts. `from` is the value's
+  // static type, when known (a u64 converts to float as unsigned).
+  static Value convertTo(Value value, const Type *type,
+                         const Type *from = nullptr);
 
   Value *lookup(std::uint32_t symbol);
   void declare(std::uint32_t symbol, Value value);

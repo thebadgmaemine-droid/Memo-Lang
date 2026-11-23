@@ -154,10 +154,20 @@ const VectorType *TypeContext::vectorType(const Type *element, unsigned lanes,
 const Type *TypeContext::primitive(std::string_view name) {
   if (name == "int" || name == "i64")
     return intType(64, true);
+  if (name == "i16")
+    return intType(16,true);
+  if (name == "i8")
+    return intType(8,true);
   if (name == "i32")
     return intType(32, true);
-  if (name == "byte")
+  if (name == "byte" || name == "u8")
     return byteType();
+  if (name == "u16")
+    return intType(16, false);
+  if (name == "u32")
+    return intType(32, false);
+  if (name == "u64")
+    return intType(64, false);
   if (name == "float" || name == "f64")
     return floatType(64);
   if (name == "f32")

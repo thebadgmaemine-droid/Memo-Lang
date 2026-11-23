@@ -170,6 +170,17 @@ std::int64_t memolang_rt_ipow(std::int64_t base, std::int64_t exponent) {
   return static_cast<std::int64_t>(result);
 }
 
+std::uint64_t memolang_rt_upow(std::uint64_t base, std::uint64_t exponent) {
+  std::uint64_t result = 1;
+  while (exponent > 0) {
+    if (exponent & 1)
+      result *= base;
+    base *= base;
+    exponent >>= 1;
+  }
+  return result;
+}
+
 void memolang_rt_panic(const char *message) {
   std::fflush(stdout);
   std::fprintf(stderr, "runtime error: %s\n", message);
@@ -183,6 +194,9 @@ void memolang_rt_shift_error(std::int64_t amount) {
 }
 
 void memolang_rt_print_int(std::int64_t value) { result(std::to_string(value)); }
+void memolang_rt_print_uint(std::uint64_t value) {
+  result(std::to_string(value));
+}
 
 void memolang_rt_print_float(double value) {
   char buffer[64];

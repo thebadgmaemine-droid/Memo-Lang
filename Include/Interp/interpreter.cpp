@@ -47,7 +47,17 @@ bool isInt(const Value &v) { return std::holds_alternative<std::int64_t>(v); }
 bool isFloat(const Value &v) { return std::holds_alternative<double>(v); }
 bool isMatrix(const Value &v) { return std::holds_alternative<MatrixRef>(v); }
 
-double asDouble(const Value &v) {
+// Ints are stored as int64; a u64 keeps its bits there, so code that reads
+// one as a number has to know its type.
+bool isU64(const Type *type) {
+  const auto *intType = dynCast<IntType>(type);
+  return intType && intType->bits() == 64 && !intType->isSigned();
+}
+
+double asDouble(const Value &v, const Type *type = nullptr) {
+  if (isInt(v) && isU64(type))
+    return static_cast<double>(
+        static_cast<std::uint64_t>(std::get<std::int64_t>(v)));
   if (isInt(v))
     return static_cast<double>(std::get<std::int64_t>(v));
   if (isFloat(v))
@@ -122,6 +132,31 @@ std::int64_t floorMod(std::int64_t a, std::int64_t b) {
     r += b;
   return r;
 }
+// u64 `//`, `%` and `**`: plain unsigned math, every exponent is valid.
+std::int64_t unsignedOp(BinaryOp op, std::int64_t a, std::int64_t b) {
+  auto ua = static_cast<std::uint64_t>(a);
+  auto ub = static_cast<std::uint64_t>(b);
+  std::uint64_t r = 1;
+  switch (op) {
+  case BinaryOp::FloorDiv:
+    if (ub == 0)
+      fail("integer division by zero");
+    r = ua / ub;
+    break;
+  case BinaryOp::Mod:
+    if (ub == 0)
+      fail("integer modulo by zero");
+    r = ua % ub;
+    break;
+  default: // Pow
+    for (; ub > 0; ub >>= 1, ua *= ua)
+      if (ub & 1)
+        r *= ua;
+    break;
+  }
+  return static_cast<std::int64_t>(r);
+}
+
 std::int64_t intPow(std::int64_t base, std::int64_t exponent) {
   if (exponent < 0)
     fail("negative exponent for an integer power; use a float");
@@ -160,7 +195,9 @@ Value defaultValue(const Type *type) {
   }
 }
 
-std::string toText(const Value &v) {
+std::string toText(const Value &v, const Type *type) {
+  if (isInt(v) && isU64(type))
+    return std::to_string(static_cast<std::uint64_t>(std::get<std::int64_t>(v)));
   if (isInt(v))
     return std::to_string(std::get<std::int64_t>(v));
   if (isFloat(v)) {
@@ -189,11 +226,17 @@ Interpreter::Interpreter(const Module &module,
     : module_(module), sema_(sema), destructive_(destructive),
       runtime_(runtime), mode_(mode) {}
 
-Value Interpreter::convertTo(Value value, const Type *type) {
+Value Interpreter::convertTo(Value value, const Type *type, const Type *from) {
   if (!type || std::holds_alternative<std::monostate>(value))
     return value;
   if (const auto *intType = dynCast<IntType>(type)) {
     std::int64_t v = 0;
+    if (isFloat(value) && isU64(type)) {
+      double d = std::get<double>(value);
+      if (!(d > -1.0 && d < 1.8446744073709552e19)) // NaN fails too.
+        fail("float value out of range for an integer");
+      return static_cast<std::int64_t>(static_cast<std::uint64_t>(d));
+    }
     if (isFloat(value)) {
       double d = std::get<double>(value);
       if (!std::isfinite(d) || d >= 9.2233720368547758e18 ||
@@ -206,7 +249,7 @@ Value Interpreter::convertTo(Value value, const Type *type) {
     return wrapInt(v, intType->bits(), intType->isSigned());
   }
   if (const auto *floatType = dynCast<FloatType>(type)) {
-    double d = asDouble(value);
+    double d = asDouble(value, from);
     if (floatType->bits() == 32)
       d = static_cast<double>(static_cast<float>(d));
     return d;
@@ -273,7 +316,8 @@ Interpreter::Result Interpreter::run() {
       fail("there is no main() function to run");
     if (!mainFunction->params().empty())
       fail("main() must not take parameters");
-    result.value = toText(callFunction(*mainFunction, {}));
+    result.value = toText(callFunction(*mainFunction, {}),
+                          returnTypeOf(*mainFunction));
     result.ok = true;
   } catch (const RuntimeError &error) {
     result.error = error.message;
@@ -361,7 +405,9 @@ Interpreter::Flow Interpreter::exec(const Statement &stmt) {
       fail("internal error: '" + decl.name() + "' was never declared");
     Value value = decl.init() ? eval(*decl.init())
                               : defaultValue(decl.resolvedType());
-    declare(id->value, convertTo(std::move(value), decl.resolvedType()));
+    declare(id->value,
+            convertTo(std::move(value), decl.resolvedType(),
+                      decl.init() ? decl.init()->resolvedType() : nullptr));
     return Flow::Normal;
   }
   case NodeKind::AssignStmt: {
@@ -372,8 +418,10 @@ Interpreter::Flow Interpreter::exec(const Statement &stmt) {
     std::uint32_t id = symbolOf(target);
     const Type *type = sema_.symbol(SymbolId{id}).type;
     Value value;
+    const Type *from = nullptr; // A compound result needs no source type.
     if (assign.op() == AssignOp::Assign) {
       value = eval(assign.value());
+      from = assign.value().resolvedType();
     } else {
       Value current = *lookup(id);
       Value rhs = eval(assign.value());
@@ -385,10 +433,10 @@ Interpreter::Flow Interpreter::exec(const Statement &stmt) {
       case AssignOp::Mod: op = BinaryOp::Mod; break;
       default: break;
       }
-      value = applyBinary(op, current, rhs);
+      value = applyBinary(op, current, rhs, type, assign.value().resolvedType());
     }
     // Replacing the old value releases its matrix, in both modes.
-    *lookup(id) = convertTo(std::move(value), type);
+    *lookup(id) = convertTo(std::move(value), type, from);
     return Flow::Normal;
   }
   case NodeKind::ReturnStmt: {
@@ -396,7 +444,8 @@ Interpreter::Flow Interpreter::exec(const Statement &stmt) {
     const FunctionDef *function = frames_.back().function;
     returnValue_ = ret.value() ? convertTo(eval(*ret.value()),
                                            function ? returnTypeOf(*function)
-                                                    : nullptr)
+                                                    : nullptr,
+                                           ret.value()->resolvedType())
                                : Value{std::monostate{}};
     return Flow::Return;
   }
@@ -483,14 +532,18 @@ Value Interpreter::evalBinary(const BinaryExpr &binary) {
       acc = asBool(acc) || asBool(eval(node.rhs()));
     } else {
       Value rhs = eval(node.rhs());
-      acc = convertTo(applyBinary(node.op(), acc, rhs), node.resolvedType());
+      acc = convertTo(applyBinary(node.op(), acc, rhs,
+                                  node.lhs().resolvedType(),
+                                  node.rhs().resolvedType()),
+                      node.resolvedType());
     }
   }
   return acc;
 }
 
 Value Interpreter::applyBinary(BinaryOp op, const Value &lhs,
-                               const Value &rhs) {
+                               const Value &rhs, const Type *lhsType,
+                               const Type *rhsType) {
   // Matrices.
   if (isMatrix(lhs) || isMatrix(rhs)) {
     if (op == BinaryOp::MatMul)
@@ -500,11 +553,11 @@ Value Interpreter::applyBinary(BinaryOp op, const Value &lhs,
       return runtime_.add(*asMatrix(lhs), *asMatrix(rhs),
                           op == BinaryOp::Sub);
     if (op == BinaryOp::Mul && isMatrix(lhs))
-      return runtime_.scale(*asMatrix(lhs), asDouble(rhs));
+      return runtime_.scale(*asMatrix(lhs), asDouble(rhs, rhsType));
     if (op == BinaryOp::Mul && isMatrix(rhs))
-      return runtime_.scale(*asMatrix(rhs), asDouble(lhs));
+      return runtime_.scale(*asMatrix(rhs), asDouble(lhs, lhsType));
     if (op == BinaryOp::Div && isMatrix(lhs)) {
-      double d = asDouble(rhs);
+      double d = asDouble(rhs, rhsType);
       if (d == 0.0)
         fail("matrix divided by zero");
       return runtime_.scale(*asMatrix(lhs), 1.0 / d);
@@ -537,6 +590,30 @@ Value Interpreter::applyBinary(BinaryOp op, const Value &lhs,
   if (isInt(lhs) && isInt(rhs)) {
     std::int64_t a = std::get<std::int64_t>(lhs);
     std::int64_t b = std::get<std::int64_t>(rhs);
+    // u64 against any other int is u64 math (sema's commonNumericType).
+    if (isU64(lhsType) || isU64(rhsType)) {
+      auto ua = static_cast<std::uint64_t>(a);
+      auto ub = static_cast<std::uint64_t>(b);
+      switch (op) {
+      case BinaryOp::Div:
+        if (ub == 0)
+          fail("division by zero");
+        return static_cast<double>(ua) / static_cast<double>(ub);
+      case BinaryOp::FloorDiv:
+      case BinaryOp::Mod:
+      case BinaryOp::Pow:
+        return unsignedOp(op, a, b);
+      case BinaryOp::Shr:
+        if (b < 0 || b > 63)
+          fail("shift amount " + std::to_string(b) + " is out of range");
+        return static_cast<std::int64_t>(ua >> b);
+      case BinaryOp::Lt: return ua < ub;
+      case BinaryOp::Le: return ua <= ub;
+      case BinaryOp::Gt: return ua > ub;
+      case BinaryOp::Ge: return ua >= ub;
+      default: break; // The rest are the same bits as int64.
+      }
+    }
     switch (op) {
     case BinaryOp::Add: return wrapAdd(a, b);
     case BinaryOp::Sub: return wrapSub(a, b);
@@ -567,8 +644,8 @@ Value Interpreter::applyBinary(BinaryOp op, const Value &lhs,
     default: break;
     }
   } else {
-    double a = asDouble(lhs);
-    double b = asDouble(rhs);
+    double a = asDouble(lhs, lhsType);
+    double b = asDouble(rhs, rhsType);
     switch (op) {
     case BinaryOp::Add: return a + b;
     case BinaryOp::Sub: return a - b;
@@ -652,13 +729,15 @@ Value Interpreter::evalCall(const CallExpr &call) {
           index = p;
     Value value = eval(*call.args()[i]);
     args[index] = convertTo(std::move(value),
-                            type ? type->params()[index] : nullptr);
+                            type ? type->params()[index] : nullptr,
+                            call.args()[i]->resolvedType());
   }
   return callFunction(function, std::move(args));
 }
 
 Value Interpreter::evalCast(const CastExpr &cast) {
-  return convertTo(eval(cast.value()), cast.target().resolvedType());
+  return convertTo(eval(cast.value()), cast.target().resolvedType(),
+                   cast.value().resolvedType());
 }
 
 RunReport runProgram(const Module &module, const sema::SemanticAnalyzer &sema,

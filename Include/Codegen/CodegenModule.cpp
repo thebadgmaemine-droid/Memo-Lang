@@ -340,6 +340,10 @@ llvm::FunctionCallee CodegenModule::runtime(RuntimeFn fn) {
     name = "memolang_rt_ipow";
     signature = type(i64, {i64, i64});
     break;
+  case RuntimeFn::UPow:
+    name = "memolang_rt_upow";
+    signature = type(i64, {i64, i64});
+    break;
   case RuntimeFn::Panic:
     name = "memolang_rt_panic";
     signature = type(voidTy, {ptr});
@@ -352,6 +356,10 @@ llvm::FunctionCallee CodegenModule::runtime(RuntimeFn fn) {
     break;
   case RuntimeFn::PrintInt:
     name = "memolang_rt_print_int";
+    signature = type(voidTy, {i64});
+    break;
+  case RuntimeFn::PrintUInt:
+    name = "memolang_rt_print_uint";
     signature = type(voidTy, {i64});
     break;
   case RuntimeFn::PrintFloat:
@@ -429,7 +437,7 @@ void CodegenModule::emitEntryPoint(const FunctionDef &mainFunction) {
   case Type::Kind::Int: {
     bool isSigned = static_cast<const IntType *>(returns)->isSigned();
     builder.CreateCall(
-        runtime(RuntimeFn::PrintInt),
+        runtime(isSigned ? RuntimeFn::PrintInt : RuntimeFn::PrintUInt),
         {builder.CreateIntCast(result, builder.getInt64Ty(), isSigned)});
     break;
   }
