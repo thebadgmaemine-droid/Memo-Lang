@@ -51,3 +51,16 @@ def escape_to_global() {
 def pointer_cast(int* p) {
     int x = p as int;             # expect-error: 13: cannot cast 'int*' to 'int'
 }
+
+def size_of_void() -> int {
+    return sizeof(void);          # expect-error: 19: can't take the size of 'void'; it has no storage
+}
+
+def increment_rvalue(int x) {
+    (x + 1)++;                    # expect-error: 6: '++' needs a variable or '*pointer'
+}
+
+def increment_through_pointer(float* p, int** pp) {
+    (*p)++;
+    --**pp;
+}

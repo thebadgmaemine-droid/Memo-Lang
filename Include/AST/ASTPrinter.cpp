@@ -77,8 +77,6 @@ std::string_view binaryOpSpelling(BinaryOp op) {
 
 std::string_view unaryOpSpelling(UnaryOp op) {
   switch (op) {
-  case UnaryOp::SizeOf:
-    return "sizeof";
   case UnaryOp::PreInc:
     return "++ (prefix)";
   case UnaryOp::PostInc:
@@ -235,6 +233,9 @@ public:
   void visit(const CastExpr &n) override {
     indent() << "Cast to " << typeToString(n.target()) << '\n';
     child(n.value());
+  }
+  void visit(const SizeOfExpr &n) override {
+    indent() << "SizeOf " << typeToString(n.target()) << '\n';
   }
   void visit(const CallExpr &n) override {
     indent() << "Call\n";

@@ -2,6 +2,7 @@
 #define MEMOLANG_INTERPRETER_H_
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -58,12 +59,24 @@ public:
   // Runs the module-level statements, then main() (no parameters).
   Result run();
 
+  // Every variable's value lives in a Cell owned by its scope. A pointer
+  // (`&x`) refers to the cell without owning it, so a variable's matrix is
+  // still freed when its scope ends, and following a pointer to a variable
+  // that no longer exists is a run-time error instead of a crash.
+  struct Cell;
+  struct Pointer {
+    std::weak_ptr<Cell> cell;
+    bool hasTarget = false; // False for a pointer that was never given one.
+  };
   using Value = std::variant<std::monostate, std::int64_t, double, bool,
-                             std::string, runtime::MatrixRef>;
+                             std::string, runtime::MatrixRef, Pointer>;
+  struct Cell {
+    Value value;
+  };
 
 private:
   enum class Flow { Normal, Break, Return };
-  using Scope = std::unordered_map<std::uint32_t, Value>;
+  using Scope = std::unordered_map<std::uint32_t, std::shared_ptr<Cell>>;
   struct Frame {
     const FunctionDef *function = nullptr; // Null for module-level code.
     std::vector<Scope> scopes;
@@ -95,8 +108,14 @@ private:
                          const Type *from = nullptr);
 
   Value *lookup(std::uint32_t symbol);
+  std::shared_ptr<Cell> lookupCell(std::uint32_t symbol);
   void declare(std::uint32_t symbol, Value value);
   std::uint32_t symbolOf(const NameExpr &name) const;
+  // The cell an assignment target names: a variable, or `*p`. `type` gets
+  // the target's static type.
+  std::shared_ptr<Cell> cellFor(const Expr &target, const Type *&type);
+  // The cell `pointer` refers to; fails if it has none or it is gone.
+  static std::shared_ptr<Cell> follow(const Value &pointer);
 
   const Module &module_;
   const sema::SemanticAnalyzer &sema_;

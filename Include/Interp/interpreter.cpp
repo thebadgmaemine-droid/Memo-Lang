@@ -191,6 +191,7 @@ Value defaultValue(const Type *type) {
   case Type::Kind::Float: return 0.0;
   case Type::Kind::Bool: return false;
   case Type::Kind::Str: return std::string();
+  case Type::Kind::Pointer: return Interpreter::Pointer{}; // Points nowhere.
   default: return std::monostate{}; // A matrix without a value.
   }
 }
@@ -272,24 +273,64 @@ std::uint32_t Interpreter::symbolOf(const NameExpr &name) const {
   return id->value;
 }
 
-Value *Interpreter::lookup(std::uint32_t symbol) {
+std::shared_ptr<Interpreter::Cell>
+Interpreter::lookupCell(std::uint32_t symbol) {
   if (!frames_.empty()) {
     auto &scopes = frames_.back().scopes;
     for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
       auto found = it->find(symbol);
       if (found != it->end())
-        return &found->second;
+        return found->second;
     }
   }
   auto found = globals_.find(symbol);
-  return found == globals_.end() ? nullptr : &found->second;
+  return found == globals_.end() ? nullptr : found->second;
+}
+
+Value *Interpreter::lookup(std::uint32_t symbol) {
+  // The scope keeps owning the cell, so the address stays valid.
+  Cell *cell = lookupCell(symbol).get();
+  return cell ? &cell->value : nullptr;
 }
 
 void Interpreter::declare(std::uint32_t symbol, Value value) {
+  // A fresh cell each time: a pointer to the variable's previous life (an
+  // earlier loop iteration or call) doesn't see the new one.
+  auto cell = std::make_shared<Cell>(Cell{std::move(value)});
   if (frames_.empty() || frames_.back().scopes.empty())
-    globals_[symbol] = std::move(value);
+    globals_[symbol] = std::move(cell);
   else
-    frames_.back().scopes.back()[symbol] = std::move(value);
+    frames_.back().scopes.back()[symbol] = std::move(cell);
+}
+
+std::shared_ptr<Interpreter::Cell> Interpreter::follow(const Value &pointer) {
+  const auto *p = std::get_if<Pointer>(&pointer);
+  if (!p)
+    fail("expected a pointer");
+  if (!p->hasTarget)
+    fail("dereferencing a pointer that was never given a value");
+  auto cell = p->cell.lock();
+  if (!cell)
+    fail("dereferencing a dangling pointer: the variable it points to no "
+         "longer exists");
+  return cell;
+}
+
+std::shared_ptr<Interpreter::Cell> Interpreter::cellFor(const Expr &target,
+                                                        const Type *&type) {
+  if (target.kind() == NodeKind::NameExpr) {
+    const auto &name = static_cast<const NameExpr &>(target);
+    std::uint32_t id = symbolOf(name);
+    auto cell = lookupCell(id);
+    if (!cell)
+      fail("internal error: '" + name.name() + "' has no storage");
+    type = sema_.symbol(SymbolId{id}).type;
+    return cell;
+  }
+  // `*p`: sema allows only a variable or a dereference here.
+  const auto &deref = static_cast<const UnaryExpr &>(target);
+  type = target.resolvedType();
+  return follow(eval(deref.operand()));
 }
 
 // ---------------------------------------------------------------------------
@@ -412,18 +453,19 @@ Interpreter::Flow Interpreter::exec(const Statement &stmt) {
   }
   case NodeKind::AssignStmt: {
     const auto &assign = static_cast<const AssignStmt &>(stmt);
-    if (assign.target().kind() != NodeKind::NameExpr)
-      fail("assigning through a pointer isn't supported at run time yet");
-    const auto &target = static_cast<const NameExpr &>(assign.target());
-    std::uint32_t id = symbolOf(target);
-    const Type *type = sema_.symbol(SymbolId{id}).type;
+    // `x = v` and `*p = v` evaluate v first; `x op= v` and `*p op= v` find
+    // the target and read it first (codegen does the same).
+    const Type *type = nullptr;
+    std::shared_ptr<Cell> cell;
     Value value;
     const Type *from = nullptr; // A compound result needs no source type.
     if (assign.op() == AssignOp::Assign) {
       value = eval(assign.value());
       from = assign.value().resolvedType();
+      cell = cellFor(assign.target(), type);
     } else {
-      Value current = *lookup(id);
+      cell = cellFor(assign.target(), type);
+      Value current = cell->value;
       Value rhs = eval(assign.value());
       BinaryOp op = BinaryOp::Add;
       switch (assign.op()) {
@@ -436,7 +478,7 @@ Interpreter::Flow Interpreter::exec(const Statement &stmt) {
       value = applyBinary(op, current, rhs, type, assign.value().resolvedType());
     }
     // Replacing the old value releases its matrix, in both modes.
-    *lookup(id) = convertTo(std::move(value), type, from);
+    cell->value = convertTo(std::move(value), type, from);
     return Flow::Normal;
   }
   case NodeKind::ReturnStmt: {
@@ -512,6 +554,11 @@ Value Interpreter::eval(const Expr &expr) {
     return evalCall(static_cast<const CallExpr &>(expr));
   case NodeKind::CastExpr:
     return evalCast(static_cast<const CastExpr &>(expr));
+  case NodeKind::SizeOfExpr:
+    return sizeOfType(static_cast<const SizeOfExpr &>(expr)
+                          .target()
+                          .resolvedType())
+        .value_or(0); // Sema rejected every type without a size.
   default:
     return std::string(); // Interpolated strings have no syntax yet.
   }
@@ -578,6 +625,17 @@ Value Interpreter::applyBinary(BinaryOp op, const Value &lhs,
     case BinaryOp::Ge: return l >= r;
     default: fail("this operation isn't supported on strings");
     }
+  }
+  // Pointers are equal when they point to the same variable (or both nowhere).
+  if (const auto *l = std::get_if<Pointer>(&lhs)) {
+    const auto &r = std::get<Pointer>(rhs);
+    bool same = l->hasTarget == r.hasTarget && !l->cell.owner_before(r.cell) &&
+                !r.cell.owner_before(l->cell);
+    if (op == BinaryOp::Eq)
+      return same;
+    if (op == BinaryOp::Ne)
+      return !same;
+    fail("this operation isn't supported on pointers");
   }
   // Bools compare by value.
   if (std::holds_alternative<bool>(lhs) && std::holds_alternative<bool>(rhs)) {
@@ -670,21 +728,31 @@ Value Interpreter::evalUnary(const UnaryExpr &unary) {
   UnaryOp op = unary.op();
   if (op == UnaryOp::PreInc || op == UnaryOp::PostInc ||
       op == UnaryOp::PreDec || op == UnaryOp::PostDec) {
-    const auto &name = static_cast<const NameExpr &>(unary.operand());
-    std::uint32_t id = symbolOf(name);
-    Value *slot = lookup(id);
-    if (!slot)
-      fail("internal error: '" + name.name() + "' has no storage");
-    Value old = *slot;
+    // `x++` or `(*p)++`.
+    const Type *type = nullptr;
+    std::shared_ptr<Cell> cell = cellFor(unary.operand(), type);
+    Value old = cell->value;
     bool up = op == UnaryOp::PreInc || op == UnaryOp::PostInc;
     Value updated = isInt(old) ? Value{up ? wrapAdd(std::get<std::int64_t>(old), 1)
                                           : wrapSub(std::get<std::int64_t>(old), 1)}
                                : Value{asDouble(old) + (up ? 1.0 : -1.0)};
-    *slot = convertTo(updated, sema_.symbol(SymbolId{id}).type);
-    return (op == UnaryOp::PreInc || op == UnaryOp::PreDec) ? *slot : old;
+    cell->value = convertTo(updated, type);
+    return (op == UnaryOp::PreInc || op == UnaryOp::PreDec) ? cell->value : old;
+  }
+  if (op == UnaryOp::AddressOf) {
+    // `&x` or `&*p`: the cell itself, not its value.
+    const Type *type = nullptr;
+    return Pointer{cellFor(unary.operand(), type), /*hasTarget=*/true};
   }
   Value operand = eval(unary.operand());
   switch (op) {
+  case UnaryOp::Deref: {
+    // A read through the pointer never moves the value out, even a matrix.
+    Value value = follow(operand)->value;
+    if (std::holds_alternative<std::monostate>(value))
+      fail("the variable this pointer points to has no value");
+    return value;
+  }
   case UnaryOp::Neg:
     if (isMatrix(operand))
       return runtime_.scale(*asMatrix(operand), -1.0);

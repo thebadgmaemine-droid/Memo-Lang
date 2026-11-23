@@ -303,6 +303,13 @@ private:
   const Type *str_ = nullptr;
 };
 
+// The size in bytes of a value of `type`, as `sizeof(T)` gives it: the size
+// of its storage on a 64-bit target. bool and byte are 1; str, matrix and
+// pointers are 8 (a pointer to the string, matrix or pointee). Nothing for
+// types with no storage (void, auto, functions, errors). Shared by semantic
+// analysis, the interpreter and code generation, so they always agree.
+[[nodiscard]] std::optional<std::int64_t> sizeOfType(const Type *type);
+
 namespace Detail {
 
 inline void appendPtr(std::string &key, const Type *t) {

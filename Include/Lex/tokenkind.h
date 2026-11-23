@@ -91,7 +91,8 @@
   TOK(TOK_TRY, "try")                                                          \
   TOK(TOK_CATCH, "catch")                                                      \
   TOK(TOK_THROW, "throw")                                                      \
-  TOK(TOK_CASE, "case")
+  TOK(TOK_CASE, "case")                                                        \
+  TOK(TOK_SIZEOF, "sizeof")
 
 namespace MemoLang {
 enum class TokenKind {

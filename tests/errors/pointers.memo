@@ -6,3 +6,11 @@ def f(int x) {
 def g(int x) {
     int y = x as int*;          # expect-error: 22: expected an expression
 }
+
+def h() {
+    int s = sizeof int;         # expect-error: 20: expected '(' after 'sizeof'
+}
+
+def k() {
+    int s = sizeof(x);          # expect-error: 20: unknown type name 'x'
+}

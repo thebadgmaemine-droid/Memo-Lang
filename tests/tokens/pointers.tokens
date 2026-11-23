@@ -24,4 +24,9 @@
 2:42	identifier	'p'
 2:43	*=
 2:45	integer literal	'2'
+2:47	sizeof
+2:53	(
+2:54	type name	'int'
+2:57	*
+2:58	)
 3:1	end of file

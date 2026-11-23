@@ -247,11 +247,22 @@ Destructive::trackedSymbol(const Expr &expr) const {
   auto id = sema_.symbolFor(static_cast<const NameExpr &>(expr));
   if (!id)
     return std::nullopt;
-  auto kind = sema_.symbol(*id).kind;
-  if (kind != sema::Symbol::Kind::Variable &&
-      kind != sema::Symbol::Kind::Parameter)
+  const sema::Symbol &symbol = sema_.symbol(*id);
+  if (symbol.kind != sema::Symbol::Kind::Variable &&
+      symbol.kind != sema::Symbol::Kind::Parameter)
+    return std::nullopt;
+  // A pointer may still read it, so it is never consumed: it keeps its
+  // matrix until its scope ends, as in baseline mode.
+  if (symbol.addressTaken)
     return std::nullopt;
   return id->value;
+}
+
+bool Destructive::isAddressTaken(const Expr &expr) const {
+  if (expr.kind() != NodeKind::NameExpr)
+    return false;
+  auto id = sema_.symbolFor(static_cast<const NameExpr &>(expr));
+  return id && sema_.symbol(*id).addressTaken;
 }
 
 void Destructive::evaluate(const Expr &expr, Flow &flow) {
@@ -341,7 +352,11 @@ void Destructive::use(const NameExpr &name, Flow &flow) {
 
 void Destructive::consume(const Expr &operand, const Node &consumer,
                           Flow &flow) {
-  if (!isConsumable(operand))
+  if (!isConsumable(operand) || isAddressTaken(operand))
+    return; // An address-taken variable is only read (see trackedSymbol).
+  // `*p` reads through the pointer; the variable it points to keeps its matrix.
+  if (operand.kind() == NodeKind::UnaryExpr &&
+      static_cast<const UnaryExpr &>(operand).op() == UnaryOp::Deref)
     return;
   consumed_.insert(&operand);
   if (auto id = trackedSymbol(operand))

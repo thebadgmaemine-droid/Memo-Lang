@@ -123,6 +123,30 @@ CodegenFunction::Slot CodegenFunction::slotFor(std::uint32_t symbol,
   return Slot{createEntryAlloca(lowered, "invalid"), type};
 }
 
+CodegenFunction::Slot CodegenFunction::emitLValue(const Expr &target) {
+  if (target.kind() == NodeKind::NameExpr) {
+    const auto &name = static_cast<const NameExpr &>(target);
+    if (auto id = cgm_.getSema().symbolFor(name))
+      return slotFor(id->value, name);
+    cgm_.error(name.range(), "internal error: '" + name.name() +
+                                 "' was never resolved");
+  } else if (target.kind() == NodeKind::UnaryExpr &&
+             static_cast<const UnaryExpr &>(target).op() == UnaryOp::Deref) {
+    // `*p`: the address is p's value. Sema allows nothing else here.
+    llvm::Value *address =
+        emitExpr(static_cast<const UnaryExpr &>(target).operand());
+    panicIf(builder_.CreateIsNull(address),
+            "dereferencing a pointer that was never given a value");
+    return Slot{address, target.resolvedType()};
+  } else {
+    cgm_.error(target.range(), "internal error: not an assignable expression");
+  }
+  llvm::Type *lowered = cgm_.lowerType(target.resolvedType());
+  if (!lowered || lowered->isVoidTy())
+    lowered = builder_.getInt64Ty();
+  return Slot{createEntryAlloca(lowered, "invalid"), target.resolvedType()};
+}
+
 // ---------------------------------------------------------------------------
 // Runtime checks and calls
 // ---------------------------------------------------------------------------
@@ -241,7 +265,8 @@ llvm::Value *CodegenFunction::defaultValue(const Type *type) {
   case Type::Kind::Int:
   case Type::Kind::Float:
   case Type::Kind::Bool:
-  case Type::Kind::Matrix: // A matrix without a value: null.
+  case Type::Kind::Matrix:  // A matrix without a value: null.
+  case Type::Kind::Pointer: // A pointer to nothing: null.
     return llvm::Constant::getNullValue(cgm_.lowerType(type));
   default:
     return nullptr;
@@ -350,28 +375,20 @@ void CodegenFunction::emitDeclareVar(const DeclareVar &decl) {
 }
 
 void CodegenFunction::emitAssign(const AssignStmt &assign) {
-  if (assign.target().kind() != NodeKind::NameExpr) {
-    cgm_.error(assign.target().range(), "can only assign to a variable");
-    return;
-  }
-  const auto &target = static_cast<const NameExpr &>(assign.target());
-  auto id = cgm_.getSema().symbolFor(target);
-  if (!id) {
-    cgm_.error(target.range(), "internal error: '" + target.name() +
-                                   "' was never resolved");
-    return;
-  }
-  Slot slot = slotFor(id->value, target);
-  llvm::Type *lowered = cgm_.lowerType(slot.type);
+  // `x = v` / `*p = v` evaluate v first; `x op= v` / `*p op= v` find and
+  // read the target first, as the interpreter does.
   const Expr &valueExpr = assign.value();
-
+  Slot slot;
   llvm::Value *value = nullptr;
   if (assign.op() == AssignOp::Assign) {
-    value = convert(emitExpr(valueExpr), valueExpr.resolvedType(), slot.type);
+    llvm::Value *raw = emitExpr(valueExpr);
+    slot = emitLValue(assign.target());
+    value = convert(raw, valueExpr.resolvedType(), slot.type);
   } else {
+    slot = emitLValue(assign.target());
     // `m op= v` reads m without consuming it, as the interpreter does.
-    llvm::Value *current = builder_.CreateLoad(lowered, slot.address,
-                                               target.name());
+    llvm::Value *current =
+        builder_.CreateLoad(cgm_.lowerType(slot.type), slot.address, "current");
     if (isMatrix(slot.type))
       retain(current);
     llvm::Value *rhs = emitExpr(valueExpr);
@@ -389,8 +406,10 @@ void CodegenFunction::emitAssign(const AssignStmt &assign) {
   if (!value)
     return;
   if (isMatrix(slot.type)) {
-    // The new value replaces the old one, which is released.
-    llvm::Value *old = builder_.CreateLoad(lowered, slot.address, "old");
+    // The new value replaces the old one, which is released (also through
+    // a pointer: the variable pointed to owned the old matrix).
+    llvm::Value *old =
+        builder_.CreateLoad(cgm_.lowerType(slot.type), slot.address, "old");
     builder_.CreateStore(value, slot.address);
     release(old);
   } else {
@@ -507,6 +526,14 @@ llvm::Value *CodegenFunction::emitExpr(const Expr &expr) {
     return convert(emitExpr(cast.value()), cast.value().resolvedType(),
                    cast.target().resolvedType());
   }
+  case NodeKind::SizeOfExpr: {
+    // The same numbers as sema and the interpreter (sizeOfType), not the
+    // target's DataLayout, so every way of running a program agrees.
+    const auto &size = static_cast<const SizeOfExpr &>(expr);
+    std::int64_t bytes = sizeOfType(size.target().resolvedType()).value_or(0);
+    return convert(builder_.getInt64(static_cast<std::uint64_t>(bytes)),
+                   types_.intType(), expr.resolvedType());
+  }
   case NodeKind::InterpolatedString: {
     // add
   }
@@ -547,16 +574,9 @@ llvm::Value *CodegenFunction::emitUnary(const UnaryExpr &unary) {
 
   if (op == UnaryOp::PreInc || op == UnaryOp::PostInc ||
       op == UnaryOp::PreDec || op == UnaryOp::PostDec) {
-    const auto &name = static_cast<const NameExpr &>(unary.operand());
-    auto id = cgm_.getSema().symbolFor(name);
-    if (!id) {
-      cgm_.error(name.range(), "internal error: '" + name.name() +
-                                   "' was never resolved");
-      return defaultValue(resultType);
-    }
-    Slot slot = slotFor(id->value, name);
+    Slot slot = emitLValue(unary.operand()); // `x++` or `(*p)++`.
     llvm::Value *old =
-        builder_.CreateLoad(cgm_.lowerType(slot.type), slot.address, name.name());
+        builder_.CreateLoad(cgm_.lowerType(slot.type), slot.address, "old");
     bool up = op == UnaryOp::PreInc || op == UnaryOp::PostInc;
     llvm::Value *updated = nullptr;
     if (slot.type->kind() == Type::Kind::Int) {
@@ -574,10 +594,28 @@ llvm::Value *CodegenFunction::emitUnary(const UnaryExpr &unary) {
     builder_.CreateStore(updated, slot.address);
     return (op == UnaryOp::PreInc || op == UnaryOp::PreDec) ? updated : old;
   }
+  // `&x`: the variable's slot (an alloca or a global), not its value. A
+  // local whose address is taken stays in memory: mem2reg leaves it alone.
+  if (op == UnaryOp::AddressOf)
+    return emitLValue(unary.operand()).address;
 
   const Type *operandType = unary.operand().resolvedType();
   llvm::Value *operand = emitExpr(unary.operand());
   switch (op) {
+  case UnaryOp::Deref: {
+    panicIf(builder_.CreateIsNull(operand),
+            "dereferencing a pointer that was never given a value");
+    llvm::Value *value =
+        builder_.CreateLoad(cgm_.lowerType(resultType), operand, "deref");
+    if (!isMatrix(resultType))
+      return value;
+    // Never consumed: the variable pointed to keeps its matrix, and the
+    // reader gets a reference of its own, as for a shared read of a name.
+    panicIf(builder_.CreateIsNull(value),
+            "the variable this pointer points to has no value");
+    retain(value);
+    return value;
+  }
   case UnaryOp::Neg:
     if (isMatrix(operandType)) {
       llvm::Value *result = builder_.CreateCall(
@@ -678,6 +716,13 @@ llvm::Value *CodegenFunction::emitBinaryOp(BinaryOp op, llvm::Value *lhs,
     case BinaryOp::Ge: return builder_.CreateICmpSGE(order, zero);
     default: break;
     }
+  } else if (isKind(lhsType, Type::Kind::Pointer) &&
+             isKind(rhsType, Type::Kind::Pointer)) {
+    // Same variable (or both null). Sema allows nothing but == and !=.
+    if (op == BinaryOp::Eq)
+      return builder_.CreateICmpEQ(lhs, rhs);
+    if (op == BinaryOp::Ne)
+      return builder_.CreateICmpNE(lhs, rhs);
   } else if (isKind(lhsType, Type::Kind::Bool) &&
              isKind(rhsType, Type::Kind::Bool)) {
     if (op == BinaryOp::Eq)

@@ -25,6 +25,26 @@ def param_pointer(int* p) -> int* {
     return p;                     # Returning a pointer we were given is fine.
 }
 
+def step(int* p) -> int {
+    (*p)++;
+    --(*p);
+    return ++(*p);
+}
+
+def sizes() -> int {
+    return sizeof(int) + sizeof(f32*) + sizeof(matrix<float>) + sizeof(bool);
+}
+
+def address_taken_matrix() {
+    # &m stops destructive reads from consuming m: a pointer may still read
+    # it. So using m after `@` or a move is fine here.
+    matrix<float> m = zeros_matrix(2, 2);
+    matrix<float>* mp = &m;
+    matrix<float> n = m @ m;
+    matrix<float> k = m;
+    matrix<float> j = *mp @ *mp;
+}
+
 def main() -> int {
     int x = 1;
     int* p = &x;

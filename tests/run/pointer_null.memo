@@ -1,0 +1,7 @@
+# A pointer declared without a value points nowhere; following it is an error.
+# expect-runtime-error: dereferencing a pointer that was never given a value
+
+def main() -> int {
+    int* p;
+    return *p;
+}

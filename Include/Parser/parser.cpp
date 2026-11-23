@@ -42,6 +42,8 @@
 
 #include "Diag/diagengine.h"
 #include "Lex/lexer.h"
+#include "diag.h"
+#include "tokenkind.h"
 #include "Parser/parser.h"
 
 namespace MemoLang {
@@ -164,6 +166,33 @@ std::optional<AssignOp> assignOp(TokenKind kind) {
   default:
     return std::nullopt;
   }
+}
+
+// The value of an integer literal's spelling (decimal, 0x..., 0b...), or
+// nothing if it doesn't fit in 64 bits. Used for literals and for matrix
+// dimensions in types (parseType).
+std::optional<std::uint64_t> integerLiteralValue(std::string_view text) {
+  int base = 10;
+  if (text.size() > 2 && text[0] == '0') {
+    if (text[1] == 'x' || text[1] == 'X')
+      base = 16;
+    else if (text[1] == 'b' || text[1] == 'B')
+      base = 2;
+    if (base != 10)
+      text.remove_prefix(2);
+  }
+  std::uint64_t value = 0;
+  auto [end, ec] =
+      std::from_chars(text.data(), text.data() + text.size(), value, base);
+  if (ec != std::errc() || end != text.data() + text.size())
+    return std::nullopt;
+  return value;
+}
+
+// Past int64's range a literal is a u64 (it keeps the bits).
+bool exceedsInt64(std::uint64_t value) {
+  return value >
+         static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
 }
 
 } // namespace
@@ -506,13 +535,35 @@ std::unique_ptr<TypeExpr> Parser::parseType(bool allowPointer) {
   }
   Token nameTok = consume();
   std::vector<std::unique_ptr<TypeExpr>> args;
+  std::vector<std::uint64_t> dims;
   if (accept(TokenKind::TOK_LESS)) {
     do {
       auto arg = parseType();
+      if(check(TokenKind::TOK_INTEGER)) {
+        Token dimTok = consume();
+        if(args.empty()) {
+          error(dimTok.range(), "Expeced type before dimension");
+          return nullptr;
+        }
+        auto value = integerLiteralValue(dimTok.spelling());
+        if (!value || *value == 0 || exceedsInt64(*value)) {
+          error(dimTok.range(), quoteForMessage(dimTok.spelling()) + " has invalid range " );
+          return nullptr;
+        }
+          dims.push_back(static_cast<std::int64_t>(*value));
+          continue; // In a do-while, this jumps to the ',' check
+          
+      }
+      if(!dims.empty()) {
+        error(tok_.range(), "type must come before dimensions");
+        return nullptr;
+      }
+     
       if (!arg)
         return nullptr;
       args.push_back(std::move(arg));
     } while (accept(TokenKind::TOK_COMMA));
+
 
     if (check(TokenKind::TOK_SHR)) {
       // `matrix<matrix<float>>`: the lexer reads `>>` as one token. Use up
@@ -974,7 +1025,7 @@ std::unique_ptr<Expr> Parser::parseCallArgs(std::unique_ptr<Expr> callee,
 }
 
 // primary := INTEGER | FLOAT | STRING | 'true' | 'false' | IDENT
-//          | '(' expr ')' | type '(' expr ')'
+//          | '(' expr ')' | type '(' expr ')' | 'sizeof' '(' type ')'
 std::unique_ptr<Expr> Parser::parsePrimary() {
   SourceLocation loc = tok_.location();
   switch (tok_.kind()) {
@@ -1012,6 +1063,23 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
       return nullptr;
     return make<CastExpr>(loc, std::move(value), std::move(target));
   }
+  case TokenKind::TOK_SIZEOF: {
+    // `sizeof(T)` takes a type, pointers included: sizeof(int*).
+    consume();
+    if (!check(TokenKind::TOK_LPAREN)) {
+      error(tok_.range(), "expected '(' after 'sizeof'");
+      // `sizeof int`: skip the type too, or the statement parser would take
+      // it for the start of a declaration and report a second error.
+      if (check(TokenKind::TOK_KEYWORDTYPE))
+        parseType();
+      return nullptr;
+    }
+    consume();
+    auto target = parseType();
+    if (!target || !expect(TokenKind::TOK_RPAREN, "after the type in 'sizeof'"))
+      return nullptr;
+    return make<SizeOfExpr>(loc, std::move(target));
+  }
   case TokenKind::TOK_NONE:
     error(tok_.range(), "'none' is not supported yet");
     consume();
@@ -1024,34 +1092,6 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
     return nullptr;
   }
 }
-
-namespace {
-// The value of an integer literal's spelling (decimal, 0x..., 0b...), or
-// nothing if it doesn't fit in 64 bits.
-std::optional<std::uint64_t> integerLiteralValue(std::string_view text) {
-  int base = 10;
-  if (text.size() > 2 && text[0] == '0') {
-    if (text[1] == 'x' || text[1] == 'X')
-      base = 16;
-    else if (text[1] == 'b' || text[1] == 'B')
-      base = 2;
-    if (base != 10)
-      text.remove_prefix(2);
-  }
-  std::uint64_t value = 0;
-  auto [end, ec] =
-      std::from_chars(text.data(), text.data() + text.size(), value, base);
-  if (ec != std::errc() || end != text.data() + text.size())
-    return std::nullopt;
-  return value;
-}
-
-// Past int64's range a literal is a u64 (it keeps the bits).
-bool exceedsInt64(std::uint64_t value) {
-  return value >
-         static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
-}
-} // namespace
 
 bool Parser::integerLiteralIsU64(std::string_view spelling) {
   auto value = integerLiteralValue(spelling);

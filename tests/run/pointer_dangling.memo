@@ -1,0 +1,14 @@
+# Semantic analysis catches `return &x;`, but not an address returned through
+# another variable. The interpreter notices when the pointer is followed.
+# expect-runtime-error: dereferencing a dangling pointer: the variable it points to no longer exists
+
+def leak() -> int* {
+    int x = 5;
+    int* q = &x;
+    return q;
+}
+
+def main() -> int {
+    int* p = leak();
+    return *p;
+}

@@ -1,2 +1,2 @@
 # Pointer syntax reuses existing tokens: '&', '*' and '**' (one token).
-&x *p **pp int* p; int** pp; a&&b a***b *p*=2
+&x *p **pp int* p; int** pp; a&&b a***b *p*=2 sizeof(int*)
