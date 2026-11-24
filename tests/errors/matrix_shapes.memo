@@ -1,0 +1,6 @@
+# Matrix shape syntax errors (parse only).
+matrix<3, float> a;                     # expect-error: 8: expected a type before the dimensions
+matrix<float, 3, float> b;              # expect-error: 18: type arguments must come before the dimensions
+matrix<float, 0, 2> c;                  # expect-error: 15: dimension '0' must be a positive i64
+matrix<float, 9223372036854775808, 1> d; # expect-error: 15: dimension '9223372036854775808' must be a positive i64
+matrix<float, -1, 2> e;                 # expect-error: 15: dimensions must be positive

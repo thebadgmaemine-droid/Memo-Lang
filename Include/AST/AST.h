@@ -308,7 +308,6 @@ public:
       assert(a && "TypeExpr argument must not be null");
   }
   [[nodiscard]] std::span<const std::int64_t> dims() const noexcept { return dims_; };
-
   [[nodiscard]] const std::string &name() const noexcept { return name_; }
   std::span<const std::unique_ptr<TypeExpr>> args() const noexcept {
     return args_;
@@ -319,7 +318,7 @@ public:
     copy.reserve(args_.size());
     for (const auto &a : args_)
       copy.push_back(a->clone());
-    auto result = std::make_unique<TypeExpr>(name_, std::move(copy));
+    auto result = std::make_unique<TypeExpr>(name_, std::move(copy), dims_);
     result->setRange(range());
     return result;
   }

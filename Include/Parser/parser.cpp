@@ -517,8 +517,10 @@ bool Parser::parseParams(std::vector<FunctionDef::Param> &params) {
   return expect(TokenKind::TOK_RPAREN, "after parameter list");
 }
 
-// type      := base_type { '*' | '**' }                 e.g. int, float**
-// base_type := TYPE_NAME [ '<' type { ',' type } '>' ]  e.g. matrix<float>
+// type      := base_type { '*' | '**' }                     e.g. int, float**
+// base_type := TYPE_NAME [ '<' type_arg { ',' type_arg } '>' ]
+//                                                 e.g. matrix<float, 3, 4>
+// type_arg  := type | INTEGER     (every type comes before every dimension)
 // `T*` becomes the internal TypeExpr `ptr<T>`. Casts pass allowPointer =
 // false so `x as int * 2` stays a multiplication.
 std::unique_ptr<TypeExpr> Parser::parseType(bool allowPointer) {
@@ -535,35 +537,60 @@ std::unique_ptr<TypeExpr> Parser::parseType(bool allowPointer) {
   }
   Token nameTok = consume();
   std::vector<std::unique_ptr<TypeExpr>> args;
-  std::vector<std::uint64_t> dims;
+  std::vector<std::int64_t> dims;
+  // After a bad dimension, skip to the closing '>' so the rest of the list
+  // (`float` in `matrix<3, float>`) isn't read as the start of a declaration.
+  auto skipTypeArgs = [&] {
+    int open = 1;
+    while (open > 0 && !check(TokenKind::TOK_EOF) &&
+           !check(TokenKind::TOK_SEMICOLON) && !check(TokenKind::TOK_LBRACE) &&
+           !check(TokenKind::TOK_RBRACE)) {
+      if (check(TokenKind::TOK_LESS))
+        ++open;
+      else if (check(TokenKind::TOK_GREATER))
+        --open;
+      else if (check(TokenKind::TOK_SHR))
+        open -= 2;
+      consume();
+    }
+  };
   if (accept(TokenKind::TOK_LESS)) {
     do {
-      auto arg = parseType();
-      if(check(TokenKind::TOK_INTEGER)) {
+      // A dimension: `matrix<float, 3, 4>`. Which types take dimensions, and
+      // how many, is checked by semantic analysis.
+      if (check(TokenKind::TOK_INTEGER)) {
         Token dimTok = consume();
-        if(args.empty()) {
-          error(dimTok.range(), "Expeced type before dimension");
+        if (args.empty()) {
+          error(dimTok.range(), "expected a type before the dimensions");
+          skipTypeArgs();
           return nullptr;
         }
         auto value = integerLiteralValue(dimTok.spelling());
         if (!value || *value == 0 || exceedsInt64(*value)) {
-          error(dimTok.range(), quoteForMessage(dimTok.spelling()) + " has invalid range " );
+          error(dimTok.range(), "dimension " +
+                                    quoteForMessage(dimTok.spelling()) +
+                                    " must be a positive i64");
+          skipTypeArgs();
           return nullptr;
         }
-          dims.push_back(static_cast<std::int64_t>(*value));
-          continue; // In a do-while, this jumps to the ',' check
-          
+        dims.push_back(static_cast<std::int64_t>(*value));
+        continue; // In a do-while, this jumps to the ',' check.
       }
-      if(!dims.empty()) {
-        error(tok_.range(), "type must come before dimensions");
+      if (check(TokenKind::TOK_MINUS)) {
+        error(tok_.range(), "dimensions must be positive");
+        skipTypeArgs();
         return nullptr;
       }
-     
+      if (!dims.empty()) {
+        error(tok_.range(), "type arguments must come before the dimensions");
+        skipTypeArgs();
+        return nullptr;
+      }
+      auto arg = parseType();
       if (!arg)
         return nullptr;
       args.push_back(std::move(arg));
     } while (accept(TokenKind::TOK_COMMA));
-
 
     if (check(TokenKind::TOK_SHR)) {
       // `matrix<matrix<float>>`: the lexer reads `>>` as one token. Use up
@@ -577,7 +604,8 @@ std::unique_ptr<TypeExpr> Parser::parseType(bool allowPointer) {
     }
   }
   auto type = make<TypeExpr>(nameTok.location(),
-                             std::string(nameTok.spelling()), std::move(args));
+                             std::string(nameTok.spelling()), std::move(args),
+                             std::move(dims));
   if (!allowPointer)
     return type;
 

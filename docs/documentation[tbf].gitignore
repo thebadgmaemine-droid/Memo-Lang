@@ -35,7 +35,8 @@ function_def   := 'def' IDENT '(' params ')' [ '->' type ] block
 extern_def     := 'extern' 'def' IDENT '(' params ')' [ '->' type ] ';'
 params         := [ type IDENT { ',' type IDENT } ]
 type           := base_type { '*' | '**' }
-base_type      := TYPE_NAME [ '<' type { ',' type } '>' ]
+base_type      := TYPE_NAME [ '<' type_arg { ',' type_arg } '>' ]
+type_arg       := type | INTEGER
 block          := '{' { statement } '}'
 var_decl       := [ 'static' ] [ 'const' ] [ type ] IDENT [ '=' expr ] ';'
 return_stmt    := 'return' [ expr ] ';'
@@ -52,6 +53,7 @@ args           := [ [ IDENT '=' ] expr { ',' [ IDENT '=' ] expr } ]
 primary        := INTEGER | FLOAT | STRING | 'true' | 'false' | IDENT
                 | '(' expr ')' | base_type '(' expr ')' | 'sizeof' '(' type ')'
 • TYPE_NAME is one of int i32 i64 u8 u16 u32 u64 float f32 f64 bool str byte void matrix. int is i64, float is f64, byte is u8 (an unsigned 8-bit integer).
+• Dimensions follow the type arguments: matrix<float, 3, 4> is a 3x4 matrix of float. Every type argument comes before every dimension, and a dimension is a positive integer literal (0x10 and 0b10 work). The parser accepts them; semantic analysis doesn't use them yet.
 • A '*' after a type makes a pointer type: int*, float**, matrix<float>*, matrix<int*>. int** is one '**' token and means two levels. Casts (x as T, T(x)) take no '*' suffix, so x as int * 2 is (x as int) * 2.
 • In expressions, prefix & takes an address and prefix * dereferences: &x, *p, **pp. These never clash with binary & and *, because the parser only reads a prefix where an operand starts: a * *p is a times *p, and a & &b is a bitwise-and with &b.
 • The left side of an assignment is a variable or a dereference: x = 1; *p = 2; **pp += 3; The same goes for ++ and --: x++, (*p)++, --**pp.

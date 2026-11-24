@@ -1,0 +1,16 @@
+Module matrix_shapes
+  ExternFunction random_matrix(int rows, int cols) -> matrix<float, 3, 4>
+  FunctionDef shapes(matrix<f32, 3, 3> a, matrix<float, 16, 2>* p) -> matrix<float, 3, 1>
+    DeclareVar m : matrix<float, 3, 4>
+      Call
+        Name random_matrix
+        Integer 3
+        Integer 4
+    DeclareVar nested : matrix<matrix<float, 2, 2>>
+    DeclareVar pp : matrix<float, 3, 4>**
+    DeclareVar f : float
+      Cast to matrix<float, 3, 4>
+        Name m
+    Return
+      Cast to matrix<float, 3, 1>
+        Name m

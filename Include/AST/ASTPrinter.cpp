@@ -131,6 +131,8 @@ std::string typeToString(const TypeExpr &type) {
       text += typeToString(*arg);
       first = false;
     }
+    for (std::int64_t dim : type.dims()) // matrix<float, 3, 4>
+      text += ", " + std::to_string(dim);
     text += '>';
   }
   return text;
