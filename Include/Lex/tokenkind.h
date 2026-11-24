@@ -66,7 +66,7 @@
   TOK(TOK_PIPE, "|")                                                           \
   TOK(TOK_CARET, "^")                                                          \
   TOK(TOK_TILDE, "~")                                                          \
-  TOK(TOK_BANG, "!")                                                           \  
+  TOK(TOK_BANG, "!")                                                            
 
 #define MEMOLANG_KEYWORD_LIST(TOK)                                             \
   TOK(TOK_DEFINE, "def")                                                       \
@@ -94,7 +94,7 @@
   TOK(TOK_THROW, "throw")                                                      \
   TOK(TOK_CASE, "case")                                                        \
   TOK(TOK_SIZEOF, "sizeof")                                                    \
-  TOK(TOK_MACRO, "macro")                                                      \
+  TOK(TOK_MACRO, "macro")                                                      
   
 namespace MemoLang {
 enum class TokenKind {
