@@ -1173,7 +1173,7 @@ int main(int argc, char **argv) {
     }
     std::cerr << "usage: MemoLangTests ast|tokens|errors|check|run <file.memo> "
                  "[--update] | stress | fuzz | bench [file.memo] [runs] | "
-                 "membench [files...] [runs]\n";
+                 "membench [files...] [runs] [--save]\n";
     return 2;
   } catch (const std::exception &e) {
     std::cout << "FAIL: " << e.what() << '\n';
