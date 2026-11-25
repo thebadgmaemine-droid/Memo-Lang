@@ -44,6 +44,7 @@ class UnaryExpr;
 class BinaryExpr;
 class CallExpr;
 class CastExpr;
+class SizeOfExpr;
 class ExprStmt;
 class DeclareVar;
 class FunctionDef;
@@ -68,7 +69,7 @@ enum class NodeKind {
   UnaryExpr,
   BinaryExpr,
   CallExpr,
-  Pointer,
+  SizeOfExpr,
   CastExpr,
   FirstExpr = NameExpr,
   LastExpr = CastExpr,
@@ -125,9 +126,8 @@ enum class UnaryOp {
   Neg,
   Inv,
   Not,
-  AddressOf,
-  Deref,
-  SizeOf,
+  AddressOf, // `&x`
+  Deref,     // `*p`
 };
 
 enum class AssignOp { Assign, Add, Sub, Mul, Div, Mod };
@@ -227,6 +227,7 @@ public:
   virtual void visit(const BinaryExpr &) = 0;
   virtual void visit(const CallExpr &) = 0;
   virtual void visit(const CastExpr &) = 0;
+  virtual void visit(const SizeOfExpr &) = 0;
   virtual void visit(const ExprStmt &) = 0;
   virtual void visit(const DeclareVar &) = 0;
   virtual void visit(const FunctionDef &) = 0;
@@ -300,13 +301,13 @@ private:
 class TypeExpr final : public Node {
 public:
   explicit TypeExpr(std::string name,
-                    std::vector<std::unique_ptr<TypeExpr>> args = {})
-      : Node(NodeKind::TypeExpr), name_(std::move(name)),
-        args_(std::move(args)) {
+                    std::vector<std::unique_ptr<TypeExpr>> args = {}, std::vector<std::int64_t> dims = {})
+      : Node(NodeKind::TypeExpr), dims_(std::move(dims)),
+        name_(std::move(name)), args_(std::move(args)) {
     for ([[maybe_unused]] const auto &a : args_)
       assert(a && "TypeExpr argument must not be null");
   }
-
+  [[nodiscard]] std::span<const std::int64_t> dims() const noexcept { return dims_; };
   [[nodiscard]] const std::string &name() const noexcept { return name_; }
   std::span<const std::unique_ptr<TypeExpr>> args() const noexcept {
     return args_;
@@ -317,7 +318,7 @@ public:
     copy.reserve(args_.size());
     for (const auto &a : args_)
       copy.push_back(a->clone());
-    auto result = std::make_unique<TypeExpr>(name_, std::move(copy));
+    auto result = std::make_unique<TypeExpr>(name_, std::move(copy), dims_);
     result->setRange(range());
     return result;
   }
@@ -325,6 +326,7 @@ public:
   void accept(Visitor &v) const override { v.visit(*this); }
 
 private:
+  std::vector<std::int64_t> dims_;
   std::string name_;
   std::vector<std::unique_ptr<TypeExpr>> args_;
 };
@@ -573,6 +575,31 @@ public:
 
 private:
   std::unique_ptr<Expr> value_;
+  std::unique_ptr<TypeExpr> target_;
+};
+
+// ---------------------------------------------------------------------------
+// SizeOfExpr: `sizeof(T)`, the size of a T in bytes, as an int. Takes a type,
+// not a value, so it has its own node like CastExpr instead of a UnaryOp.
+// ---------------------------------------------------------------------------
+class SizeOfExpr final : public Expr {
+public:
+  explicit SizeOfExpr(std::unique_ptr<TypeExpr> target)
+      : Expr(NodeKind::SizeOfExpr), target_(std::move(target)) {
+    assert(target_ && "SizeOfExpr target must not be null");
+  }
+
+  [[nodiscard]] const TypeExpr &target() const noexcept { return *target_; }
+  [[nodiscard]] TypeExpr &target() noexcept { return *target_; }
+
+  [[nodiscard]] std::unique_ptr<Expr> clone() const override {
+    auto c = std::make_unique<SizeOfExpr>(target_->clone());
+    c->setRange(range());
+    return c;
+  }
+  void accept(Visitor &v) const override { v.visit(*this); }
+
+private:
   std::unique_ptr<TypeExpr> target_;
 };
 

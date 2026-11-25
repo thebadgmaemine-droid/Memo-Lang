@@ -1,4 +1,5 @@
-# Pointer types (`T*` is printed as written) and the '&' / '*' prefixes.
+# Pointer types (`T*` is printed as written), the '&' / '*' prefixes,
+# '++' / '--' through a pointer, and sizeof(T).
 def pointers(int* p, float** pp, matrix<float>* mp) -> int* {
     int x = 1;
     int* q = &x;
@@ -14,5 +15,8 @@ def pointers(int* p, float** pp, matrix<float>* mp) -> int* {
     int f = -*q;
     float g = (*q) as float;
     int h = x as int * 2;   # Casts take no '*' suffix: (x as int) * 2.
+    (*q)++;
+    --**qq;
+    int i = sizeof(int) + sizeof(matrix<float>*) * 2;
     return &*q;
 }

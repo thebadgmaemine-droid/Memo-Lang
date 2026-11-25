@@ -85,7 +85,6 @@ std::string_view unaryOpSpelling(UnaryOp op) {
   switch (op) {
   case UnaryOp::AddressOf: return "&";
   case UnaryOp::Deref: return "*";
-  case UnaryOp::SizeOf: return "sizeof";
   case UnaryOp::PreInc:
   case UnaryOp::PostInc: return "++";
   case UnaryOp::PreDec:
@@ -862,6 +861,19 @@ const Type *SemanticAnalyzer::inferExpressionType(const Expr &expr) {
   case NodeKind::CastExpr:
     type = inferCast(static_cast<const CastExpr &>(expr));
     break;
+  case NodeKind::SizeOfExpr: {
+    const TypeExpr &target = static_cast<const SizeOfExpr &>(expr).target();
+    const Type *measured = resolveType(target);
+    if (measured->isError())
+      break; // resolveType reported it.
+    if (!sizeOfType(measured)) {
+      error(target, "can't take the size of " + typeName(measured) +
+                        "; it has no storage");
+      break;
+    }
+    type = types_.intType();
+    break;
+  }
   default:
     break;
   }
@@ -894,7 +906,13 @@ const Type *SemanticAnalyzer::inferUnary(const UnaryExpr &unary) {
   // `&x` checks its operand as an assignment target, not as a value.
   if (unary.op() == UnaryOp::AddressOf) {
     const Type *target = checkLValue(unary.operand(), "take the address of");
-    return target->isError() ? target : types_.pointerType(target);
+    if (target->isError())
+      return target;
+    // Destructive analysis must not consume a variable a pointer may see.
+    if (unary.operand().kind() == NodeKind::NameExpr)
+      if (auto id = symbolFor(static_cast<const NameExpr &>(unary.operand())))
+        symbols_[id->value].addressTaken = true;
+    return types_.pointerType(target);
   }
 
   const Type *operand = inferExpressionType(unary.operand());
@@ -908,9 +926,6 @@ const Type *SemanticAnalyzer::inferUnary(const UnaryExpr &unary) {
       return static_cast<const PointerType *>(operand)->pointee();
     error(unary, "can't dereference a value of type " + typeName(operand) +
                      "; it isn't a pointer");
-    return types_.errorType();
-  case UnaryOp::SizeOf:
-    error(unary, "'sizeof' is not supported yet");
     return types_.errorType();
   case UnaryOp::Neg:
     if (operand->isNumeric() || operand->kind() == Type::Kind::Matrix)
@@ -931,8 +946,13 @@ const Type *SemanticAnalyzer::inferUnary(const UnaryExpr &unary) {
     if (!operand->isNumeric())
       break;
     std::string op(unaryOpSpelling(unary.op()));
+    // `(*p)++` changes what p points to; inferUnary already checked `p`.
+    if (unary.operand().kind() == NodeKind::UnaryExpr &&
+        static_cast<const UnaryExpr &>(unary.operand()).op() ==
+            UnaryOp::Deref)
+      return operand;
     if (unary.operand().kind() != NodeKind::NameExpr) {
-      error(unary, "'" + op + "' needs a variable");
+      error(unary, "'" + op + "' needs a variable or '*pointer'");
       return types_.errorType();
     }
     const auto &name = static_cast<const NameExpr &>(unary.operand());

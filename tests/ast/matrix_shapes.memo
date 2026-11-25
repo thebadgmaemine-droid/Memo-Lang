@@ -1,0 +1,10 @@
+# Matrix shapes in types: the dimensions come after the element type.
+extern def random_matrix(int rows, int cols) -> matrix<float, 3, 4>;
+
+def shapes(matrix<f32, 3, 3> a, matrix<float, 0x10, 0b10>* p) -> matrix<float, 3, 1> {
+    matrix<float, 3, 4> m = random_matrix(3, 4);
+    matrix<matrix<float, 2, 2>> nested;
+    matrix<float, 3, 4>** pp;
+    float f = m as matrix<float, 3, 4>;
+    return matrix<float, 3, 1>(m);
+}

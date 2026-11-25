@@ -33,6 +33,10 @@
 //     iteration.
 //   - Temporaries (results of `@`, calls, copy()) are always consumed by the
 //     operation that uses them; they have no name, so nothing can reuse them.
+//   - (2026-11-23) A variable whose address is taken (`&m` anywhere) is never
+//     consumed: a pointer may still read it. Its uses only read it, and its
+//     matrix is freed when its scope ends, as in baseline mode. `*p` is never
+//     consumed either.
 //
 // For code generation, isConsumed() and consumeFlags() tell which operands of
 // each `@` and which call arguments hand over their buffer: the consume_a /
@@ -100,6 +104,8 @@ private:
   // The tracked variable `expr` names: a matrix variable or parameter.
   [[nodiscard]] std::optional<std::uint32_t>
   trackedSymbol(const Expr &expr) const;
+  // Is `expr` a variable whose address is taken (`&m`) somewhere?
+  [[nodiscard]] bool isAddressTaken(const Expr &expr) const;
 
   // A loop worked out without reporting: its state on entry and on exit.
   struct LoopResult {

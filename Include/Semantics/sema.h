@@ -10,6 +10,7 @@
 
 #include "AST/AST.h"
 #include "Semantics/Scope.h"
+#include "Typecontext.h"
 
 // Semantic analysis: name resolution and type checking.
 //
@@ -44,6 +45,9 @@ struct Symbol {
   bool isParameter = false; // kind == Parameter.
   bool isLocal = false;     // Declared inside a function.
   bool isConst = false;
+  // `&name` appears somewhere: a pointer may read the variable, so
+  // destructive analysis never consumes (moves out of) it.
+  bool addressTaken = false;
   std::uint32_t scopeDepth = 0; // 0 = module level.
   SourceRange location;         // Where it was declared.
   const FunctionDef *function = nullptr; // For Kind::Function.
@@ -131,6 +135,7 @@ private:
                             const Type *rhs);
   const Type *inferMatMul(const BinaryExpr &binary, const Type *lhs,
                           const Type *rhs);
+  const Type *inferMatMulDimensions(const MatrixType &mat);
   const Type *inferCall(const CallExpr &call);
   const Type *inferCast(const CastExpr &cast);
   const Type *commonNumericType(const Type &lhs, const Type &rhs);

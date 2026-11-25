@@ -146,7 +146,8 @@ if(MEMOLANG_BUILD_TESTS)
   # benchmarks/cpp: the benchmark workloads in native C++, for `membench`.
   add_executable(MemoLangTests tests/runner.cpp
     benchmarks/cpp/workloads.cpp
-    Include/IR/IRBuilder_GPU.cpp)
+    Include/IR/IRBuilder_GPU.cpp
+    Include/Macro/MacroExpander.h)
   target_include_directories(MemoLangTests PRIVATE ${CMAKE_SOURCE_DIR}/benchmarks/cpp)
   target_link_libraries(MemoLangTests PRIVATE MemoLangFrontend)
   memolang_use_big_stack(MemoLangTests)

@@ -1,0 +1,81 @@
+# Interpreter checks for pointers and sizeof. main() returns how many passed.
+# Both modes must agree and free every matrix, including the ones reached
+# only through a pointer.
+# expect-result: 16
+
+extern def random_matrix(int rows, int cols) -> matrix<float>;
+extern def identity_matrix(int n) -> matrix<float>;
+extern def matrix_sum(matrix<float> m) -> float;
+
+int counter = 10;
+
+def bump(int* p) {
+    *p += 1;
+    (*p)++;
+}
+
+def set_through_two(int** pp, int value) {
+    **pp = value;
+}
+
+def global_address() -> int* {
+    return &counter;
+}
+
+def close(float a, float b) -> bool {
+    float d = a - b;
+    return d < 0.000001 and d > -0.000001;
+}
+
+def main() -> int {
+    int score = 0;
+
+    # Reading and writing through a pointer.
+    int x = 1;
+    int* p = &x;
+    if *p == 1 { score++; }
+    *p = 5;
+    if x == 5 { score++; }
+    bump(p);
+    if x == 7 { score++; }
+    if (*p)-- == 7 and x == 6 { score++; }
+    if ++(*p) == 7 { score++; }
+
+    # Two levels.
+    int** pp = &p;
+    set_through_two(pp, 42);
+    if x == 42 and **pp == 42 { score++; }
+
+    # Equality: same variable, different variable, never given a value.
+    int y = 42;
+    int* q = &y;
+    int* none_yet;
+    int* none_either;
+    if p == &x and p != q { score++; }
+    if none_yet == none_either { score++; }
+    *pp = q;                          # p now points to y.
+    if p == q and *p == 42 { score++; }
+
+    # Globals outlive every call.
+    int* g = global_address();
+    *g += 5;
+    if counter == 15 { score++; }
+
+    # Matrices: a variable whose address is taken is never consumed, so it
+    # stays usable after being passed to a call.
+    matrix<float> m = random_matrix(3, 3);
+    matrix<float>* mp = &m;
+    float total = matrix_sum(m);
+    if close(matrix_sum(*mp), total) { score++; }
+    *mp = identity_matrix(3) @ *mp;   # Replaces (and frees) m's old matrix.
+    if close(matrix_sum(m), total) { score++; }
+    *mp = *mp * 2.0;
+    if close(matrix_sum(*mp), 2.0 * total) { score++; }
+
+    # sizeof: bytes of storage, the same in every backend.
+    if sizeof(int) == 8 and sizeof(i32) == 4 and sizeof(byte) == 1 { score++; }
+    if sizeof(f32) == 4 and sizeof(bool) == 1 and sizeof(float) == 8 { score++; }
+    if sizeof(int*) == 8 and sizeof(matrix<float>) == 8 and sizeof(str) == 8 { score++; }
+
+    return score;
+}

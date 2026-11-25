@@ -98,6 +98,9 @@ private:
     const Type *type = nullptr;
   };
   Slot slotFor(std::uint32_t symbol, const Node &where);
+  // Where an assignment target lives: a variable's slot, or the address in
+  // `p` for `*p` (checked for null). Used by assignment, `++`/`--` and `&`.
+  Slot emitLValue(const Expr &target);
   llvm::AllocaInst *createEntryAlloca(llvm::Type *type, const std::string &name);
   void declareLocal(std::uint32_t symbol, const Type *type,
                     const std::string &name, llvm::Value *initial);

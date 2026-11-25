@@ -56,6 +56,21 @@ Module pointers
         Cast to int
           Name x
         Integer 2
+    ExprStmt
+      Unary ++ (postfix)
+        Unary *
+          Name q
+    ExprStmt
+      Unary -- (prefix)
+        Unary *
+          Unary *
+            Name qq
+    DeclareVar i : int
+      Binary +
+        SizeOf int
+        Binary *
+          SizeOf matrix<float>*
+          Integer 2
     Return
       Unary &
         Unary *

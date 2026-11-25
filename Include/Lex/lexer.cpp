@@ -334,6 +334,11 @@ Token Lexer::lexOperator(std::uint32_t start, char c) {
       kind = K::TOK_NOTEQUAL;
       break;
     }
+    if (match('(') ) {
+      kind == K::TOK_MACRO;
+      break;
+
+    }
     diags_.error(rangeFrom(start),
                  "unexpected '!'; use 'not' for logical negation");
     return makeToken(K::UNKNOWN_TOKEN_SYNTAX_ERROR, start);

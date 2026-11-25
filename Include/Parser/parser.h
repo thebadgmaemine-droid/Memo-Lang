@@ -28,8 +28,8 @@ public:
   // reports an error and stops parsing the file, instead of risking a
   // stack overflow (clang treats its bracket-depth limit the same way).
   static constexpr int kMaxNestingDepth = 256;
-
-  Parser(Lexer &lexer, DiagnosticEngine &diags);
+  class TokenSource{virtual Token next() = 0; }; 
+  Parser(Lexer &lexer, DiagnosticEngine &diags, TokenSource &tokensource);
 
   [[nodiscard]] Module parseModule(std::string name);
 

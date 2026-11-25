@@ -58,11 +58,11 @@ std::string FloatType::display() const {
 std::string MatrixType::display() const {
   std::string text = "matrix<" + Detail::displayOrUnknown(element_) + ">";
   if (rows_ || cols_) {
-    text += '[';
+    text += '<';
     text += rows_ ? std::to_string(*rows_) : "?";
     text += 'x';
     text += cols_ ? std::to_string(*cols_) : "?";
-    text += ']';
+    text += '>';
   }
   return text;
 }
@@ -181,6 +181,25 @@ const Type *TypeContext::primitive(std::string_view name) {
   if (name == "auto")
     return auto_;
   return nullptr;
+}
+
+std::optional<std::int64_t> sizeOfType(const Type *type) {
+  if (!type)
+    return std::nullopt;
+  switch (type->kind()) {
+  case Type::Kind::Bool:
+    return 1;
+  case Type::Kind::Int:
+    return static_cast<const IntType *>(type)->bits() / 8;
+  case Type::Kind::Float:
+    return static_cast<const FloatType *>(type)->bits() / 8;
+  case Type::Kind::Str:
+  case Type::Kind::Matrix:
+  case Type::Kind::Pointer:
+    return 8;
+  default:
+    return std::nullopt;
+  }
 }
 
 } // namespace MemoLang

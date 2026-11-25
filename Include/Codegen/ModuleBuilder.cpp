@@ -1,5 +1,7 @@
 #include "Codegen/ModuleBuilder.h"
 
+#include <algorithm>
+
 #include <llvm/IR/Module.h>
 
 #include "AST/AST.h"
@@ -27,8 +29,7 @@ void ModuleBuilder::prepareImportedModule(const Module &module) {
 
 bool ModuleBuilder::handleModule(const Module &ast,
                                  const std::vector<const Module *> &imported) {
-  ModuleBuilder::importedFiles_ = imported;
-  codegen_->declareModule(ast);
+  importedFiles_ = imported;
   std::size_t before = diagnostics_.errorCount();
   // Declare everything first, so any body can call any function.
   for (const Module *module : imported)

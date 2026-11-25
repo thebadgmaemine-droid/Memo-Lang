@@ -34,7 +34,8 @@ private:
   char advance() noexcept;
   bool match(char expected) noexcept;
   void skipWhitespaceAndComments();
-  // uint32_ ensures safety since lexer doesn't happen on runtime unless interpreter
+  // uint32_ ensures safety since lexer doesn't happen on runtime unless
+  // interpreter
   [[nodiscard]] SourceRange rangeFrom(std::uint32_t start) const;
 
   [[nodiscard]] Token makeToken(TokenKind kind, std::uint32_t start) const;
@@ -49,8 +50,9 @@ private:
   std::uint32_t pos_ = 0;
 };
 
-// Prints one token per line: "line:col<TAB>kind[<TAB>'spelling']". Used by --dump-tokens.
+// Prints one token per line: "line:col<TAB>kind[<TAB>'spelling']". Used by
+// --dump-tokens.
 void printTokens(const std::vector<Token> &tokens, std::ostream &out);
-}
+} // namespace MemoLang
 
 #endif // LEXER_H_

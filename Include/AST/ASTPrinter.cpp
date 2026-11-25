@@ -77,8 +77,6 @@ std::string_view binaryOpSpelling(BinaryOp op) {
 
 std::string_view unaryOpSpelling(UnaryOp op) {
   switch (op) {
-  case UnaryOp::SizeOf:
-    return "sizeof";
   case UnaryOp::PreInc:
     return "++ (prefix)";
   case UnaryOp::PostInc:
@@ -133,6 +131,8 @@ std::string typeToString(const TypeExpr &type) {
       text += typeToString(*arg);
       first = false;
     }
+    for (std::int64_t dim : type.dims()) // matrix<float, 3, 4>
+      text += ", " + std::to_string(dim);
     text += '>';
   }
   return text;
@@ -235,6 +235,9 @@ public:
   void visit(const CastExpr &n) override {
     indent() << "Cast to " << typeToString(n.target()) << '\n';
     child(n.value());
+  }
+  void visit(const SizeOfExpr &n) override {
+    indent() << "SizeOf " << typeToString(n.target()) << '\n';
   }
   void visit(const CallExpr &n) override {
     indent() << "Call\n";

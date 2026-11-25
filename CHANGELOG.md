@@ -5,6 +5,23 @@ All notable changes to MemoLang. Versions follow `project(VERSION ...)` in
 
 ## [Unreleased]
 
+### Added (2026-11-23)
+- Pointers run: the interpreter and code generation support `&x`, `*p`,
+  `*p = v`, `*p op= v`, `(*p)++` / `--(*p)` and pointer `==` / `!=`.
+  Following a pointer that was never given a value is a run-time error in
+  both; following one to a variable that no longer exists is a run-time
+  error in the interpreter.
+- `sizeof(T)` (new keyword and `SizeOfExpr` node): the size in bytes as an
+  `int`, the same in sema, the interpreter and compiled code.
+- Tests: `tests/run/pointers`, `pointer_null`, `pointer_dangling`; more cases
+  in the pointer `ast`, `tokens`, `errors` and `check` tests.
+
+### Changed (2026-11-23)
+- Destructive reads never consume a variable whose address is taken, or
+  `*p`: a pointer may still read the matrix. Benchmark numbers are unchanged.
+- Interpreter variables live in scope-owned cells (`Interpreter::Cell`).
+- Removed the placeholder `UnaryOp::SizeOf` and the unused `NodeKind::Pointer`.
+
 ### Added (2026-11-21)
 - Pointers, parsing and type checking only: `T*` types (`int*`, `float**`,
   `matrix<float>*`), `&x` and `*p` / `**pp` in expressions, and assignment
