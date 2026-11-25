@@ -1,0 +1,22 @@
+# Macro definition and use errors (parse only).
+macro sq(x) { (x) * (x) }
+macro sq(y) { y }                   # expect-error: 7: macro 'sq' is already defined
+macro self(x) { self!(x) }          # expect-error: 17: macro 'self' expands into itself
+macro ping { pong! }
+macro pong { ping! }                # expect-error: 14: macro 'ping' expands into itself
+macro dup(a, a) { a }               # expect-error: 14: duplicate parameter 'a' in macro 'dup'
+macro bad x { 1 }                   # expect-error: 11: expected '{' to start the body of macro 'bad'
+macro { 2 }                         # expect-error: 7: expected a macro name after 'macro'
+
+def f() -> int {
+    macro inner { 3 }               # expect-error: 5: a macro can only be defined at the top level
+    int a = sq!(1, 2);              # expect-error: 13: macro 'sq' takes 1 argument, but 2 were given
+    int b = sq!;                    # expect-error: 16: expected '(' after 'sq!'; macro 'sq' takes 1 argument
+    int c = nope!(4);               # expect-error: 13: 'nope' is not a macro (a macro must be defined before it is used)
+    int d = self!(1);
+    int e = ping!;
+    int g = !a;                     # expect-error: 13: unexpected '!'; use 'not' for logical negation
+    return a;
+}
+
+def h() -> int { return sq!(2 }     # expect-error: 31: expected ')' to close the arguments to 'sq!'

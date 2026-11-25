@@ -63,6 +63,7 @@
 #include "workloads.h" // benchmarks/cpp: the benchmarks in native C++
 #include "Diag/diagengine.h"
 #include "Lex/lexer.h"
+#include "Macro/MacroExpander.h"
 #include "Parser/parser.h"
 #include "Semantics/sema.h"
 #include "Source/SourceManager.h"
@@ -100,7 +101,8 @@ ParseResult parseSource(const std::string &moduleName, std::string text,
   auto start = Clock::now();
   {
     Lexer lexer(sources, diags);
-    Parser parser(lexer, diags);
+    MacroExpander expander(lexer, diags);
+    Parser parser(expander, diags);
     Module module = parser.parseModule(moduleName);
     if (analyze && !diags.hasErrors()) {
       TypeContext types;
@@ -544,7 +546,8 @@ std::unique_ptr<LoadedProgram> loadProgram(const std::filesystem::path &file) {
   program->diags =
       std::make_unique<DiagnosticEngine>(*program->sources, program->diagOut);
   Lexer lexer(*program->sources, *program->diags);
-  Parser parser(lexer, *program->diags);
+  MacroExpander expander(lexer, *program->diags);
+  Parser parser(expander, *program->diags);
   program->module = parser.parseModule(file.stem().string());
   program->types = std::make_unique<TypeContext>();
   program->sema = std::make_unique<sema::SemanticAnalyzer>(*program->types,
@@ -973,7 +976,8 @@ int runBench(const std::string &path, int runs) {
     DiagnosticEngine diags(sources, diagOut);
     auto t0 = Clock::now();
     Lexer lexer(sources, diags);
-    Parser parser(lexer, diags);
+    MacroExpander expander(lexer, diags);
+    Parser parser(expander, diags);
     Module module = parser.parseModule("bench");
     auto t1 = Clock::now();
     TypeContext types;

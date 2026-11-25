@@ -2,7 +2,8 @@
 // driver.cpp: the command-line program
 //
 // Reads the options, then runs the pipeline:
-//   SourceManager (read the file) -> Lexer -> Parser -> semantic analysis
+//   SourceManager (read the file) -> Lexer -> MacroExpander -> Parser
+//   -> semantic analysis
 //   -> destructive analysis -> print the AST, symbols or errors
 // Each analysis runs only if the stage before it found no errors.
 // Exit code: 0 = no errors, 1 = errors in the source or an unreadable input
@@ -15,6 +16,8 @@
 // --dump-symbols added.
 // 2026-11-17: code generation (builds with -DMEMOLANG_USE_LLVM=ON):
 // --emit-llvm, --emit-bc, -S, -c, -o and -O0..-O3.
+// 2026-11-25: macros. The parser reads from the MacroExpander;
+// --dump-expanded prints the tokens after expansion.
 // ---------------------------------------------------------------------------
 #include <filesystem>
 #include <iostream>
@@ -27,6 +30,7 @@
 #include "Driver/driver.h"
 #include "Interp/interpreter.h"
 #include "Lex/lexer.h"
+#include "Macro/MacroExpander.h"
 #include "Parser/parser.h"
 #include "Semantics/sema.h"
 #include "Source/SourceManager.h"
@@ -49,6 +53,7 @@ namespace {
 struct Options {
   std::string inputPath;
   bool dumpTokens = false;
+  bool dumpExpanded = false;
   bool dumpAst = false;
   bool dumpSymbols = false;
   bool parseOnly = false;
@@ -138,6 +143,7 @@ void printUsage(std::ostream &out) {
          "\n"
          "Options:\n"
          "  --dump-tokens   Print the token stream instead of parsing\n"
+         "  --dump-expanded Print the tokens after macro expansion\n"
          "  --dump-ast      Print the syntax tree\n"
          "  --dump-symbols  Print every declared name and its type\n"
          "  --parse-only    Check syntax only (skip type and consumption checks)\n"
@@ -167,6 +173,8 @@ int runDriver(int argc, char **argv) {
     std::string_view arg = argv[i];
     if (arg == "--dump-tokens") {
       options.dumpTokens = true;
+    } else if (arg == "--dump-expanded") {
+      options.dumpExpanded = true;
     } else if (arg == "--dump-ast") {
       options.dumpAst = true;
     } else if (arg == "--dump-symbols") {
@@ -237,10 +245,13 @@ int runDriver(int argc, char **argv) {
 
   DiagnosticEngine diags(*sources, std::cerr);
   Lexer lexer(*sources, diags);
+  MacroExpander expander(lexer, diags);
   if (options.dumpTokens) {
     printTokens(lexer.tokenize(), std::cout);
+  } else if (options.dumpExpanded) {
+    printTokens(expander.tokenize(), std::cout);
   } else {
-    Parser parser(lexer, diags);
+    Parser parser(expander, diags);
     // The module is named after the file: examples/basicadd.memo -> basicadd.
     Module module = parser.parseModule(
         std::filesystem::path(options.inputPath).stem().string());

@@ -5,6 +5,17 @@ All notable changes to MemoLang. Versions follow `project(VERSION ...)` in
 
 ## [Unreleased]
 
+### Added (2026-11-25)
+- Macros: `macro name(params) { body }` and `macro name { body }`, used as
+  `name!(args)` / `name!`. A new token stage, `MacroExpander`
+  (`Include/Macro`), sits between the lexer and the parser, which now reads
+  from a `TokenSource`. Arguments expand before substitution; self-use,
+  nesting past 256 levels and expansions over 1M tokens are errors, with an
+  "in the expansion of" note for each enclosing macro.
+- `--dump-expanded` prints the tokens after macro expansion.
+- `!` lexes as `TOK_BANG`; a `!` outside a macro use is still an error.
+- Tests: `tests/run/macros`, `tests/errors/macros`.
+
 ### Added (2026-11-23)
 - Pointers run: the interpreter and code generation support `&x`, `*p`,
   `*p = v`, `*p op= v`, `(*p)++` / `--(*p)` and pointer `==` / `!=`.

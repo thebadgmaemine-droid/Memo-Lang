@@ -1,0 +1,23 @@
+# Macro expansion (Include/Macro/MacroExpander). main() returns the sum.
+# expect-result: 153
+
+macro square(x) { ((x) * (x)) }
+macro limit { 100 }
+macro add3(a, b, c) { (a) + (b) + (c) }
+macro twice(f, v) { f!(f!(v)) }      # a macro name passed as an argument
+macro nothing() { 7 }
+macro swap(a, b) { int tmp = a; a = b; b = tmp; }
+
+def main() -> int {
+    int n = square!(3);                    # 9
+    int m = square!(square!(2));           # 16: arguments expand first
+    int k = add3!(1, square!(2), limit!);  # 105
+    int t = twice!(square, 2);             # 16
+    int p = 1;
+    int q = 2;
+    swap!(p, q);                           # statements work too
+    if p != 2 or q != 1 {
+        return 0;
+    }
+    return n + m + k + t + nothing!();     # 153
+}

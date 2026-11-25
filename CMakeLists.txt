@@ -83,6 +83,7 @@ add_library(MemoLangFrontend STATIC
     Include/Interp/interpreter.cpp
     Include/Lex/lexer.cpp
     Include/Lex/token.cpp
+    Include/Macro/MacroExpander.cpp
     Include/Parser/parser.cpp
     Include/Semantics/Scope.cpp
     Include/Semantics/sema.cpp

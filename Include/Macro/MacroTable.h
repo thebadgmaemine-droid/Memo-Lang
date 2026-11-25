@@ -1,7 +1,7 @@
 #ifndef MEMOLANG_MACRO_TABLE_H_
 #define MEMOLANG_MACRO_TABLE_H_
 // The macros a file defines, by name. Filled and read by the macro expander,
-// a stage between the lexer and the parser (planned; nothing uses this yet).
+// a stage between the lexer and the parser (see MacroExpander.h).
 //
 // 2026-11-24: moved here from lexer.h, where it was first sketched with
 // llvm::StringMap / SmallVector / StringRef. The front end builds without
@@ -23,6 +23,7 @@ struct MacroDef {
   std::vector<Token> bodyTokens;   // The body, substituted at each use.
   bool isFunctionLike = false;     // `name!(args)` rather than `name!`.
   bool isVariadic = false;
+  SourceRange range{}; // The name in the definition, for redefinition notes.
 };
 
 class MacroTable {
