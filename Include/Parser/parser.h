@@ -9,10 +9,10 @@
 #include <vector>
 
 #include "AST/AST.h"
+#include "Lex/TokenSource.h"
 #include "Lex/token.h"
 namespace MemoLang {
 class DiagnosticEngine;
-class Lexer;
 /* Reviewing 17/10/2026 */
 
 // Recursive-descent parser; binary operators use precedence climbing.
@@ -28,8 +28,8 @@ public:
   // reports an error and stops parsing the file, instead of risking a
   // stack overflow (clang treats its bracket-depth limit the same way).
   static constexpr int kMaxNestingDepth = 256;
-  class TokenSource{virtual Token next() = 0; }; 
-  Parser(Lexer &lexer, DiagnosticEngine &diags, TokenSource &tokensource);
+  // Reads from `tokens`: the Lexer, or a MacroExpander wrapping it.
+  Parser(TokenSource &tokens, DiagnosticEngine &diags);
 
   [[nodiscard]] Module parseModule(std::string name);
 
@@ -48,6 +48,7 @@ private:
   };
   // Token stream
   [[nodiscard]] const Token &peekNext();
+  Token pull(); // The next token from tokens_ (see parser.cpp).
   Token consume();
   [[nodiscard]] bool check(TokenKind kind) const noexcept {
     return tok_.is(kind);
@@ -94,8 +95,7 @@ private:
   static bool integerLiteralIsU64(std::string_view spelling);
   std::unique_ptr<Expr> parseFloatLiteral(const Token &tok);
   std::unique_ptr<Expr> parsePointerPrefix();
-
-  Lexer &lexer_;
+  TokenSource &tokens_;
   DiagnosticEngine &diags_;
   Token tok_;                 // Current token.
   std::optional<Token> next_; // One token of lookahead, filled by peekNext().

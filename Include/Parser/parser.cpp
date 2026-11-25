@@ -210,10 +210,20 @@ std::unique_ptr<T> Parser::make(SourceLocation begin, Args &&...args) {
   return node;
 }
 
-// Constructor for parser, don't know if optimizations are needed
-Parser::Parser(Lexer &lexer, DiagnosticEngine &diags)
-    : lexer_(lexer), diags_(diags), tok_(lexer.next()) {}
+Parser::Parser(TokenSource &tokens, DiagnosticEngine &diags)
+    : tokens_(tokens), diags_(diags), tok_(pull()) {}
 
+// The next token from the source. A `!` that reaches the parser isn't part
+// of a macro use (the macro expander takes those), so it is reported here,
+// as the lexer used to, and read as an error token.
+Token Parser::pull() {
+  Token token = tokens_.next();
+  if (!token.is(TokenKind::TOK_BANG))
+    return token;
+  diags_.error(token.range(), "unexpected '!'; use 'not' for logical negation");
+  return Token(TokenKind::UNKNOWN_TOKEN_SYNTAX_ERROR, token.range(),
+               std::string(token.spelling()));
+}
 // ---------------------------------------------------------------------------
 // Token stream
 // ---------------------------------------------------------------------------
@@ -221,7 +231,7 @@ const Token &Parser::peekNext() {
   if (stopped_)
     return tok_; // EOF.
   if (!next_)
-    next_ = lexer_.next();
+    next_ = pull();
   return *next_;
 }
 
@@ -233,7 +243,7 @@ Token Parser::consume() {
     tok_ = std::move(*next_);
     next_.reset();
   } else {
-    tok_ = lexer_.next();
+    tok_ = pull();
   }
   prevEnd_ = previous.range().end;
   return previous;

@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include "Lex/TokenSource.h"
 #include "Lex/token.h"
 /* Begin checking 16/10/2026 */
 //  wait i wrote this
@@ -20,12 +21,12 @@ class SourceManager;
 // Errors (unknown characters, unterminated strings, bad numbers) are reported
 // to the DiagnosticEngine and returned as UNKNOWN_TOKEN_SYNTAX_ERROR, so one
 // run reports every problem instead of stopping at the first.
-class Lexer {
+class Lexer final : public TokenSource {
 public:
   Lexer(const SourceManager &sources, DiagnosticEngine &diags);
 
   // Returns the next token. Keeps returning TOK_EOF once the input is used up.
-  [[nodiscard]] Token next();
+  [[nodiscard]] Token next() override;
   // Lexes the remaining input. The last token is always TOK_EOF.
   [[nodiscard]] std::vector<Token> tokenize();
 
