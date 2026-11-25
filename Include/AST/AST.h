@@ -57,7 +57,8 @@ class BreakStmt;
 // ---------------------------------------------------------------------------
 // Enums
 // ---------------------------------------------------------------------------
-// TODO (not implemented yet): LambdaExpr, MacroDef.
+// TODO (not implemented yet): LambdaExpr. (Macros are expanded before
+// parsing, by Macro/MacroExpander, so they need no node.)
 enum class NodeKind {
   // Expressions
   NameExpr,

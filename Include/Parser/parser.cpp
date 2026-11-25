@@ -106,7 +106,6 @@ bool startsStatement(TokenKind kind) {
   case TokenKind::TOK_STATIC:
   case TokenKind::TOK_KEYWORDTYPE:
   case TokenKind::TOK_IMPORT:
-  case TokenKind::TOK_MACRO:
   case TokenKind::TOK_TRY:
   case TokenKind::TOK_CATCH:
   case TokenKind::TOK_THROW:
@@ -404,7 +403,6 @@ void Parser::parseStatementInto(StmtList &out) {
     return;
   case TokenKind::TOK_FOR:
   case TokenKind::TOK_IMPORT:
-  case TokenKind::TOK_MACRO:
   case TokenKind::TOK_TRY:
   case TokenKind::TOK_CATCH:
   case TokenKind::TOK_THROW:

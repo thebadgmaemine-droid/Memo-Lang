@@ -148,7 +148,6 @@ if(MEMOLANG_BUILD_TESTS)
   add_executable(MemoLangTests tests/runner.cpp
     benchmarks/cpp/workloads.cpp
     Include/IR/IRBuilder_GPU.cpp
-    Include/Macro/MacroExpander.h
     Include/Lex/TokenSource.h)
   target_include_directories(MemoLangTests PRIVATE ${CMAKE_SOURCE_DIR}/benchmarks/cpp)
   target_link_libraries(MemoLangTests PRIVATE MemoLangFrontend)

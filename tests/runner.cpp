@@ -342,6 +342,19 @@ std::vector<StressCase> stressCases() {
                    "def f(int x) { return " + repeat("(", kDeep) + "x" +
                        repeat(")", kDeep) + "; }",
                    1, tooDeep});
+  // Macro uses inside macro arguments recurse in the expander.
+  const std::string idMacro = "macro id(x) { x }\n";
+  const std::size_t argLimit = MacroExpander::kMaxExpansionDepth;
+  cases.push_back({"macro arguments at the nesting limit",
+                   idMacro + "def f() -> int { return " +
+                       repeat("id!(", argLimit) + "1" + repeat(")", argLimit) +
+                       "; }",
+                   0, ""});
+  cases.push_back({"100000 nested macro arguments",
+                   idMacro + "def f() -> int { return " +
+                       repeat("id!(", kDeep) + "1" + repeat(")", kDeep) +
+                       "; }",
+                   1, "macro arguments are nested too deeply"});
   cases.push_back({"100000 unary minus",
                    "def f(int x) { return " + repeat("- ", kDeep) + "x; }", 1,
                    tooDeep});

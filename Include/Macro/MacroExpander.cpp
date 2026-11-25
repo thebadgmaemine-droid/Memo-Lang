@@ -64,12 +64,12 @@ Token MacroExpander::next() {
 
 std::vector<Token> MacroExpander::tokenize() {
   std::vector<Token> tokens;
-  do
+  do {
     tokens.push_back(next());
-  while (!tokens.back().is(TokenKind::TOK_EOF));
+  }
+  while ( !tokens.back().is(TokenKind::TOK_EOF));
   return tokens;
 }
-
 Token MacroExpander::expandNext() {
   for (;;) {
     Token token = pull();
@@ -331,6 +331,28 @@ bool MacroExpander::expandUse(const Token &name, const MacroDef &def) {
 
 bool MacroExpander::collectArgs(const Token &name, const Token &lparen,
                                 std::vector<std::vector<Token>> &args) {
+  // A use inside an argument is expanded by a recursive call (collectArgs ->
+  // expandNext -> expandUse -> collectArgs), before anything is pushed on
+  // active_, so kMaxExpansionDepth alone doesn't bound the C++ stack here:
+  // f!(f!(f!(...))) nested 100000 deep crashed. Count these levels too.
+  if (argDepth_ >= kMaxExpansionDepth) {
+    // One error for the file: every other use past the limit is the same
+    // mistake.
+    if (!argsTooDeep_)
+      error(name.range(), "macro arguments are nested too deeply (more than " +
+                              std::to_string(kMaxExpansionDepth) + " levels)");
+    argsTooDeep_ = true;
+    skipBalancedParens(); // Iterative: the rest of this use, up to its `)`.
+    return false;
+  }
+  ++argDepth_;
+  bool ok = collectArgsAt(name, lparen, args);
+  --argDepth_;
+  return ok;
+}
+
+bool MacroExpander::collectArgsAt(const Token &name, const Token &lparen,
+                                  std::vector<std::vector<Token>> &args) {
   args.emplace_back();
   int depth = 0;
   for (;;) {
@@ -385,7 +407,14 @@ MacroExpander::substitute(const MacroDef &def,
                              tok.spelling());
       if (param != def.params.end()) {
         const auto &arg = args[param - def.params.begin()];
+        // Keep the argument together: sq!(a + 1) with body `x * x` must be
+        // (a + 1) * (a + 1), not a + 1 * a + 1. A single token needs no parens.
+        bool wrap = arg.size() > 1;
+        if (wrap)
+          out.push_back(Token(TokenKind::TOK_LPAREN, arg.front().range(), "("));
         out.insert(out.end(), arg.begin(), arg.end());
+        if (wrap)
+          out.push_back(Token(TokenKind::TOK_RPAREN, arg.back().range(), ")"));
         continue;
       }
     }

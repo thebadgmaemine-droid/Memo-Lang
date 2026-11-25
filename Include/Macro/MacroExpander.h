@@ -18,10 +18,13 @@
 //   substituted, so square!(square!(2)) works. The result is then rescanned
 //   for further uses.
 // - A macro that (directly or through others) uses itself is an error, as is
-//   nesting deeper than kMaxExpansionDepth or producing more than
-//   kMaxExpandedTokens tokens in total.
+//   nesting expansions or arguments (f!(f!(...))) deeper than
+//   kMaxExpansionDepth, or producing more than kMaxExpandedTokens tokens in
+//   total.
 // - Substitution is textual: no hygiene, and an argument used twice is
-//   evaluated twice. Parenthesize parameters in the body.
+//   evaluated twice. An argument of more than one token is substituted in
+//   parentheses, so sq!(a + 1) is (a + 1) * (a + 1); parenthesize the body
+//   yourself if it is used inside a larger expression.
 // ---------------------------------------------------------------------------
 #include <cstddef>
 #include <deque>
@@ -62,6 +65,9 @@ private:
   // top-level commas, expanding macro uses inside the arguments.
   bool collectArgs(const Token &name, const Token &lparen,
                    std::vector<std::vector<Token>> &args);
+  // collectArgs() after its depth check: the actual reading.
+  bool collectArgsAt(const Token &name, const Token &lparen,
+                     std::vector<std::vector<Token>> &args);
   void skipBalancedParens(); // After an error at `name!(`.
   [[nodiscard]] std::vector<Token>
   substitute(const MacroDef &def,
@@ -85,6 +91,10 @@ private:
   std::size_t expandedTokens_ = 0;
   bool tooManyTokens_ = false;
   int braceDepth_ = 0; // Of the tokens handed out; 0 = top level.
+  // collectArgs() calls on the C++ stack: uses inside arguments, like
+  // f!(f!(...)). Limited to kMaxExpansionDepth.
+  std::size_t argDepth_ = 0;
+  bool argsTooDeep_ = false; // That error was reported (once per file).
 };
 
 } // namespace MemoLang

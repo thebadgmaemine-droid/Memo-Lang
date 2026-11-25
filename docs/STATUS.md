@@ -1,8 +1,9 @@
 # MemoLang: remaining work
 
-Last updated: 2026-11-23. Done: source/diag, lexer, parser, AST, types, sema,
+Last updated: 2026-11-26. Done: source/diag, lexer, parser, AST, types, sema,
 destructive-read analysis, driver, interpreter, CPU runtime, benchmarks,
-codegen core (`--emit-llvm/-bc/-S/-c`, `-O0..3`, `nounwind`, data layout).
+codegen core (`--emit-llvm/-bc/-S/-c`, `-O0..3`, `nounwind`, data layout),
+integer types `i8`/`i16`/`i32`/`i64` and `u8`/`u16`/`u32`/`u64`, macros (see 4b).
 
 ## 0. Fix now (build broken)
 - [x] `#include "Codegen/BackendDiagnostics.h"` → `"Diag/BackendDiagnostics.h"`, because the file was moved to `Include/Diag/` — `Include/Codegen/CodegenAction.h:24`
@@ -12,7 +13,7 @@ codegen core (`--emit-llvm/-bc/-S/-c`, `-O0..3`, `nounwind`, data layout).
 
 ## 1. Codegen: unsupported constructs
 Files: `Include/Codegen/CodegenFunction.cpp`, `CodegenModule.cpp`
-- [ ] Interpolated strings (`CodegenFunction.cpp:493`)
+- [ ] Interpolated strings (empty `case NodeKind::InterpolatedString` at `CodegenFunction.cpp:537` falls through to the "doesn't support" error)
 - [ ] Nested function definitions (`CodegenFunction.cpp:307`)
 - [x] Pointer values: `lowerType` → opaque `ptr`, `&x` → slot/global address, `*p` → load (`CodegenModule.cpp:90`, `CodegenFunction.cpp` `emitUnary`)
 - [ ] Vector / generic / function-typed values (`CodegenModule.cpp:81,97,107,183`)
@@ -34,12 +35,13 @@ Files: `Include/Codegen/CodegenFunction.cpp`, `CodegenModule.cpp`
 
 ## 4. Language / front-end gaps
 - [ ] Missing-return check on non-void functions — `Semantics/sema.cpp`
+- [ ] Range check for integer constants in declarations, assignments and call arguments (only `return` is checked; `u8 x = 300;` wraps silently). Reuse `integerConstant()`/`fitsIn()` — `Semantics/sema.cpp`
 - [ ] Matrix shapes in syntax (`matrix<float, R, C>`) + compile-time `@` check — `Parser/parser.cpp`, `Types/Typecontext.cpp`, `Semantics/sema.cpp`
 - [ ] Lexer syntax for interpolated / byte / regex strings — `Lex/lexer.cpp`, `Lex/tokenkind.h`
 - [ ] Parser: `for`, `import`, `try`/`catch`/`throw`, `case`, `none` — `Parser/parser.cpp`, `AST/AST.h`
 - [ ] Sema: `is`, `is not`, `in`, `not in` — `Semantics/sema.cpp`
-- [ ] `LambdaExpr`, `MacroDef` — `AST/AST.h:59`, `Include/Macro/` (notes only)
-- [ ] Remove the empty `Include/AST/ASTContext.h` or fill it in
+- [ ] `LambdaExpr` — `AST/AST.h:60` (macros are expanded before parsing, so no `MacroDef` node is needed; see 4b)
+- [x] Remove the empty `Include/AST/ASTContext.h` (deleted)
 
 ## 4a. Pointers (done 2026-11-23 except the last two; see the Pointers section of the reference doc)
 - [x] `T*` types, `&x` / `*p` / `**pp`, `*p = v` targets — `Parser/parser.cpp`
@@ -51,6 +53,24 @@ Files: `Include/Codegen/CodegenFunction.cpp`, `CodegenModule.cpp`
 - [x] `sizeof(T)` as its own node (`SizeOfExpr`, `TOK_SIZEOF`, `sizeOfType()` shared by every stage)
 - [ ] Indirect escapes (`q = &x; return q;`) need a flow pass; the interpreter catches them at run time, compiled code doesn't — `Semantics/sema.{h,cpp}`
 - [ ] Null pointer literal (`none`); static locals (re-initialized every call today, so the escape check on them is correct for now)
+
+## 4b. Macros (core done 2026-11-25; see `Include/Macro/MacroExpander.h` for the rules)
+- [x] `TokenSource` interface; `Lexer` implements it and the parser reads through `Parser::pull()` — `Lex/TokenSource.h`, `Parser/parser.{h,cpp}`
+- [x] `!` lexes as `TOK_BANG`; a stray `!` is reported by the parser ("use 'not'") — `Lex/lexer.cpp`, `Parser/parser.cpp`
+- [x] `MacroExpander` between lexer and parser: `macro name(params) { body }` / `macro name { body }`, uses `name!(args)` / `name!`, arguments expanded first, result rescanned — `Macro/MacroExpander.{h,cpp}`, `Macro/MacroTable.h`
+- [x] Errors: unknown macro, argument count, redefinition, duplicate parameter, self-use, non-top-level definition, unterminated body/arguments, expansion over 1M tokens; "in the expansion of" notes on these
+- [x] Depth limit (256) on nested expansions and on nested arguments (`f!(f!(...))` 100000 deep used to overflow the stack) — `collectArgs()`; stress cases in `tests/runner.cpp`
+- [x] Driver/test runner use the expander; `--dump-expanded` — `Driver/driver.cpp`, `tests/runner.cpp`
+- [x] Tests: `tests/run/macros.memo`, `tests/errors/macros.memo`
+- [x] Wrap multi-token arguments in `( )` so `sq!(a + 1)` is `(a + 1) * (a + 1)` — `MacroExpander::substitute()`; run case in `tests/run/macros.memo`
+- [ ] Parser/sema errors inside an expansion: no "in the expansion of" note, and body tokens carry the definition's location. Needs the use site on expanded tokens — `Lex/token.h`, `Diag/diagengine.*`, `Macro/MacroExpander.cpp`
+- [ ] Lookahead after an identifier crosses the end of an expansion (a body ending in `NAME` + a `!` in the source joins into a use) — `MacroExpander::expandNext()`
+- [ ] Variadic macros (`...`): implement, or remove the unused `MacroDef::isVariadic` — `Macro/MacroTable.h`
+- [x] Remove unreachable `TOK_MACRO` cases — `Parser/parser.cpp`
+- [x] Remove `MacroExpander.h` from the `MemoLangTests` sources — `CMakeLists.txt`
+- [x] Delete `Include/Macro/read.md`
+- [x] One error, not one per use, when several uses pass the argument depth limit
+- [ ] Tests: `tests/ast/macros.memo` (exact expansion), error tests for the two expansion issues above
 
 ## 5. GPU runtime (plan: `docs/gpu-runtime.md` §6)
 - [ ] `~Runtime()` + `#if` blocks, CPU unchanged — `Runtime/runtime.h`
