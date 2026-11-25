@@ -1,0 +1,41 @@
+# Testing integer type inference 
+
+# Type promotion check
+def i8Typepromotion() -> i8 {
+    i8 s = 300;
+    int d = 200;
+    int k = s + d;
+    # error expected from return
+    return k;
+}
+def i16Typepromotion() -> i16 {
+    i16 s = 300;
+    int d = 200;
+    int k = s + d;
+    # error expected from return
+    return k;
+}
+def i32Typepromotion() -> i32 {
+    i32 s = 300;
+    int d = 200;
+    int k = s + d;
+    # error expected from return
+    return k;
+}
+def i64Typepromotion() -> i64 {
+    i64 s = 300;
+    int d = 200;
+    int k = s + d;
+    # error expected from return
+    return k;
+}
+
+def CorrectType() -> int {
+    i32 s = 300;
+    int d = 200;
+    return s + d;
+}
+def main() -> int {
+    return CorrectType(); # Change to test result
+
+}
