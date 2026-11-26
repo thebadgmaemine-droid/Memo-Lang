@@ -15,6 +15,7 @@
 #include <system_error>
 
 #include "AST/ASTPrinter.h"
+#include "Support/Compiler.h"
 
 namespace MemoLang {
 namespace {
@@ -175,7 +176,7 @@ std::string formatDouble(double value) {
 
 class Printer final : public Visitor {
 public:
-  explicit Printer(std::ostream &out) : out_(out) {}
+  explicit Printer(std::ostream &out MEMOLANG_LIFETIMEBOUND) : out_(out) {}
 
   void printBody(std::span<const std::unique_ptr<Statement>> body) {
     ++depth_;

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "Source/SourceLocation.h"
+#include "Support/Compiler.h"
 
 //  Private data members are named [name]_
 //  Nodes are move-only. Use clone() for deep copies.
@@ -314,9 +315,9 @@ public:
     for ([[maybe_unused]] const auto &a : args_)
       assert(a && "TypeExpr argument must not be null");
   }
-  [[nodiscard]] std::span<const std::int64_t> dims() const noexcept { return dims_; };
-  [[nodiscard]] const std::string &name() const noexcept { return name_; }
-  std::span<const std::unique_ptr<TypeExpr>> args() const noexcept {
+  [[nodiscard]] std::span<const std::int64_t> dims() const noexcept MEMOLANG_LIFETIMEBOUND { return dims_; }
+  [[nodiscard]] const std::string &name() const noexcept MEMOLANG_LIFETIMEBOUND { return name_; }
+  std::span<const std::unique_ptr<TypeExpr>> args() const noexcept MEMOLANG_LIFETIMEBOUND {
     return args_;
   }
 
@@ -373,7 +374,7 @@ public:
     assert(!name_.empty() && "name must not be empty");
   }
 
-  [[nodiscard]] const std::string &name() const noexcept { return name_; }
+  [[nodiscard]] const std::string &name() const noexcept MEMOLANG_LIFETIMEBOUND { return name_; }
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<NameExpr>(name_);
@@ -446,7 +447,7 @@ public:
       : Expr(NodeKind::StringLiteral), value_(std::move(value)),
         isRegex_(isRegex) {}
 
-  [[nodiscard]] const std::string &value() const noexcept { return value_; }
+  [[nodiscard]] const std::string &value() const noexcept MEMOLANG_LIFETIMEBOUND { return value_; }
   [[nodiscard]] bool isRegex() const noexcept {
     return isRegex_;
   } // Pattern validity is checked later.
@@ -468,7 +469,7 @@ public:
   explicit InterpolatedString(std::vector<StringPart> parts)
       : Expr(NodeKind::InterpolatedString), parts_(std::move(parts)) {}
 
-  [[nodiscard]] std::span<const StringPart> parts() const noexcept {
+  [[nodiscard]] std::span<const StringPart> parts() const noexcept MEMOLANG_LIFETIMEBOUND {
     return parts_;
   }
 
@@ -518,8 +519,8 @@ public:
   }
 
   [[nodiscard]] UnaryOp op() const noexcept { return op_; }
-  [[nodiscard]] const Expr &operand() const noexcept { return *operand_; }
-  [[nodiscard]] Expr &operand() noexcept { return *operand_; }
+  [[nodiscard]] const Expr &operand() const noexcept MEMOLANG_LIFETIMEBOUND { return *operand_; }
+  [[nodiscard]] Expr &operand() noexcept MEMOLANG_LIFETIMEBOUND { return *operand_; }
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<UnaryExpr>(op_, operand_->clone());
@@ -542,10 +543,10 @@ public:
   }
 
   [[nodiscard]] BinaryOp op() const noexcept { return op_; }
-  [[nodiscard]] const Expr &lhs() const noexcept { return *lhs_; }
-  [[nodiscard]] Expr &lhs() noexcept { return *lhs_; }
-  [[nodiscard]] const Expr &rhs() const noexcept { return *rhs_; }
-  [[nodiscard]] Expr &rhs() noexcept { return *rhs_; }
+  [[nodiscard]] const Expr &lhs() const noexcept MEMOLANG_LIFETIMEBOUND { return *lhs_; }
+  [[nodiscard]] Expr &lhs() noexcept MEMOLANG_LIFETIMEBOUND { return *lhs_; }
+  [[nodiscard]] const Expr &rhs() const noexcept MEMOLANG_LIFETIMEBOUND { return *rhs_; }
+  [[nodiscard]] Expr &rhs() noexcept MEMOLANG_LIFETIMEBOUND { return *rhs_; }
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<BinaryExpr>(op_, lhs_->clone(), rhs_->clone());
@@ -568,10 +569,10 @@ public:
     assert(value_ && target_ && "CastExpr value and target must not be null");
   }
 
-  [[nodiscard]] const Expr &value() const noexcept { return *value_; }
-  [[nodiscard]] Expr &value() noexcept { return *value_; }
-  [[nodiscard]] const TypeExpr &target() const noexcept { return *target_; }
-  [[nodiscard]] TypeExpr &target() noexcept { return *target_; }
+  [[nodiscard]] const Expr &value() const noexcept MEMOLANG_LIFETIMEBOUND { return *value_; }
+  [[nodiscard]] Expr &value() noexcept MEMOLANG_LIFETIMEBOUND { return *value_; }
+  [[nodiscard]] const TypeExpr &target() const noexcept MEMOLANG_LIFETIMEBOUND { return *target_; }
+  [[nodiscard]] TypeExpr &target() noexcept MEMOLANG_LIFETIMEBOUND { return *target_; }
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<CastExpr>(value_->clone(), target_->clone());
@@ -596,8 +597,8 @@ public:
     assert(target_ && "SizeOfExpr target must not be null");
   }
 
-  [[nodiscard]] const TypeExpr &target() const noexcept { return *target_; }
-  [[nodiscard]] TypeExpr &target() noexcept { return *target_; }
+  [[nodiscard]] const TypeExpr &target() const noexcept MEMOLANG_LIFETIMEBOUND { return *target_; }
+  [[nodiscard]] TypeExpr &target() noexcept MEMOLANG_LIFETIMEBOUND { return *target_; }
 
   [[nodiscard]] std::unique_ptr<Expr> clone() const override {
     auto c = std::make_unique<SizeOfExpr>(target_->clone());
@@ -631,17 +632,17 @@ public:
            "paramNames must be empty or match args one-to-one");
   }
 
-  [[nodiscard]] const Expr &callee() const noexcept { return *callee_; }
-  [[nodiscard]] Expr &callee() noexcept { return *callee_; }
-  [[nodiscard]] std::span<const std::unique_ptr<Expr>> args() const noexcept {
+  [[nodiscard]] const Expr &callee() const noexcept MEMOLANG_LIFETIMEBOUND { return *callee_; }
+  [[nodiscard]] Expr &callee() noexcept MEMOLANG_LIFETIMEBOUND { return *callee_; }
+  [[nodiscard]] std::span<const std::unique_ptr<Expr>> args() const noexcept MEMOLANG_LIFETIMEBOUND {
     return args_;
   }
   [[nodiscard]] std::span<const std::unique_ptr<TypeExpr>>
-  typeArgs() const noexcept {
+  typeArgs() const noexcept MEMOLANG_LIFETIMEBOUND {
     return typeArgs_;
   }
   // Named arguments: empty, or one (possibly empty) name per argument.
-  [[nodiscard]] std::span<const std::string> paramNames() const noexcept {
+  [[nodiscard]] std::span<const std::string> paramNames() const noexcept MEMOLANG_LIFETIMEBOUND {
     return paramNames_;
   }
 
@@ -690,8 +691,8 @@ public:
     assert(expr_ && "ExprStmt expression must not be null");
   }
 
-  [[nodiscard]] const Expr &expr() const noexcept { return *expr_; }
-  [[nodiscard]] Expr &expr() noexcept { return *expr_; }
+  [[nodiscard]] const Expr &expr() const noexcept MEMOLANG_LIFETIMEBOUND { return *expr_; }
+  [[nodiscard]] Expr &expr() noexcept MEMOLANG_LIFETIMEBOUND { return *expr_; }
 
   void accept(Visitor &v) const override { v.visit(*this); }
 
@@ -711,12 +712,12 @@ public:
     assert((type_ || init_) && "declaration needs a type or an initializer");
   }
 
-  [[nodiscard]] const std::string &name() const noexcept { return name_; }
+  [[nodiscard]] const std::string &name() const noexcept MEMOLANG_LIFETIMEBOUND { return name_; }
   void setName(std::string name) { name_ = std::move(name); }
-  [[nodiscard]] const TypeExpr *type() const noexcept {
+  [[nodiscard]] const TypeExpr *type() const noexcept MEMOLANG_LIFETIMEBOUND {
     return type_.get();
   } // May be null.
-  [[nodiscard]] const Expr *init() const noexcept {
+  [[nodiscard]] const Expr *init() const noexcept MEMOLANG_LIFETIMEBOUND {
     return init_.get();
   } // May be null.
   [[nodiscard]] bool isStatic() const noexcept {
@@ -760,19 +761,19 @@ public:
            "extern function must not have a body");
   }
 
-  [[nodiscard]] const std::string &name() const noexcept { return name_; }
-  [[nodiscard]] std::span<const Param> params() const noexcept {
+  [[nodiscard]] const std::string &name() const noexcept MEMOLANG_LIFETIMEBOUND { return name_; }
+  [[nodiscard]] std::span<const Param> params() const noexcept MEMOLANG_LIFETIMEBOUND {
     return params_;
   }
-  [[nodiscard]] const TypeExpr &returnType() const noexcept {
+  [[nodiscard]] const TypeExpr &returnType() const noexcept MEMOLANG_LIFETIMEBOUND {
     return *returnType_;
   }
-  [[nodiscard]] TypeExpr &returnType() noexcept { return *returnType_; }
+  [[nodiscard]] TypeExpr &returnType() noexcept MEMOLANG_LIFETIMEBOUND { return *returnType_; }
   [[nodiscard]] std::span<const std::unique_ptr<Statement>>
-  body() const noexcept {
+  body() const noexcept MEMOLANG_LIFETIMEBOUND {
     return body_;
   }
-  [[nodiscard]] const std::string &externName() const noexcept {
+  [[nodiscard]] const std::string &externName() const noexcept MEMOLANG_LIFETIMEBOUND {
     return externName_;
   }
   [[nodiscard]] bool isExtern() const noexcept { return !externName_.empty(); }
@@ -804,8 +805,8 @@ public:
   }
 
   [[nodiscard]] AssignOp op() const noexcept { return op_; }
-  [[nodiscard]] const Expr &target() const noexcept { return *target_; }
-  [[nodiscard]] const Expr &value() const noexcept { return *value_; }
+  [[nodiscard]] const Expr &target() const noexcept MEMOLANG_LIFETIMEBOUND { return *target_; }
+  [[nodiscard]] const Expr &value() const noexcept MEMOLANG_LIFETIMEBOUND { return *value_; }
 
   void accept(Visitor &v) const override { v.visit(*this); }
 
@@ -821,7 +822,7 @@ public:
   explicit ReturnStmt(std::unique_ptr<Expr> value) // value is nullable.
       : Statement(NodeKind::ReturnStmt), value_(std::move(value)) {}
 
-  [[nodiscard]] const Expr *value() const noexcept {
+  [[nodiscard]] const Expr *value() const noexcept MEMOLANG_LIFETIMEBOUND {
     return value_.get();
   } // May be null.
 
@@ -843,13 +844,13 @@ public:
     assert(condition_ && "IfStmt condition must not be null");
   }
 
-  [[nodiscard]] const Expr &condition() const noexcept { return *condition_; }
+  [[nodiscard]] const Expr &condition() const noexcept MEMOLANG_LIFETIMEBOUND { return *condition_; }
   [[nodiscard]] std::span<const std::unique_ptr<Statement>>
-  thenBody() const noexcept {
+  thenBody() const noexcept MEMOLANG_LIFETIMEBOUND {
     return thenBody_;
   }
   [[nodiscard]] std::span<const std::unique_ptr<Statement>>
-  elseBody() const noexcept {
+  elseBody() const noexcept MEMOLANG_LIFETIMEBOUND {
     return elseBody_;
   }
 
@@ -871,9 +872,9 @@ public:
     assert(condition_ && "WhileStmt condition must not be null");
   }
 
-  [[nodiscard]] const Expr &condition() const noexcept { return *condition_; }
+  [[nodiscard]] const Expr &condition() const noexcept MEMOLANG_LIFETIMEBOUND { return *condition_; }
   [[nodiscard]] std::span<const std::unique_ptr<Statement>>
-  body() const noexcept {
+  body() const noexcept MEMOLANG_LIFETIMEBOUND {
     return body_;
   }
 
@@ -902,12 +903,12 @@ public:
     assert(iterable_ && "ForStmt iterable must not be null");
   }
 
-  [[nodiscard]] const std::string &variable() const noexcept {
+  [[nodiscard]] const std::string &variable() const noexcept MEMOLANG_LIFETIMEBOUND {
     return variable_;
   }
-  [[nodiscard]] const Expr &iterable() const noexcept { return *iterable_; }
+  [[nodiscard]] const Expr &iterable() const noexcept MEMOLANG_LIFETIMEBOUND { return *iterable_; }
   [[nodiscard]] std::span<const std::unique_ptr<Statement>>
-  body() const noexcept {
+  body() const noexcept MEMOLANG_LIFETIMEBOUND {
     return body_;
   }
 
@@ -938,10 +939,10 @@ public:
     assert(subject_ && "CaseStmt subject must not be null");
   }
 
-  [[nodiscard]] const Expr &subject() const noexcept { return *subject_; }
-  [[nodiscard]] std::span<const CaseArm> arms() const noexcept { return arms_; }
+  [[nodiscard]] const Expr &subject() const noexcept MEMOLANG_LIFETIMEBOUND { return *subject_; }
+  [[nodiscard]] std::span<const CaseArm> arms() const noexcept MEMOLANG_LIFETIMEBOUND { return arms_; }
   [[nodiscard]] std::span<const std::unique_ptr<Statement>>
-  elseBody() const noexcept {
+  elseBody() const noexcept MEMOLANG_LIFETIMEBOUND {
     return elseBody_;
   }
   // `else {}` with an empty body still counts, for the missing-return check.
