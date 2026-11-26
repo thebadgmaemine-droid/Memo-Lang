@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "AST/AST.h"
+#include "Support/Compiler.h"
 
 // Destructive-read (consumption) analysis: the core of MemoLang.
 //
@@ -62,7 +63,7 @@ public:
   using State = Visitor::State;
 
   // `sema` must already have analyzed the module. Both must outlive this.
-  Destructive(const sema::SemanticAnalyzer &sema, DiagnosticEngine &diags);
+  Destructive(const sema::SemanticAnalyzer &sema MEMOLANG_LIFETIMEBOUND, DiagnosticEngine &diags MEMOLANG_LIFETIMEBOUND);
 
   // Checks every function and the module-level code. Returns true if no
   // matrix is used after being consumed.
