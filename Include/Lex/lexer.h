@@ -9,6 +9,7 @@
 #include "Lex/TokenSource.h"
 #include "Lex/token.h"
 #include "Support/Compiler.h"
+#include "SourceManager.h"
 /* Begin checking 16/10/2026 */
 //  wait i wrote this
 namespace MemoLang {

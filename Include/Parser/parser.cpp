@@ -43,6 +43,7 @@
 #include "Diag/diagengine.h"
 #include "Lex/lexer.h"
 #include "SourceLocation.h"
+#include "SourceManager.h"
 #include "diag.h"
 #include "tokenkind.h"
 #include "Parser/parser.h"

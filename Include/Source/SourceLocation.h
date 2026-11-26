@@ -4,15 +4,17 @@
 #include <cstdint>
 
 namespace MemoLang {
-
-
+struct FileID {
+  std::uint32_t id = 0;
+  [[nodiscard]] bool isValid() const noexcept { return id != 0; }
+  friend bool operator==(FileID,FileID) = default;
+};
 // A position in a source buffer. line and column are 1-based; 0 means unknown.
 struct SourceLocation {
   std::uint32_t offset = 0; // Byte offset from the start of the buffer.
   std::uint32_t line = 0;
-  std::uint32_t column = 0;
-  std::string fileID;
-
+  std::uint32_t column = 0; 
+  FileID file;
   [[nodiscard]] bool isValid() const noexcept { return line != 0; }
 };
 

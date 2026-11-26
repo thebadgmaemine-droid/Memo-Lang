@@ -98,7 +98,6 @@ target_include_directories(MemoLangRuntime PUBLIC ${MEMOLANG_INCLUDE_DIRS})
 # next to its header. When a file moves, update this list too.
 add_library(MemoLangFrontend STATIC
     Include/Analysis/destructive.cpp
-    Include/AST/AST.cpp
     Include/AST/ASTPrinter.cpp
     Include/Diag/diags.cpp
     Include/Driver/driver.cpp
