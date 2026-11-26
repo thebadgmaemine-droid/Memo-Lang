@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "Source/SourceLocation.h"
+#include "Support/Compiler.h"
 
 namespace MemoLang {
 
@@ -20,10 +21,10 @@ public:
   [[nodiscard]] static std::optional<SourceManager>
   fromFile(const std::string &path, std::string &error);
 
-  [[nodiscard]] const std::string &fileName() const noexcept {
+  [[nodiscard]] const std::string &fileName() const noexcept MEMOLANG_LIFETIMEBOUND {
     return fileName_;
   }
-  [[nodiscard]] std::string_view text() const noexcept { return text_; }
+  [[nodiscard]] std::string_view text() const noexcept MEMOLANG_LIFETIMEBOUND { return text_; }
 
   [[nodiscard]] SourceLocation locationAt(std::uint32_t offset) const;
   // The reverse: a 1-based line:column to a full location, offset included.
