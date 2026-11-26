@@ -1,0 +1,19 @@
+# `for` and `case` syntax errors.
+def bad_for(int n) {
+    for 1 in n { }              # expect-error: 9: expected a loop variable after 'for'
+    for i n { }                 # expect-error: 11: expected 'in' after the loop variable
+}
+
+def bad_case(int x) {
+    case x 1 { }                # expect-error: 12: expected '{' after the value in 'case'
+    case x {
+        else { }
+        1 { }                   # expect-error: 9: 'else' must be the last arm of a 'case'
+    }
+    case x {
+        1 { }
+        else { }
+        else { }                # expect-error: 9: a 'case' can have only one 'else'
+    }
+    int after = 1;              # still parsed: no error here
+}

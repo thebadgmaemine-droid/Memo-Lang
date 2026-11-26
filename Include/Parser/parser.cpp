@@ -42,6 +42,7 @@
 
 #include "Diag/diagengine.h"
 #include "Lex/lexer.h"
+#include "SourceLocation.h"
 #include "diag.h"
 #include "tokenkind.h"
 #include "Parser/parser.h"
@@ -402,11 +403,19 @@ void Parser::parseStatementInto(StmtList &out) {
       skipBalancedBraces();
     return;
   case TokenKind::TOK_FOR:
+    // `for (init; cond; step)`: say what to write instead, and skip the
+    // whole loop so its pieces don't each produce an error.
+    if (peekNext().is(TokenKind::TOK_LPAREN)) {
+      error(tok_.range(), "C-style 'for' is not supported; write "
+                          "'for name in ...' or use 'while'");
+      skipUnsupported();
+      return;
+    }
+    break;
   case TokenKind::TOK_IMPORT:
   case TokenKind::TOK_TRY:
   case TokenKind::TOK_CATCH:
   case TokenKind::TOK_THROW:
-  case TokenKind::TOK_CASE:
     error(tok_.range(),
           "'" + std::string(tok_.spelling()) + "' is not supported yet");
     skipUnsupported();
@@ -437,6 +446,10 @@ std::unique_ptr<Statement> Parser::parseStatement() {
       return nullptr;
     }
     return parseFunctionDef(loc, true);
+  case TokenKind::TOK_FOR:
+    return parseFor();
+  case TokenKind::TOK_CASE:
+    return parseCase();
   case TokenKind::TOK_RETURN:
     return parseReturn();
   case TokenKind::TOK_IF:
@@ -703,7 +716,79 @@ std::unique_ptr<Statement> Parser::parseReturn() {
     return nullptr;
   return make<ReturnStmt>(loc, std::move(value));
 }
+// for_stmt := 'for' IDENT 'in' expr block
+std::unique_ptr<Statement> Parser::parseFor() {
+  SourceLocation loc = consume().location();      // 'for'
+  if (!check(TokenKind::TOK_IDENTIFIER)) {
+    error(tok_.range(), "expected a loop variable after 'for'");
+    return nullptr;
+  }
+  Token var = consume();
+  if (!expect(TokenKind::TOK_IN, "after the loop variable"))
+    return nullptr;
+  auto iterable = parseExpression();               // e.g. a range or a matrix
+  if (!iterable)
+    return nullptr;
+  StmtList body;
+  if (!parseBlock(body))                           // reports a missing '{'
+    return nullptr;
+  return make<ForStmt>(loc, std::string(var.spelling()), std::move(iterable),
+                       std::move(body));
+}
+// case_stmt := 'case' expr '{' { case_arm } [ 'else' block ] '}'
+// case_arm  := expr { ',' expr } block
+// No fallthrough: only the matching arm's block runs.
+std::unique_ptr<Statement> Parser::parseCase() {
+  SourceLocation loc = consume().location(); // 'case'
+  auto subject = parseExpression();
+  if (!subject)
+    return nullptr;
+  if (!expect(TokenKind::TOK_LBRACE, "after the value in 'case'"))
+    return nullptr;
 
+  std::vector<CaseArm> arms;
+  StmtList elseBody;
+  bool hasElse = false;
+  bool reportedMisplacedElse = false;
+  while (!check(TokenKind::TOK_RBRACE) && !check(TokenKind::TOK_EOF)) {
+    if (check(TokenKind::TOK_ELSE)) {
+      Token elseTok = consume();
+      // A second `else` is parsed into a scratch body, so the first one
+      // stays the one the node keeps.
+      StmtList extra;
+      if (hasElse)
+        error(elseTok.range(), "a 'case' can have only one 'else'");
+      if (!parseBlock(hasElse ? extra : elseBody))
+        return nullptr;
+      hasElse = true;
+      continue;
+    }
+    // Arms after the `else` are still parsed, so the `case`'s closing `}`
+    // is found and one mistake gives one error.
+    if (hasElse && !reportedMisplacedElse) {
+      error(tok_.range(), "'else' must be the last arm of a 'case'");
+      reportedMisplacedElse = true;
+    }
+
+    CaseArm arm;
+    SourceLocation armLoc = tok_.location();
+    do {
+      auto value = parseExpression();
+      if (!value)
+        return nullptr;
+      arm.values.push_back(std::move(value));
+    } while (accept(TokenKind::TOK_COMMA));
+    if (!parseBlock(arm.body))
+      return nullptr;
+    arm.range = SourceRange{armLoc, prevEnd_};
+    arms.push_back(std::move(arm));
+  }
+
+  if (!expect(TokenKind::TOK_RBRACE, "to close the 'case'"))
+    return nullptr;
+  return make<CaseStmt>(loc, std::move(subject), std::move(arms),
+                        std::move(elseBody), hasElse);
+}
 // if_stmt := 'if' expr block [ 'else' ( if_stmt | block ) ]
 // Parentheses around the condition are optional: they parse as a normal
 // parenthesized expression.

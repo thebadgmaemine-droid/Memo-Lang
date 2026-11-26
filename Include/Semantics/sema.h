@@ -44,7 +44,8 @@ struct Symbol {
   bool isFunction = false;  // kind == Function or Builtin.
   bool isParameter = false; // kind == Parameter.
   bool isLocal = false;     // Declared inside a function.
-  bool isConst = false;
+  bool isConst = false;     // Flagged by source and returns error if not possible
+  
   // `&name` appears somewhere: a pointer may read the variable, so
   // destructive analysis never consumes (moves out of) it.
   bool addressTaken = false;

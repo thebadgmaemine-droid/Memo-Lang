@@ -78,6 +78,8 @@ private:
   std::unique_ptr<Statement> parseReturn();
   std::unique_ptr<Statement> parseIf();
   std::unique_ptr<Statement> parseWhile();
+  std::unique_ptr<Statement> parseCase();
+  std::unique_ptr<Statement> parseFor();
   std::unique_ptr<Statement> parseExprOrAssign();
 
 

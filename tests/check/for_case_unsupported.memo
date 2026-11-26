@@ -1,0 +1,8 @@
+# `for` and `case` parse, but semantic analysis doesn't support them yet.
+def f(int x) {
+    for i in x {                # expect-error: 5: 'for' is not supported yet
+    }
+    case x {                    # expect-error: 5: 'case' is not supported yet
+        1 { }
+    }
+}

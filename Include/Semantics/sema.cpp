@@ -611,6 +611,14 @@ bool SemanticAnalyzer::analyzeStatement(const Statement &stmt) {
     if (current_->loopDepth == 0)
       error(stmt, "'break' outside a loop");
     break;
+  // Parsed, but no later stage handles them yet: stop here rather than
+  // let the interpreter and codegen skip them silently.
+  case NodeKind::ForStmt:
+    error(stmt, "'for' is not supported yet");
+    break;
+  case NodeKind::CaseStmt:
+    error(stmt, "'case' is not supported yet");
+    break;
   default:
     break;
   }

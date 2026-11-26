@@ -94,7 +94,9 @@
   TOK(TOK_THROW, "throw")                                                      \
   TOK(TOK_CASE, "case")                                                        \
   TOK(TOK_SIZEOF, "sizeof")                                                    \
-  TOK(TOK_MACRO, "macro")                                                      
+  TOK(TOK_MACRO, "macro")                                                      \
+  TOK(TOK_NULLPTR, "nullptr")
+                                                     
   
 namespace MemoLang {
 enum class TokenKind {

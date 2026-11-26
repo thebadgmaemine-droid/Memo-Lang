@@ -1,0 +1,24 @@
+# `for` and `case` statements (parsed only; sema reports them as not supported yet).
+def loops(int n) {
+    for i in n {
+        i;
+    }
+}
+
+def choose(int x) -> int {
+    case x {
+        1, 2 {
+            return 10;
+        }
+        3 {
+            return 30;
+        }
+        else {
+            return 0;
+        }
+    }
+    case x + 1 {
+        4 { x = 1; }
+    }
+    return x;
+}

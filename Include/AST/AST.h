@@ -53,6 +53,8 @@ class ReturnStmt;
 class IfStmt;
 class WhileStmt;
 class BreakStmt;
+class ForStmt;
+class CaseStmt;
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -84,8 +86,10 @@ enum class NodeKind {
   IfStmt,
   WhileStmt,
   BreakStmt,
+  ForStmt,
+  CaseStmt,
   FirstStmt = ExprStmt,
-  LastStmt = BreakStmt,
+  LastStmt = CaseStmt,
 
   // Type expressions
   TypeExpr,
@@ -237,6 +241,8 @@ public:
   virtual void visit(const IfStmt &) = 0;
   virtual void visit(const WhileStmt &) = 0;
   virtual void visit(const BreakStmt &) = 0;
+  virtual void visit(const ForStmt &) = 0;
+  virtual void visit(const CaseStmt &) = 0;
   enum class State { // State is along with visitors, then revisited in analysis
                      // for consume flags
     Live,
@@ -883,6 +889,71 @@ public:
   BreakStmt() : Statement(NodeKind::BreakStmt) {}
 
   void accept(Visitor &v) const override { v.visit(*this); }
+};
+
+// `for name in iterable { ... }`. Parsed only so far: semantic analysis
+// reports it as not supported yet.
+class ForStmt final : public Statement {
+public:
+  ForStmt(std::string variable, std::unique_ptr<Expr> iterable,
+          std::vector<std::unique_ptr<Statement>> body)
+      : Statement(NodeKind::ForStmt), variable_(std::move(variable)),
+        iterable_(std::move(iterable)), body_(std::move(body)) {
+    assert(iterable_ && "ForStmt iterable must not be null");
+  }
+
+  [[nodiscard]] const std::string &variable() const noexcept {
+    return variable_;
+  }
+  [[nodiscard]] const Expr &iterable() const noexcept { return *iterable_; }
+  [[nodiscard]] std::span<const std::unique_ptr<Statement>>
+  body() const noexcept {
+    return body_;
+  }
+
+  void accept(Visitor &v) const override { v.visit(*this); }
+
+private:
+  std::string variable_;
+  std::unique_ptr<Expr> iterable_;
+  std::vector<std::unique_ptr<Statement>> body_;
+};
+
+// `case x { 1, 2 { ... } 3 { ... } else { ... } }`. No fallthrough: only the
+// matching arm runs. Parsed only so far: semantic analysis reports it as not
+// supported yet.
+struct CaseArm {
+  std::vector<std::unique_ptr<Expr>> values;
+  std::vector<std::unique_ptr<Statement>> body;
+  SourceRange range; // From the first value to the end of the block.
+};
+
+class CaseStmt final : public Statement {
+public:
+  CaseStmt(std::unique_ptr<Expr> subject, std::vector<CaseArm> arms,
+           std::vector<std::unique_ptr<Statement>> elseBody, bool hasElse)
+      : Statement(NodeKind::CaseStmt), subject_(std::move(subject)),
+        arms_(std::move(arms)), elseBody_(std::move(elseBody)),
+        hasElse_(hasElse) {
+    assert(subject_ && "CaseStmt subject must not be null");
+  }
+
+  [[nodiscard]] const Expr &subject() const noexcept { return *subject_; }
+  [[nodiscard]] std::span<const CaseArm> arms() const noexcept { return arms_; }
+  [[nodiscard]] std::span<const std::unique_ptr<Statement>>
+  elseBody() const noexcept {
+    return elseBody_;
+  }
+  // `else {}` with an empty body still counts, for the missing-return check.
+  [[nodiscard]] bool hasElse() const noexcept { return hasElse_; }
+
+  void accept(Visitor &v) const override { v.visit(*this); }
+
+private:
+  std::unique_ptr<Expr> subject_;
+  std::vector<CaseArm> arms_;
+  std::vector<std::unique_ptr<Statement>> elseBody_;
+  bool hasElse_;
 };
 
 // One parsed source file.

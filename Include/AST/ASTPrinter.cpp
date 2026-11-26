@@ -316,6 +316,33 @@ public:
     --depth_;
   }
   void visit(const BreakStmt &) override { indent() << "Break\n"; }
+  void visit(const ForStmt &n) override {
+    indent() << "For " << n.variable() << '\n';
+    child(n.iterable());
+    ++depth_;
+    indent() << "Body\n";
+    printBody(n.body());
+    --depth_;
+  }
+  void visit(const CaseStmt &n) override {
+    indent() << "Case\n";
+    child(n.subject());
+    ++depth_;
+    for (const CaseArm &arm : n.arms()) {
+      indent() << "Arm\n";
+      for (const auto &value : arm.values)
+        child(*value);
+      ++depth_;
+      indent() << "Body\n";
+      printBody(arm.body);
+      --depth_;
+    }
+    if (n.hasElse()) {
+      indent() << "Else\n";
+      printBody(n.elseBody());
+    }
+    --depth_;
+  }
 
 private:
   std::ostream &indent() {

@@ -310,6 +310,7 @@ void CodegenFunction::finish() {
     emitCleanupsDownTo(0);
     const Type *returns = returnType();
     if (isKind(returns, Type::Kind::Void))
+    //  Silently defaults to void, to be changed
       builder_.CreateRetVoid();
     else
       builder_.CreateRet(defaultValue(returns));

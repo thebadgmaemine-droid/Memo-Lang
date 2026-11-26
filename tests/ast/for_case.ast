@@ -1,0 +1,36 @@
+Module for_case
+  FunctionDef loops(int n) -> auto
+    For i
+      Name n
+      Body
+        ExprStmt
+          Name i
+  FunctionDef choose(int x) -> int
+    Case
+      Name x
+      Arm
+        Integer 1
+        Integer 2
+        Body
+          Return
+            Integer 10
+      Arm
+        Integer 3
+        Body
+          Return
+            Integer 30
+      Else
+        Return
+          Integer 0
+    Case
+      Binary +
+        Name x
+        Integer 1
+      Arm
+        Integer 4
+        Body
+          Assign =
+            Name x
+            Integer 1
+    Return
+      Name x

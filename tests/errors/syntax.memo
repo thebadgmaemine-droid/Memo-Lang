@@ -59,7 +59,7 @@ def standalone_block() {
 }
 
 def unsupported() {
-    for (int i = 0; i < 3; i++) {   # expect-error: 5: 'for' is not supported yet
+    for (int i = 0; i < 3; i++) {   # expect-error: 5: C-style 'for' is not supported; write 'for name in ...' or use 'while'
         i;
     }
     import foo;                 # expect-error: 5: 'import' is not supported yet
