@@ -10,6 +10,7 @@
 
 #include "AST/AST.h"
 #include "Runtime/runtime.h"
+#include "Support/Compiler.h"
 
 // The interpreter: runs a checked MemoLang program by walking its tree, and
 // calls the matrix runtime for matrix work. It is how MemoLang programs run
@@ -52,8 +53,8 @@ public:
   };
 
   // `sema` and `destructive` must have analyzed `module` without errors.
-  Interpreter(const Module &module, const sema::SemanticAnalyzer &sema,
-              const Destructive &destructive, runtime::Runtime &runtime,
+  Interpreter(const Module &module MEMOLANG_LIFETIMEBOUND, const sema::SemanticAnalyzer &sema MEMOLANG_LIFETIMEBOUND,
+              const Destructive &destructive MEMOLANG_LIFETIMEBOUND, runtime::Runtime &runtime MEMOLANG_LIFETIMEBOUND,
               Mode mode);
 
   // Runs the module-level statements, then main() (no parameters).

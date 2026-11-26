@@ -27,6 +27,7 @@
 #include "Analysis/destructive.h"
 #include "Semantics/sema.h"
 #include "Types/Typecontext.h"
+#include "Support/Compiler.h"
 
 namespace MemoLang {
 namespace {
@@ -81,7 +82,7 @@ bool asBool(const Value &v) {
   fail("expected a bool");
 }
 
-const MatrixRef &asMatrix(const Value &v) {
+const MatrixRef &asMatrix(const Value &v MEMOLANG_LIFETIMEBOUND) {
   if (!isMatrix(v) || !std::get<MatrixRef>(v))
     fail("expected a matrix");
   return std::get<MatrixRef>(v);
@@ -712,8 +713,17 @@ Value Interpreter::applyBinary(BinaryOp op, const Value &lhs,
     case BinaryOp::FloorDiv: return std::floor(a / b);
     case BinaryOp::Mod: return a - std::floor(a / b) * b;
     case BinaryOp::Pow: return std::pow(a, b);
+// MemoLang's `==` and `!=` on floats are exact comparisons, as in C, so
+// -Wfloat-equal (usually right about C++ code) is wrong here.
+#if defined(__GNUC__) // GCC and Clang
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+#endif
     case BinaryOp::Eq: return a == b;
     case BinaryOp::Ne: return a != b;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
     case BinaryOp::Lt: return a < b;
     case BinaryOp::Le: return a <= b;
     case BinaryOp::Gt: return a > b;
