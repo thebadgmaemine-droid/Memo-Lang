@@ -37,6 +37,7 @@
 #include "Lex/TokenSource.h"
 #include "Lex/token.h"
 #include "Macro/MacroTable.h"
+#include "Support/Compiler.h"
 
 namespace MemoLang {
 class MacroExpander final : public TokenSource {
@@ -46,11 +47,11 @@ public:
   // Stops exponential blow-up (each macro using the previous one twice).
   static constexpr std::size_t kMaxExpandedTokens = 1u << 20;
 
-  MacroExpander(TokenSource &input, DiagnosticEngine &diags);
+  MacroExpander(TokenSource &input MEMOLANG_LIFETIMEBOUND, DiagnosticEngine &diags MEMOLANG_LIFETIMEBOUND);
   Token next() override; // The next token after expansion.
   // Expands the rest of the input. The last token is always TOK_EOF.
   [[nodiscard]] std::vector<Token> tokenize();
-  [[nodiscard]] const MacroTable &macros() const noexcept { return table_; }
+  [[nodiscard]] const MacroTable &macros() const noexcept MEMOLANG_LIFETIMEBOUND { return table_; }
 
 private:
   Token expandNext(); // next() without the brace-depth bookkeeping.

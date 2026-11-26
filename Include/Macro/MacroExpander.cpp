@@ -406,7 +406,8 @@ MacroExpander::substitute(const MacroDef &def,
       auto param = std::find(def.params.begin(), def.params.end(),
                              tok.spelling());
       if (param != def.params.end()) {
-        const auto &arg = args[param - def.params.begin()];
+        const auto &arg =
+            args[static_cast<std::size_t>(param - def.params.begin())];
         // Keep the argument together: sq!(a + 1) with body `x * x` must be
         // (a + 1) * (a + 1), not a + 1 * a + 1. A single token needs no parens.
         bool wrap = arg.size() > 1;

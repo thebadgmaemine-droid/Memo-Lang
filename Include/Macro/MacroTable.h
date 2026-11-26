@@ -9,12 +9,14 @@
 // this uses the standard library. A file defines a handful of macros, so
 // std::unordered_map is plenty.
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
 #include "Lex/token.h"
+#include "Support/Compiler.h"
 
 namespace MemoLang {
 
@@ -28,35 +30,48 @@ struct MacroDef {
 
 class MacroTable {
 public:
-  [[nodiscard]] MacroDef *find(std::string_view name) {
-    auto it = macros_.find(std::string(name));
+  [[nodiscard]] MacroDef *find(std::string_view name) MEMOLANG_LIFETIMEBOUND {
+    auto it = macros_.find(name);
     return it == macros_.end() ? nullptr : &it->second;
   }
-  [[nodiscard]] const MacroDef *lookup(std::string_view name) const {
-    auto it = macros_.find(std::string(name));
+  [[nodiscard]] const MacroDef *lookup(std::string_view name) const MEMOLANG_LIFETIMEBOUND {
+    auto it = macros_.find(name);
     return it == macros_.end() ? nullptr : &it->second;
   }
   // The definition for `name`, created empty if it doesn't exist yet.
-  MacroDef &insert(std::string_view name) { return macros_[std::string(name)]; }
+  MacroDef &insert(std::string_view name) MEMOLANG_LIFETIMEBOUND { return macros_[std::string(name)]; }
   // Starts a fresh definition of `name`, replacing any earlier one. Check
   // isDefined() first to report a redefinition.
-  MacroDef &defineMacro(std::string_view name) {
+  MacroDef &defineMacro(std::string_view name) MEMOLANG_LIFETIMEBOUND {
     MacroDef &def = macros_[std::string(name)];
     def = MacroDef{};
     return def;
   }
   // Was `name` already defined (so defining it again is a redefinition)?
   [[nodiscard]] bool isDefined(std::string_view name) const {
-    return macros_.count(std::string(name)) != 0;
+    return macros_.find(name) != macros_.end();
   }
   bool erase(std::string_view name) {
-    return macros_.erase(std::string(name)) != 0;
+    // erase() can't take a string_view until C++23.
+    auto it = macros_.find(name);
+    if (it == macros_.end())
+      return false;
+    macros_.erase(it);
+    return true;
   }
   void clear() { macros_.clear(); }
   [[nodiscard]] std::size_t size() const noexcept { return macros_.size(); }
 
 private:
-  std::unordered_map<std::string, MacroDef> macros_;
+  // Lets find() take a string_view without building a std::string (the
+  // same trick as Semantics/Scope.h).
+  struct NameHash {
+    using is_transparent = void;
+    std::size_t operator()(std::string_view s) const noexcept {
+      return std::hash<std::string_view>{}(s);
+    }
+  };
+  std::unordered_map<std::string, MacroDef, NameHash, std::equal_to<>> macros_;
 };
 
 } // namespace MemoLang
