@@ -34,7 +34,10 @@ struct State {
 };
 
 State &state() {
-  static State s;
+  // Never destroyed: compiled code and a host's own static destructors may
+  // still call into the runtime while the program exits. Still reachable, so
+  // leak checkers don't report it.
+  static State &s = *new State;
   return s;
 }
 

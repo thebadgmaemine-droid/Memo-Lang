@@ -61,7 +61,7 @@ std::uint64_t Matrix::bytes() const noexcept {
 
 double Matrix::at(std::int64_t row, std::int64_t col) const {
   auto i = static_cast<std::size_t>(row * cols_ + col);
-  return type_ == ElementType::F32 ? f32_[i] : f64_[i];
+  return type_ == ElementType::F32 ? static_cast<double>(f32_[i]) : f64_[i];
 }
 
 void Matrix::set(std::int64_t row, std::int64_t col, double value) {

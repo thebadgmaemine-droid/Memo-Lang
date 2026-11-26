@@ -6,6 +6,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include "Support/Compiler.h"
 
 // The matrix runtime: allocates, computes and frees matrices, and measures
 // memory while it does. The interpreter (Interp/interpreter.h) calls it when a
@@ -86,7 +87,7 @@ public:
 
   [[nodiscard]] double sum(const Matrix &m) const;
 
-  [[nodiscard]] const MemoryStats &stats() const noexcept { return stats_; }
+  [[nodiscard]] const MemoryStats &stats() const noexcept MEMOLANG_LIFETIMEBOUND { return stats_; }
 
 private:
   MatrixRef allocate(std::int64_t rows, std::int64_t cols, ElementType type);
