@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "Diag/diag.h"
+#include "Support/Compiler.h"
 
 namespace MemoLang {
 
@@ -20,7 +21,7 @@ class SourceManager;
 //      |                  ^
 class DiagnosticEngine {
 public:
-  DiagnosticEngine(const SourceManager &sources, std::ostream &out);
+  DiagnosticEngine(const SourceManager &sources MEMOLANG_LIFETIMEBOUND, std::ostream &out MEMOLANG_LIFETIMEBOUND);
 
   void report(Severity severity, SourceRange range, std::string message);
   void error(SourceRange range, std::string message) {
@@ -43,7 +44,7 @@ public:
     return warningCount_;
   }
   [[nodiscard]] bool hasErrors() const noexcept { return errorCount_ != 0; }
-  [[nodiscard]] const std::vector<Diagnostic> &diagnostics() const noexcept {
+  [[nodiscard]] const std::vector<Diagnostic> &diagnostics() const noexcept MEMOLANG_LIFETIMEBOUND {
     return diagnostics_;
   }
 

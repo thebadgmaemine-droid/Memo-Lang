@@ -60,7 +60,7 @@ bool sameFile(const std::string &llvmPath, const std::string &ours) {
 // The LLVM-side handler: forwards everything to BackendDiagnostics.
 class Handler final : public llvm::DiagnosticHandler {
 public:
-  explicit Handler(BackendDiagnostics &diagnostics)
+  explicit Handler(BackendDiagnostics &diagnostics MEMOLANG_LIFETIMEBOUND)
       : diagnostics_(diagnostics) {}
 
   bool handleDiagnostics(const llvm::DiagnosticInfo &info) override {

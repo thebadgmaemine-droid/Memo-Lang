@@ -30,6 +30,7 @@
 #include "Codegen/CodegenOptions.h"
 #include "Diag/diag.h"
 #include "Source/SourceLocation.h"
+#include "Support/Compiler.h"
 
 namespace llvm {
 class DiagnosticHandler;
@@ -53,14 +54,15 @@ class DiagnosticEngine;
 
 class BackendDiagnostics {
 public:
-  BackendDiagnostics(DiagnosticEngine &Diags, const CodegenOptions &CodeGenOpts)
-      : Diags(Diags), CodeGenOpts(CodeGenOpts) {}
+  BackendDiagnostics(DiagnosticEngine &diags MEMOLANG_LIFETIMEBOUND, const CodegenOptions &codeGenOpts MEMOLANG_LIFETIMEBOUND)
+      : Diags(diags), CodeGenOpts(codeGenOpts) {}
 
   // Routes `context`'s diagnostics here until the returned guard is
   // destroyed; then the previous handler is restored.
   class InstallGuard {
   public:
-    InstallGuard(llvm::LLVMContext &context, BackendDiagnostics &diagnostics);
+    InstallGuard(llvm::LLVMContext &context MEMOLANG_LIFETIMEBOUND,
+                 BackendDiagnostics &diagnostics);
     ~InstallGuard();
     InstallGuard(const InstallGuard &) = delete;
     InstallGuard &operator=(const InstallGuard &) = delete;
@@ -69,7 +71,8 @@ public:
     llvm::LLVMContext &context_;
     std::unique_ptr<llvm::DiagnosticHandler> previous_;
   };
-  [[nodiscard]] InstallGuard install(llvm::LLVMContext &context) {
+  [[nodiscard]] InstallGuard
+  install(llvm::LLVMContext &context MEMOLANG_LIFETIMEBOUND) {
     return InstallGuard(context, *this);
   }
 
