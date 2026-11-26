@@ -833,7 +833,7 @@ int runMemBench(std::vector<std::string> files, int runs, bool save) {
     rows.push_back(std::move(row));
   }
 
-  auto table = [&](const char *title, const char *format,
+  auto table = [&](const char *title, int decimals,
                    double Measured::*field) {
     std::printf("%s\n", title);
     std::printf("  %-19s %14s %14s %14s %14s\n", "workload", "MemoLang",
@@ -845,7 +845,7 @@ int runMemBench(std::vector<std::string> files, int runs, bool save) {
       for (const Measured &m : row.variant) {
         char cell[32] = "-";
         if (m.ran)
-          std::snprintf(cell, sizeof cell, format, m.*field);
+          std::snprintf(cell, sizeof cell, "%.*f", decimals, m.*field);
         std::printf(" %14s", cell);
       }
       std::printf("\n");
@@ -855,9 +855,9 @@ int runMemBench(std::vector<std::string> files, int runs, bool save) {
   std::printf("MemoLang runtime benchmark: CPU matrix runtime, 256x256 f32 "
               "matrices, median of %d runs\n\n",
               runs);
-  table("Peak matrix memory (MiB)", "%.2f", &Measured::peakMiB);
-  table("Matrix allocations", "%.0f", &Measured::allocations);
-  table("Time (ms)", "%.1f", &Measured::ms);
+  table("Peak matrix memory (MiB)", 2, &Measured::peakMiB);
+  table("Matrix allocations", 0, &Measured::allocations);
+  table("Time (ms)", 1, &Measured::ms);
   std::printf(
       "MemoLang base:        matrices freed at the end of their scope (like "
       "C++).\n"
@@ -899,7 +899,7 @@ int runMemBench(std::vector<std::string> files, int runs, bool save) {
           "last use\n"
        << "- All four versions of each workload returned the same result"
        << (failures == 0 ? "" : " (EXCEPT where noted as failed)") << "\n\n";
-    auto mdTable = [&](const char *title, const char *format,
+    auto mdTable = [&](const char *title, int decimals,
                        double Measured::*field) {
       md << "## " << title << "\n\n| Workload |";
       for (const char *v : variantNames)
@@ -910,16 +910,16 @@ int runMemBench(std::vector<std::string> files, int runs, bool save) {
         for (const Measured &m : row.variant) {
           char cell[32] = "-";
           if (m.ran)
-            std::snprintf(cell, sizeof cell, format, m.*field);
+            std::snprintf(cell, sizeof cell, "%.*f", decimals, m.*field);
           md << ' ' << cell << " |";
         }
         md << '\n';
       }
       md << '\n';
     };
-    mdTable("Peak matrix memory (MiB)", "%.2f", &Measured::peakMiB);
-    mdTable("Matrix allocations", "%.0f", &Measured::allocations);
-    mdTable("Time (ms, CPU; noisy, see note)", "%.1f", &Measured::ms);
+    mdTable("Peak matrix memory (MiB)", 2, &Measured::peakMiB);
+    mdTable("Matrix allocations", 0, &Measured::allocations);
+    mdTable("Time (ms, CPU; noisy, see note)", 1, &Measured::ms);
     md << "Memory numbers are exact and carry over to a GPU. CPU times vary "
           "between\nidentical runs and don't carry over; GPU timing needs the "
           "cuBLAS version.\n";
