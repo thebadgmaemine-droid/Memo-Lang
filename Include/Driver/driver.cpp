@@ -19,6 +19,7 @@
 // 2026-11-25: macros. The parser reads from the MacroExpander;
 // --dump-expanded prints the tokens after expansion.
 // ---------------------------------------------------------------------------
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -74,7 +75,7 @@ std::string mib(std::uint64_t bytes) {
 }
 
 std::string percentChange(double before, double after) {
-  if (before == 0)
+  if (std::fpclassify(before) == FP_ZERO) // No change can be computed from 0.
     return "";
   char buffer[32];
   std::snprintf(buffer, sizeof buffer, "%+.1f%%",
