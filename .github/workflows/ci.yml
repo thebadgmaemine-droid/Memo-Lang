@@ -20,7 +20,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake -S . -B build -DMEMOLANG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+        # OFF explicitly: the front end and interpreter, as before, even if the
+        # runner happens to have LLVM installed. The build-with-llvm job covers codegen.
+        run: cmake -S . -B build -DMEMOLANG_BUILD_TESTS=ON -DMEMOLANG_USE_LLVM=OFF -DCMAKE_BUILD_TYPE=${{ matrix.config }}
 
       - name: Build
         run: cmake --build build --config ${{ matrix.config }} --parallel
@@ -36,3 +38,29 @@ jobs:
           runner=$(find build -name 'MemoLangTests*' -type f \( -name '*.exe' -o -perm -u+x \) | head -1)
           "$runner" stress | tr '\r' '\n' | grep -v '^\.\.\.\.'
           "$runner" fuzz
+
+  # The same build with code generation (Include/Codegen), against the LLVM
+  # version it is developed with. Linux only: LLVM on the Windows runners is
+  # a large, slow install.
+  build-with-llvm:
+    name: ubuntu-latest / LLVM 23 / Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 23
+        run: |
+          wget -q https://apt.llvm.org/llvm.sh
+          sudo bash llvm.sh 23
+          # llvm-23-dev has LLVMConfig.cmake; LLVM's CMake package also
+          # checks that the Polly library exists.
+          sudo apt-get install -y llvm-23-dev libpolly-23-dev
+
+      - name: Configure
+        run: cmake -S . -B build -DMEMOLANG_BUILD_TESTS=ON -DMEMOLANG_USE_LLVM=ON -DLLVM_DIR=/usr/lib/llvm-23/lib/cmake/llvm -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
