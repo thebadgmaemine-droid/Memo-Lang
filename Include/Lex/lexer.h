@@ -8,6 +8,7 @@
 
 #include "Lex/TokenSource.h"
 #include "Lex/token.h"
+#include "Support/Compiler.h"
 /* Begin checking 16/10/2026 */
 //  wait i wrote this
 namespace MemoLang {
@@ -23,7 +24,7 @@ class SourceManager;
 // run reports every problem instead of stopping at the first.
 class Lexer final : public TokenSource {
 public:
-  Lexer(const SourceManager &sources, DiagnosticEngine &diags);
+  Lexer(const SourceManager &sources MEMOLANG_LIFETIMEBOUND, DiagnosticEngine &diags MEMOLANG_LIFETIMEBOUND);
 
   // Returns the next token. Keeps returning TOK_EOF once the input is used up.
   [[nodiscard]] Token next() override;

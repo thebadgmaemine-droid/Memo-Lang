@@ -7,6 +7,7 @@
 
 #include "Lex/tokenkind.h"
 #include "Source/SourceLocation.h"
+#include "Support/Compiler.h"
 namespace MemoLang {
 // One token produced by the lexer: its kind, where it is, and its text.
 // 2026-10-14: finished the original declaration (it had no data members and
@@ -24,7 +25,7 @@ public:
   }
   // The token's source text. For string literals it is the decoded value:
   // no quotes, escapes already applied.
-  [[nodiscard]] std::string_view spelling() const noexcept { return spelling_; }
+  [[nodiscard]] std::string_view spelling() const noexcept MEMOLANG_LIFETIMEBOUND { return spelling_; }
 
   [[nodiscard]] bool is(TokenKind kind) const noexcept { return kind_ == kind; }
   [[nodiscard]] bool isNot(TokenKind kind) const noexcept {
