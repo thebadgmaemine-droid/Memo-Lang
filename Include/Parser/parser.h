@@ -11,6 +11,7 @@
 #include "AST/AST.h"
 #include "Lex/TokenSource.h"
 #include "Lex/token.h"
+#include "Support/Compiler.h"
 namespace MemoLang {
 class DiagnosticEngine;
 /* Reviewing 17/10/2026 */
@@ -29,7 +30,7 @@ public:
   // stack overflow (clang treats its bracket-depth limit the same way).
   static constexpr int kMaxNestingDepth = 256;
   // Reads from `tokens`: the Lexer, or a MacroExpander wrapping it.
-  Parser(TokenSource &tokens, DiagnosticEngine &diags);
+  Parser(TokenSource &tokens MEMOLANG_LIFETIMEBOUND, DiagnosticEngine &diags MEMOLANG_LIFETIMEBOUND);
 
   [[nodiscard]] Module parseModule(std::string name);
 
@@ -47,7 +48,7 @@ private:
     int tokenCount; // 2 for `is not` and `not in`.
   };
   // Token stream
-  [[nodiscard]] const Token &peekNext();
+  [[nodiscard]] const Token &peekNext() MEMOLANG_LIFETIMEBOUND;
   Token pull(); // The next token from tokens_ (see parser.cpp).
   Token consume();
   [[nodiscard]] bool check(TokenKind kind) const noexcept {

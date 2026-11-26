@@ -46,6 +46,7 @@
 #include "diag.h"
 #include "tokenkind.h"
 #include "Parser/parser.h"
+#include "Support/Compiler.h"
 
 namespace MemoLang {
 namespace {
@@ -67,7 +68,7 @@ constexpr int kPrecMultiplicative = 10; // * / // % @
 // Raises the parser's nesting depth for the lifetime of one recursive call.
 class NestingGuard {
 public:
-  explicit NestingGuard(int &depth) noexcept : depth_(depth) { ++depth_; }
+  explicit NestingGuard(int &depth MEMOLANG_LIFETIMEBOUND) noexcept : depth_(depth) { ++depth_; }
   ~NestingGuard() { --depth_; }
   NestingGuard(const NestingGuard &) = delete;
   NestingGuard &operator=(const NestingGuard &) = delete;
