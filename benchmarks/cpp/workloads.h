@@ -1,7 +1,8 @@
 #ifndef MEMOLANG_CPP_WORKLOADS_H_
 #define MEMOLANG_CPP_WORKLOADS_H_
 
-#include <vector>
+#include <array>
+#include <span>
 
 #include "Runtime/runtime.h"
 
@@ -26,7 +27,7 @@ struct Workload {
   double (*handFreed)(runtime::Runtime &);
 };
 
-const std::vector<Workload> &workloads();
+std::span<const Workload> workloads();
 
 } // namespace MemoLang::cppbench
 

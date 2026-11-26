@@ -151,13 +151,14 @@ double singleExpressionHandFreed(Runtime &rt) {
 
 } // namespace
 
-const std::vector<Workload> &workloads() {
-  static const std::vector<Workload> all = {
+std::span<const Workload> workloads() {
+  // constexpr: built at compile time, so nothing is destroyed at exit.
+  static constexpr std::array<Workload, 4> all = {{
       {"layer_loop", layerLoopPlain, layerLoopHandFreed},
       {"named_chain", namedChainPlain, namedChainHandFreed},
       {"power_iteration", powerIterationPlain, powerIterationPlain},
       {"single_expression", singleExpressionPlain, singleExpressionHandFreed},
-  };
+  }};
   return all;
 }
 
