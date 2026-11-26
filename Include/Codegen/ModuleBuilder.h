@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 #include "Codegen/CodegenModule.h"
+#include "Support/Compiler.h"
 namespace llvm {
 class LLVMContext;
 class Module;
@@ -39,8 +40,8 @@ public:
   // Called once every module has been handled: finishes and verifies.
   void handleTranslationUnit();
  // Getter for codegenModule
-  [[nodiscard]] CodegenModule &getCodegenModule() const { return *codegen_; }
-  [[nodiscard]] llvm::Module *getModule() const;
+  [[nodiscard]] CodegenModule &getCodegenModule() const MEMOLANG_LIFETIMEBOUND { return *codegen_; }
+  [[nodiscard]] llvm::Module *getModule() const MEMOLANG_LIFETIMEBOUND;
   // Hands the finished module to the caller.
   [[nodiscard]] std::unique_ptr<llvm::Module> releaseModule();
   void prepareImportedModule(const Module &module);

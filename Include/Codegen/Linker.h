@@ -3,6 +3,7 @@
 // Links the llvm::Modules generated for each imported file into one module
 // before it is emitted. Not implemented yet (template).
 #include <memory>
+#include "Support/Compiler.h"
 
 namespace llvm {
 class Module;
@@ -13,7 +14,7 @@ class DiagnosticEngine;
 
 class Linker {
 public:
-  Linker(llvm::Module &destination, DiagnosticEngine &diagnostics);
+  Linker(llvm::Module &destination MEMOLANG_LIFETIMEBOUND, DiagnosticEngine &diagnostics MEMOLANG_LIFETIMEBOUND);
 
   // Moves `source` into the destination module. Returns false on conflicts
   // (e.g. two definitions of the same function), which are reported.

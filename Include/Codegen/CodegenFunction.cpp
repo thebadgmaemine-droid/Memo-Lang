@@ -46,7 +46,7 @@ bool isU64(const Type *type) {
 }
 
 // matrix<f32> -> 1, matrix<float> -> 0 (the runtime's element type flag).
-int f32Flag(const Type *matrixType) {
+std::uint32_t f32Flag(const Type *matrixType) {
   if (const auto *m = dynCast<MatrixType>(matrixType))
     if (const auto *f = dynCast<FloatType>(m->element()))
       return f->bits() == 32 ? 1 : 0;

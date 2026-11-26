@@ -134,13 +134,11 @@ bool CodegenModule::isRuntimeExtern(const FunctionDef &function) {
 
 llvm::Function *CodegenModule::getOrCreateFunction(std::string_view name,
                                                    llvm::FunctionType *type) {
-  std::string key(name);
-  if (auto it = functions_.find(key); it != functions_.end())
-    return it->second;
-  llvm::Function *function = llvm::Function::Create(
-      type, llvm::Function::ExternalLinkage, key, module_.get());
-  functions_.emplace(std::move(key), function);
-  return function;
+  llvm::Function *&slot = functions_[name];
+  if (!slot)
+    slot = llvm::Function::Create(type, llvm::Function::ExternalLinkage,
+                                  llvm::StringRef(name), module_.get());
+  return slot;
 }
 
 llvm::Function *CodegenModule::functionFor(const FunctionDef &function) const {
@@ -258,11 +256,10 @@ void CodegenModule::emitTopLevel(const Statement &statement) {
 // Runtime functions and constants
 // ---------------------------------------------------------------------------
 llvm::FunctionCallee CodegenModule::runtime(RuntimeFn fn) {
-  // Runs each time a function is found. The runtime function is casted then
-  // searched to find the appropriate key.
-  int key = static_cast<int>(fn);
-  if (auto it = runtimeFns_.find(key); it != runtimeFns_.end())
-    return it->second;
+  // Declared on first use, then reused.
+  const auto key = static_cast<std::size_t>(fn);
+  if (llvm::Function *known = runtimeFns_[key])
+    return known;
 
   // Type definition
   llvm::Type *voidTy = llvm::Type::getVoidTy(context_);
@@ -397,17 +394,17 @@ llvm::FunctionCallee CodegenModule::runtime(RuntimeFn fn) {
 }
 // String type
 llvm::Constant *CodegenModule::stringConstant(std::string_view text) {
-  std::string key(text);
-  if (auto it = strings_.find(key); it != strings_.end())
-    return it->second;
+  llvm::Constant *&slot = strings_[text];
+  if (slot)
+    return slot;
   llvm::Constant *data =
-      llvm::ConstantDataArray::getString(context_, key, true);
+      llvm::ConstantDataArray::getString(context_, text, true);
   auto *global =
       new llvm::GlobalVariable(*module_, data->getType(), /*isConstant=*/true,
                                llvm::GlobalValue::PrivateLinkage, data, ".str");
   global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   global->setAlignment(llvm::Align(1));
-  strings_.emplace(std::move(key), global);
+  slot = global;
   return global;
 }
 

@@ -31,6 +31,7 @@
 #include "AST/AST.h"
 #include "Codegen/LifetimeUtils.h"
 #include "Typecontext.h"
+#include "Support/Compiler.h"
 
 namespace MemoLang {
 class CodegenModule;
@@ -39,8 +40,8 @@ class TypeContext;
 class CodegenFunction {
 public:
   // `definition` is null for memo.init (module-level code).
-  CodegenFunction(CodegenModule &cgm, llvm::Function *function,
-                  const FunctionDef *definition);
+  CodegenFunction(CodegenModule &cgm MEMOLANG_LIFETIMEBOUND, llvm::Function *function MEMOLANG_LIFETIMEBOUND,
+                  const FunctionDef *definition MEMOLANG_LIFETIMEBOUND);
   ~CodegenFunction();
   CodegenFunction(const CodegenFunction &) = delete;
   CodegenFunction &operator=(const CodegenFunction &) = delete;
@@ -87,7 +88,7 @@ private:
                             const Node &where);
 
   // Conversions, as the interpreter's convertTo().
-  llvm::Value *convert(llvm::Value *value, const Type *from, const Type *to);
+  llvm::Value *convert(llvm::Value *value MEMOLANG_LIFETIMEBOUND, const Type *from, const Type *to);
   llvm::Value *toI64(llvm::Value *value, const Type *from);
   llvm::Value *toF64(llvm::Value *value, const Type *from);
   llvm::Value *defaultValue(const Type *type);

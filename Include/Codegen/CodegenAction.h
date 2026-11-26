@@ -24,6 +24,7 @@
 #include "Diag/BackendDiagnostics.h"
 #include "Codegen/CodegenModule.h"
 #include "Codegen/CodegenOptions.h"
+#include "Support/Compiler.h"
 
 namespace llvm {
 class LLVMContext;
@@ -45,7 +46,8 @@ enum class BackendAction {
 
 class CodegenAction {
 public:
-  CodegenAction(BackendAction action, llvm::LLVMContext &context,
+  CodegenAction(BackendAction action,
+                llvm::LLVMContext &context MEMOLANG_LIFETIMEBOUND,
                 const CodegenInputs &inputs, CodegenOptions options = {});
   ~CodegenAction();
   CodegenAction(const CodegenAction &) = delete;

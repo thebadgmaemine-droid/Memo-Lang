@@ -14,16 +14,21 @@
 //                 call MemoLang's main(), print what it returned, fini, end.
 //
 // 2026-11-17: implemented.
+#include <array>
+#include <cstddef>
 #include <cstdint>
-#include <llvm-23/llvm/IR/DerivedTypes.h>
 #include <memory>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
+
+#include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/StringMap.h>
+#include <llvm/IR/DerivedTypes.h>
 
 #include "Codegen/CodegenOptions.h"
 #include "Source/SourceLocation.h"
+#include "Support/Compiler.h"
 
 namespace llvm {
 class TargetMachine;
@@ -86,12 +91,14 @@ enum class RuntimeFn {
   PrintBool,
   PrintStr,
   PrintMatrix,
-  PrintNothing,
+  PrintNothing, // Keep last: kRuntimeFnCount counts up to it.
 };
+inline constexpr std::size_t kRuntimeFnCount =
+    static_cast<std::size_t>(RuntimeFn::PrintNothing) + 1;
 
 class CodegenModule {
 public:
-  CodegenModule(llvm::LLVMContext &context, const CodegenInputs &inputs,
+  CodegenModule(llvm::LLVMContext &context MEMOLANG_LIFETIMEBOUND, const CodegenInputs &inputs,
                 const CodegenOptions &options, std::string_view moduleName,
                 const llvm::TargetMachine *target = nullptr);
   ~CodegenModule(); // Out of line: llvm::Module is incomplete here.
@@ -107,8 +114,8 @@ public:
   [[nodiscard]] const Destructive &getDestructive() const {
     return inputs_.destructive;
   }
-  [[nodiscard]] const CodegenOptions &getOptions() const { return options_; }
-  [[nodiscard]] llvm::Module *getModule() const { return module_.get(); }
+  [[nodiscard]] const CodegenOptions &getOptions() const MEMOLANG_LIFETIMEBOUND { return options_; }
+  [[nodiscard]] llvm::Module *getModule() const MEMOLANG_LIFETIMEBOUND { return module_.get(); }
 
   // Declares every function and module-level variable of `ast`, so bodies
   // can refer to them in any order. Call before emitTopLevel().
@@ -156,19 +163,24 @@ private:
   // Called by release(): marks generated functions and calls nounwind where
   // nothing they reach can throw.
   void markNoUnwind(llvm::Module &module);
-  CodegenFunction &initFunction();
+  CodegenFunction &initFunction() MEMOLANG_LIFETIMEBOUND;
 
   llvm::LLVMContext &context_;
   CodegenInputs inputs_;
   CodegenOptions options_;
   std::size_t errorsAtStart_ = 0;
   std::unique_ptr<llvm::Module> module_;
-  std::unordered_map<std::string, llvm::Function *> functions_{};
-  std::unordered_map<const FunctionDef *, llvm::Function *> lowered_{};
-  std::unordered_map<std::uint32_t, llvm::GlobalVariable *> globals_{};
+  // Codegen always links LLVM, so these use its containers: StringMap finds
+  // a string_view key without building a std::string, and DenseMap stores
+  // pointer/int keys without an allocation per entry.
+  llvm::StringMap<llvm::Function *> functions_{};
+  llvm::DenseMap<const FunctionDef *, llvm::Function *> lowered_{};
+  // Symbol ids are small, never DenseMap's reserved ~0u / ~0u - 1 keys.
+  llvm::DenseMap<std::uint32_t, llvm::GlobalVariable *> globals_{};
   std::vector<llvm::GlobalVariable *> matrixGlobals_{}; // Released by fini.
-  std::unordered_map<std::string, llvm::Constant *> strings_{};
-  std::unordered_map<int, llvm::Function *> runtimeFns_{};
+  llvm::StringMap<llvm::Constant *> strings_{};
+  // Indexed by RuntimeFn; null until first used.
+  std::array<llvm::Function *, kRuntimeFnCount> runtimeFns_{};
   std::unique_ptr<CodegenFunction> init_;
   const FunctionDef *mainFunction_ = nullptr;
   bool released_ = false;

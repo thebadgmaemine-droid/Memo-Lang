@@ -16,6 +16,7 @@
 // intrinsics, so the helpers no longer take one.
 //--------------------------------------------------------------------------
 #include <vector>
+#include "Support/Compiler.h"
 
 namespace llvm {
 class AllocaInst;
@@ -31,7 +32,7 @@ void emitLifetimeEnd(llvm::IRBuilderBase &builder, llvm::AllocaInst *alloca);
 
 class LifetimeScope {
 public:
-  explicit LifetimeScope(CodegenModule &cgm) : cgm_(cgm) {}
+  explicit LifetimeScope(CodegenModule &cgm MEMOLANG_LIFETIMEBOUND) : cgm_(cgm) {}
 
   // Registers a variable's slot; `ownsMatrix` slots hold a matrix reference
   // that is released when the scope ends.
