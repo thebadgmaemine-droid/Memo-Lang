@@ -4,10 +4,32 @@ project(MemoLang VERSION 0.1.0 LANGUAGES C CXX)
 
 option(MEMOLANG_BUILD_TESTS "Build MemoLang tests" ON)
 option(MEMOLANG_BUILD_EXAMPLES "Build MemoLang example programs" ON)
-# The front-end (lexer, parser, diagnostics) doesn't use LLVM, so it builds
-# without it. OFF by default so the project builds on machines without LLVM
-# (CI, teammates); with LLVM installed, configure with -DMEMOLANG_USE_LLVM=ON.
-option(MEMOLANG_USE_LLVM "Link against LLVM and enable LLVM frontend support" OFF)
+# The front-end (lexer, macros, parser, sema, interpreter) doesn't use LLVM,
+# so it builds without it; only code generation (Include/Codegen) needs it.
+# Default: ON when the LLVM version codegen is developed against (23.1) is
+# installed, OFF otherwise, so machines without it (or with another LLVM,
+# like the preinstalled ones on CI runners) still build. Pass
+# -DMEMOLANG_USE_LLVM=ON/OFF to choose; ON accepts any LLVM version.
+set(MEMOLANG_LLVM_AUTO_VERSION 23.1)
+if(NOT DEFINED MEMOLANG_USE_LLVM)
+  if(NOT DEFINED LLVM_DIR AND NOT WIN32
+     AND EXISTS "/usr/lib/llvm-23/lib/cmake/llvm/LLVMConfig.cmake")
+    set(LLVM_DIR "/usr/lib/llvm-23/lib/cmake/llvm" CACHE PATH
+        "Path to the LLVM CMake package (folder containing LLVMConfig.cmake)")
+  endif()
+  find_package(LLVM ${MEMOLANG_LLVM_AUTO_VERSION} CONFIG QUIET)
+  set(MEMOLANG_USE_LLVM_DEFAULT ${LLVM_FOUND})
+  if(LLVM_FOUND)
+    message(STATUS "LLVM ${LLVM_PACKAGE_VERSION} found: code generation is on")
+  else()
+    message(STATUS "LLVM ${MEMOLANG_LLVM_AUTO_VERSION} not found: building "
+                   "without code generation (-DMEMOLANG_USE_LLVM=ON to force)")
+  endif()
+else()
+  set(MEMOLANG_USE_LLVM_DEFAULT OFF) # Already chosen; option() keeps it.
+endif()
+option(MEMOLANG_USE_LLVM "Link against LLVM and build code generation"
+       ${MEMOLANG_USE_LLVM_DEFAULT})
 
 set(CMAKE_CXX_STANDARD 20) # Use Cpp 20 for compiler and tests
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -93,7 +115,6 @@ add_library(MemoLangFrontend STATIC
 # Code generation needs the LLVM headers, so it's built only with LLVM.
 if(MEMOLANG_USE_LLVM)
   target_sources(MemoLangFrontend PRIVATE
-      Include/IR/IRBuilder.cpp
       Include/Diag/BackendDiagnostics.cpp
       Include/Codegen/CodegenAction.cpp
       Include/Codegen/CodegenFunction.cpp
@@ -128,12 +149,45 @@ function(memolang_use_big_stack target)
 endfunction()
 memolang_use_big_stack(MemoLang)
 
-foreach(target MemoLangRuntime MemoLangFrontend MemoLang)
+# Warnings. Clang (not clang-cl, which takes the MSVC branch) gets every
+# warning it has (-Weverything) minus groups that don't fit this project:
+#   c++98-compat*, pre-c++NN-compat   the project requires C++20
+#   padded                            reports struct padding, not mistakes
+#   weak-vtables                      every AST node defines its virtuals in
+#                                     AST.h; out-of-line anchors buy nothing
+#   switch-enum, switch-default       switches use `default:` on purpose;
+#                                     -Wswitch (in -Wall) still checks them
+#   unsafe-buffer-usage*              C++ "safe buffers" hardening mode
+#   nrvo                              copy-elision hints, not mistakes
+#   lifetime-safety-invalidation      (Clang 23, experimental) flags any
+#                                     push_back on a vector passed by
+#                                     reference, element held or not
+# New Clang releases add warnings to -Weverything, so a compiler update can
+# show new ones. GCC keeps -Wall -Wextra.
+set(MEMOLANG_CLANG_WARNINGS
+    -Weverything
+    -Wno-c++98-compat -Wno-c++98-compat-pedantic
+    -Wno-pre-c++14-compat -Wno-pre-c++17-compat -Wno-pre-c++20-compat
+    -Wno-padded
+    -Wno-weak-vtables
+    -Wno-switch-enum -Wno-switch-default
+    -Wno-unsafe-buffer-usage -Wno-unsafe-buffer-usage-in-libc-call
+    -Wno-nrvo
+    -Wno-lifetime-safety-invalidation
+    # Options newer than the oldest supported Clang are ignored, not errors.
+    -Wno-unknown-warning-option)
+function(memolang_warnings target)
   if(MSVC)
     target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(${target} PRIVATE ${MEMOLANG_CLANG_WARNINGS})
   else()
     target_compile_options(${target} PRIVATE -Wall -Wextra)
   endif()
+endfunction()
+
+foreach(target MemoLangRuntime MemoLangFrontend MemoLang)
+  memolang_warnings(${target})
 endforeach()
 
 # LLVM's include dirs and definitions come from include_directories() and
@@ -153,11 +207,7 @@ if(MEMOLANG_BUILD_TESTS)
   target_link_libraries(MemoLangTests PRIVATE MemoLangFrontend)
   memolang_use_big_stack(MemoLangTests)
   target_compile_definitions(MemoLangTests PRIVATE MEMOLANG_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-  if(MSVC)
-    target_compile_options(MemoLangTests PRIVATE /W4 /permissive- /utf-8)
-  else()
-    target_compile_options(MemoLangTests PRIVATE -Wall -Wextra)
-  endif()
+  memolang_warnings(MemoLangTests)
 
   # One test per file: tests/<mode>/<name>.memo runs as "<mode>/<name>".
   foreach(mode ast tokens errors check run)
