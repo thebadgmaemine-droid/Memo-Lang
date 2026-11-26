@@ -16,6 +16,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include "Support/Compiler.h"
 
 namespace MemoLang {
 
@@ -32,7 +33,7 @@ struct Binding {
 
 class Scope {
 public:
-  explicit Scope(Scope *parent = nullptr) : parent_(parent) {}
+  explicit Scope(Scope *parent MEMOLANG_LIFETIMEBOUND = nullptr) : parent_(parent) {}
 
   // Adds `name` to this scope. Returns false (and changes nothing) if this
   // scope already declares it. A name from a parent scope may be shadowed.

@@ -42,6 +42,7 @@
 #include "AST.h"
 #include "Diag/diagengine.h"
 #include "Types/Typecontext.h"
+#include "Support/Compiler.h"
 
 namespace MemoLang::sema {
 namespace {
@@ -192,7 +193,7 @@ struct SemanticAnalyzer::FunctionContext {
 // Opens a block scope for its lifetime.
 class SemanticAnalyzer::ScopeGuard {
 public:
-  explicit ScopeGuard(SemanticAnalyzer &analyzer) : analyzer_(analyzer) {
+  explicit ScopeGuard(SemanticAnalyzer &analyzer MEMOLANG_LIFETIMEBOUND) : analyzer_(analyzer) {
     Scope *parent = analyzer.localScopes_.empty()
                         ? &analyzer.global_
                         : analyzer.localScopes_.back().get();

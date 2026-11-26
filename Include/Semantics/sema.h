@@ -11,6 +11,7 @@
 #include "AST/AST.h"
 #include "Semantics/Scope.h"
 #include "Typecontext.h"
+#include "Support/Compiler.h"
 
 // Semantic analysis: name resolution and type checking.
 //
@@ -57,7 +58,7 @@ struct Symbol {
 class SemanticAnalyzer {
 public:
   // `types` and `diags` must outlive the analyzer.
-  SemanticAnalyzer(TypeContext &types, DiagnosticEngine &diags);
+  SemanticAnalyzer(TypeContext &types MEMOLANG_LIFETIMEBOUND, DiagnosticEngine &diags MEMOLANG_LIFETIMEBOUND);
   ~SemanticAnalyzer();
   SemanticAnalyzer(const SemanticAnalyzer &) = delete;
   SemanticAnalyzer &operator=(const SemanticAnalyzer &) = delete;
@@ -85,8 +86,8 @@ public:
                                      const Type &rhs) const;
 
   // Results for later passes.
-  [[nodiscard]] const Symbol &symbol(SymbolId id) const;
-  [[nodiscard]] const std::vector<Symbol> &symbols() const noexcept {
+  [[nodiscard]] const Symbol &symbol(SymbolId id) const MEMOLANG_LIFETIMEBOUND;
+  [[nodiscard]] const std::vector<Symbol> &symbols() const noexcept MEMOLANG_LIFETIMEBOUND {
     return symbols_;
   }
   // The symbol a name refers to, or nullopt if it didn't resolve.
@@ -95,7 +96,7 @@ public:
   [[nodiscard]] std::optional<SymbolId>
   declaredSymbol(const DeclareVar &decl) const;
   [[nodiscard]] const std::vector<SymbolId> &
-  parameterSymbols(const FunctionDef &function) const;
+  parameterSymbols(const FunctionDef &function) const MEMOLANG_LIFETIMEBOUND;
 
   // One line per symbol, for --dump-symbols and debugging.
   [[nodiscard]] std::string dumpSymbolTable() const;
@@ -126,7 +127,7 @@ private:
   const Type *checkLValue(const Expr &target, std::string_view action);
   // If `value` is `&x` with x a local or parameter, x's symbol; else null.
   // Only the direct form: `q = &x; return q;` isn't caught.
-  [[nodiscard]] const Symbol *addressedLocal(const Expr &value) const;
+  [[nodiscard]] const Symbol *addressedLocal(const Expr &value) const MEMOLANG_LIFETIMEBOUND;
 
   // Expressions
   const Type *inferName(const NameExpr &name);
