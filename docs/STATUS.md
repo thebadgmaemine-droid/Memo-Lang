@@ -22,11 +22,11 @@ Files: `Include/Codegen/CodegenFunction.cpp`, `CodegenModule.cpp`
 - [ ] Host CPU/features (`-march=native`) instead of `"generic"` — `CodegenAction.cpp:120`, `CodegenOptions.h`, `Driver/driver.cpp`
 - [ ] JIT path (LLJIT; orcjit already linked) using `runtime_abi` `lastResult()`/`setEchoResult()` — `CodegenAction.{h,cpp}`, `Driver/driver.cpp`
 - [ ] Use `Linker` for per-file modules (implemented, never called) — `Codegen/Linker.{h,cpp}`, `ModuleBuilder.cpp`
-- [ ] Remove or finish legacy `IRGenerator` stub — `Include/IR/IRBuilder.{h,cpp}`
+- [x] Remove legacy `IRGenerator` stub (deleted `Include/IR/IRBuilder.{h,cpp}`)
 
 ## 3. Codegen tests / CI
 - [ ] `MemoLangTests codegen`: compile `tests/run/*.memo` + benchmarks, result must match interpreter — `tests/runner.cpp`, `CMakeLists.txt`
-- [ ] CI job with `-DMEMOLANG_USE_LLVM=ON` — `.github/workflows/ci.yml`
+- [x] CI job with `-DMEMOLANG_USE_LLVM=ON` (`build-with-llvm`, Linux, LLVM 23 from apt.llvm.org; not yet seen running on GitHub) — `.github/workflows/ci.yml`. `MEMOLANG_USE_LLVM` now defaults to ON when LLVM 23.1 is installed
 
 ## 4. Language / front-end gaps
 - [ ] Missing-return check on non-void functions — `Semantics/sema.cpp`

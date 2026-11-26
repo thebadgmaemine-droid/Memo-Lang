@@ -222,3 +222,5 @@ Prompt was to fix this snippet:
 "fix the markNoUnwind link error"
 
 "Should token source be retrieved from parser in macroexpander?"
+
+"Fix the 17 clang warnings and replace unordered_map implementation with StringMap"
