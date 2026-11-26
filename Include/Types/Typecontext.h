@@ -9,6 +9,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+#include "Support/Compiler.h"
 
 // Semantic types, and the TypeContext that creates and owns them.
 //
@@ -18,7 +19,7 @@
 // and of llvm::IntegerType, the duplicate setRecordFlags, the misspelled
 // `llvm:SpecificBumpPtrAllocator<llvm::DomainValue>` and the qualified
 // printBumpPtrAllocatorStats member. Renamed Typecontext -> TypeContext to match
-// IR/IRBuilder.h. GenericKey is inline (it was an ODR violation) and keys on
+// IR/IRBuilder.h (since removed: codegen is Include/Codegen/). GenericKey is inline (it was an ODR violation) and keys on
 // type identity.
 //
 // 2026-11-12: reworked for semantic analysis (Semantics/sema.cpp):
@@ -151,7 +152,7 @@ private:
 // shape, so rows() and cols() are empty until something gives them a value.
 class MatrixType final : public Type {
 public:
-  MatrixType(const Type *element, std::optional<std::int64_t> rows,
+  MatrixType(const Type *element MEMOLANG_LIFETIMEBOUND, std::optional<std::int64_t> rows,
              std::optional<std::int64_t> cols)
       : Type(Kind::Matrix), element_(element), rows_(rows), cols_(cols) {}
   [[nodiscard]] const Type *element() const noexcept { return element_; }
@@ -172,10 +173,10 @@ private:
 
 class FunctionType final : public Type {
 public:
-  FunctionType(std::vector<const Type *> params, const Type *returnType)
+  FunctionType(std::vector<const Type *> params, const Type *returnType MEMOLANG_LIFETIMEBOUND)
       : Type(Kind::Function), params_(std::move(params)),
         returnType_(returnType) {}
-  [[nodiscard]] const std::vector<const Type *> &params() const noexcept {
+  [[nodiscard]] const std::vector<const Type *> &params() const noexcept MEMOLANG_LIFETIMEBOUND {
     return params_;
   }
   [[nodiscard]] const Type *returnType() const noexcept { return returnType_; }
@@ -190,7 +191,7 @@ private:
 
 class PointerType final : public Type {
 public:
-  explicit PointerType(const Type *pointee)
+  explicit PointerType(const Type *pointee MEMOLANG_LIFETIMEBOUND)
       : Type(Kind::Pointer), pointee_(pointee) {}
   [[nodiscard]] const Type *pointee() const noexcept { return pointee_; }
   [[nodiscard]] std::string display() const override {
@@ -207,8 +208,8 @@ class GenericType final : public Type {
 public:
   GenericType(std::string ctor, std::vector<const Type *> args)
       : Type(Kind::Generic), ctor_(std::move(ctor)), args_(std::move(args)) {}
-  [[nodiscard]] const std::string &ctor() const noexcept { return ctor_; }
-  [[nodiscard]] const std::vector<const Type *> &args() const noexcept {
+  [[nodiscard]] const std::string &ctor() const noexcept MEMOLANG_LIFETIMEBOUND { return ctor_; }
+  [[nodiscard]] const std::vector<const Type *> &args() const noexcept MEMOLANG_LIFETIMEBOUND {
     return args_;
   }
   [[nodiscard]] std::string display() const override {
@@ -229,7 +230,7 @@ private:
 
 class VectorType final : public Type {
 public:
-  VectorType(const Type *elem, unsigned lanes, bool scalable = false)
+  VectorType(const Type *elem MEMOLANG_LIFETIMEBOUND, unsigned lanes, bool scalable = false)
       : Type(Kind::Vector), elem_(elem), lanes_(lanes), scalable_(scalable) {}
 
   [[nodiscard]] const Type *elem() const noexcept { return elem_; }

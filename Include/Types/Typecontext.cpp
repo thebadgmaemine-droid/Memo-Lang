@@ -82,10 +82,13 @@ const T *TypeContext::intern(std::string key, Args &&...args) {
   auto it = interned_.find(key);
   if (it != interned_.end())
     return static_cast<const T *>(it->second.get());
-  auto type = std::make_unique<T>(std::forward<Args>(args)...);
-  const T *result = type.get();
-  interned_.emplace(std::move(key), std::move(type));
-  return result;
+  // Moved into the map first, then read back from it: the pointer then
+  // plainly comes from the map's copy (Clang 23's lifetime analysis can't
+  // tell that a moved unique_ptr keeps its pointee).
+  auto [inserted, ok] = interned_.emplace(
+      std::move(key), std::make_unique<T>(std::forward<Args>(args)...));
+  (void)ok; // find() above returned end(), so this always inserts.
+  return static_cast<const T *>(inserted->second.get());
 }
 
 TypeContext::TypeContext() {
