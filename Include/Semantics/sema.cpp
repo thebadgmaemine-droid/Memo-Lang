@@ -900,12 +900,12 @@ const Type *SemanticAnalyzer::inferName(const NameExpr &name) {
   const Symbol &symbol = symbols_[id->value];
   if (symbol.kind == Symbol::Kind::Builtin) {
     error(name, quoteForMessage(name.name()) +
-                    " is a built-in function; call it, e.g. copy(m)");
+                    " is a built-in function");
     return types_.errorType();
   }
   if (symbol.kind == Symbol::Kind::Function) {
     error(name, "function " + quoteForMessage(name.name()) +
-                    " can't be used as a value; call it");
+                    " can't be used as a value");
     return types_.errorType();
   }
   return symbol.type;

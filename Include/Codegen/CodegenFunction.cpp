@@ -5,12 +5,16 @@
 
 #include <cassert>
 
+#include <llvm-21/llvm/IR/BasicBlock.h>
+#include <llvm-23/llvm/IR/LLVMContext.h>
+#include <llvm-23/llvm/IR/Value.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/MDBuilder.h>
 
+#include "AST.h"
 #include "Analysis/destructive.h"
 #include "Codegen/CallUtils.h"
 #include "Codegen/CodegenModule.h"
@@ -417,6 +421,9 @@ void CodegenFunction::emitAssign(const AssignStmt &assign) {
     builder_.CreateStore(value, slot.address);
   }
 }
+llvm::Value CodegenFunction::emitToString(const StringLiteral &string) {
+
+}
 
 void CodegenFunction::emitReturn(const ReturnStmt &ret) {
   const Type *returns = returnType();
@@ -481,8 +488,21 @@ void CodegenFunction::emitWhile(const WhileStmt &loop) {
   if (llvm::pred_empty(exit))
     builder_.CreateUnreachable(); // `while true` without `break`.
 }
+llvm::Value CodegenFunction::emitInterpolatedString(const InterpolatedString &s) {
+  llvm::LLVMContext &context = cgm_.getLLVMContext();
+  llvm::Value *acc = cgm_.stringConstant("");
+  for (const StringPart &part : s.parts()) {
+    if(!part.literal.empty()) {
+      acc = builder_.CreateCall(cgm_.runtime(RuntimeFn::StrConcat), {acc, cgm_.stringConstant(part.literal)});
 
-
+    }
+    if(part.value) {
+      llvm::Value *piece = emitToString(*part.value, part.spec);
+      acc = builder_.CreateCall(cgm_.runtime(RuntimeFn::StrConcat), {acc,piece});
+    }
+  }
+  return acc;
+}
 
 void CodegenFunction::emitBreak(const BreakStmt &stmt) {
   if (loops_.empty()) {
@@ -536,7 +556,7 @@ llvm::Value *CodegenFunction::emitExpr(const Expr &expr) {
                    types_.intType(), expr.resolvedType());
   }
   case NodeKind::InterpolatedString: {
-    // add
+    return emitInterpolatedString(static_cast<const InterpolatedString &>(expr));
   }
   default:
     cgm_.error(expr.range(), "code generation doesn't support this type! ");

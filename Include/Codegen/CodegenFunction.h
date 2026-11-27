@@ -19,6 +19,7 @@
 //--------------------------------------------------------------------------
 // 2026-11-17: added.
 #include <cstdint>
+#include <llvm-23/llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <memory>
 #include <span>
@@ -67,6 +68,7 @@ private:
   // Expressions: each returns a value of the lowered expr.resolvedType().
   llvm::Value *emitExpr(const Expr &expr);
   llvm::Value *emitName(const NameExpr &name);
+  llvm::Value *emitInterpolatedString(const InterpolatedString &interpolatedstring);
   llvm::Value *emitUnary(const UnaryExpr &unary);
   llvm::Value *emitBinary(const BinaryExpr &binary);
   llvm::Value *emitLogical(const BinaryExpr &binary, llvm::Value *lhs);
@@ -74,6 +76,8 @@ private:
   llvm::Value *emitRuntimeExtern(const FunctionDef &function,
                                  std::vector<llvm::Value *> &args,
                                  const CallExpr &call);
+  llvm::Value *emitToString(const StringLiteral &string);
+
   // `lhs op rhs` (not `and`/`or`), converted to `result`. Releases matrix
   // operands.
   llvm::Value *emitBinaryOp(BinaryOp op, llvm::Value *lhs, const Type *lhsType,
