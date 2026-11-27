@@ -1,0 +1,22 @@
+# Integer constants stored in a variable must fit its type, as returned
+# constants must (return_constants.memo). An explicit cast asks for the wrap.
+u8 g = 255;
+
+def edges() {
+    i8 a = -128;
+    i8 b = 127;
+    i16 c = -32768;
+    u16 d = 65535;
+    u64 e = 18446744073709551615;
+    i8 f = 300 as i8;             # Explicit: wraps to 44.
+    f += 100;                     # Arithmetic wraps by design.
+}
+
+def too_big() {
+    i8 a = 128;                   # expect-error: 12: 'a' has type 'i8', which can't hold 128
+    i16 b = -32769;               # expect-error: 13: 'b' has type 'i16', which can't hold -32769
+    u32 c = -1;                   # expect-error: 13: 'c' has type 'u32', which can't hold -1
+    i8 d = 0;
+    d = 1000;                     # expect-error: 9: 'd' has type 'i8', which can't hold 1000
+    g = 256;                      # expect-error: 9: 'g' has type 'byte', which can't hold 256
+}

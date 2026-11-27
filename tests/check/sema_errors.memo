@@ -68,7 +68,7 @@ def not_callable() {
 }
 
 def function_as_value() {
-    int f = two;                  # expect-error: 13: function 'two' can't be used as a value; call it
+    int f = two;                  # expect-error: 13: function 'two' can't be used as a value
 }
 
 def operators() {

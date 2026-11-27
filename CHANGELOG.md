@@ -5,6 +5,18 @@ All notable changes to MemoLang. Versions follow `project(VERSION ...)` in
 
 ## [Unreleased]
 
+### Fixed (2026-11-27)
+- An integer constant stored in a variable must fit its type, as a returned
+  constant already had to: `i8 x = 1000;` and `x = 1000;` are errors instead
+  of silently storing -24. `300 as i8` still asks for the wrap, and `+=` and
+  other arithmetic still wrap. Test: `tests/check/constant_range`.
+- Code generation for interpolated strings compiles again (the LLVM CI job
+  failed): machine-specific `<llvm-21/...>` / `<llvm-23/...>` includes
+  replaced, declarations and definitions match, and `emitToString` is
+  implemented for `str` values (other types report "not supported yet").
+- `tests/check/sema_errors` matches the shorter "can't be used as a value"
+  message.
+
 ### Added (2026-11-25)
 - Macros: `macro name(params) { body }` and `macro name { body }`, used as
   `name!(args)` / `name!`. A new token stage, `MacroExpander`

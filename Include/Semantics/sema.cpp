@@ -165,6 +165,21 @@ std::string constantSpelling(IntegerConstant value) {
   return (value.negative ? "-" : "") + std::to_string(value.magnitude);
 }
 
+// "which can't hold 1000" if `value` is an integer constant that doesn't fit
+// the integer type `target`, else nothing. Integers convert by truncating,
+// so such a constant would silently become a different number (300 as a u8
+// is 44); an explicit cast (`300 as u8`) is how to ask for that.
+std::optional<std::string> constantOverflow(const Type &target,
+                                            const Expr &value) {
+  const auto *intType = dynCast<IntType>(&target);
+  if (!intType)
+    return std::nullopt;
+  auto constant = integerConstant(value);
+  if (!constant || fitsIn(*constant, *intType))
+    return std::nullopt;
+  return "which can't hold " + constantSpelling(*constant);
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -649,6 +664,10 @@ void SemanticAnalyzer::analyzeDeclareVar(const DeclareVar &decl) {
     error(*decl.init(), "cannot initialize " + quoteForMessage(decl.name()) +
                             " of type " + typeName(declared) +
                             " with a value of type " + typeName(value));
+  else if (declared && value)
+    if (auto overflow = constantOverflow(*declared, *decl.init()))
+      error(*decl.init(), quoteForMessage(decl.name()) + " has type " +
+                              typeName(declared) + ", " + *overflow);
 
   Symbol symbol;
   symbol.name = decl.name();
@@ -740,6 +759,14 @@ void SemanticAnalyzer::analyzeAssign(const AssignStmt &assign) {
                               typeName(targetType));
     return;
   }
+  // `x += 1000` on an i8 wraps by design, like any arithmetic; only a plain
+  // `x = 1000` stores the constant as written.
+  if (assign.op() == AssignOp::Assign)
+    if (auto overflow = constantOverflow(*targetType, assign.value())) {
+      error(assign.value(), targetName + " has type " + typeName(targetType) +
+                                ", " + *overflow);
+      return;
+    }
   // A global outlives every local, so it can't hold a local's address.
   if (target.kind() == NodeKind::NameExpr) {
     auto id = symbolFor(static_cast<const NameExpr &>(target));

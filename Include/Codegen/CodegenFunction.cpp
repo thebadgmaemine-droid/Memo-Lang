@@ -5,16 +5,15 @@
 
 #include <cassert>
 
-#include <llvm-21/llvm/IR/BasicBlock.h>
-#include <llvm-23/llvm/IR/LLVMContext.h>
-#include <llvm-23/llvm/IR/Value.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/MDBuilder.h>
+#include <llvm/IR/Value.h>
 
-#include "AST.h"
+#include "AST/AST.h"
 #include "Analysis/destructive.h"
 #include "Codegen/CallUtils.h"
 #include "Codegen/CodegenModule.h"
@@ -421,8 +420,21 @@ void CodegenFunction::emitAssign(const AssignStmt &assign) {
     builder_.CreateStore(value, slot.address);
   }
 }
-llvm::Value CodegenFunction::emitToString(const StringLiteral &string) {
-
+// The text of one embedded value in an interpolated string. Only `str`
+// values are supported for now: the runtime has no number-to-text functions
+// yet, and the format spec (`{x:.2f}`) isn't applied.
+llvm::Value *CodegenFunction::emitToString(const Expr &value,
+                                           std::string_view spec) {
+  const Type *type = value.resolvedType();
+  if (!isKind(type, Type::Kind::Str) || !spec.empty()) {
+    cgm_.error(value.range(),
+               "code generation doesn't support interpolating a value of "
+               "type " +
+                   Detail::displayOrUnknown(type) +
+                   (spec.empty() ? "" : " with a format spec") + " yet");
+    return cgm_.stringConstant("");
+  }
+  return emitExpr(value);
 }
 
 void CodegenFunction::emitReturn(const ReturnStmt &ret) {
@@ -488,17 +500,18 @@ void CodegenFunction::emitWhile(const WhileStmt &loop) {
   if (llvm::pred_empty(exit))
     builder_.CreateUnreachable(); // `while true` without `break`.
 }
-llvm::Value CodegenFunction::emitInterpolatedString(const InterpolatedString &s) {
-  llvm::LLVMContext &context = cgm_.getLLVMContext();
+// "a{x}b" is concatenated left to right: "" + "a" + x + "b".
+llvm::Value *
+CodegenFunction::emitInterpolatedString(const InterpolatedString &s) {
   llvm::Value *acc = cgm_.stringConstant("");
   for (const StringPart &part : s.parts()) {
-    if(!part.literal.empty()) {
-      acc = builder_.CreateCall(cgm_.runtime(RuntimeFn::StrConcat), {acc, cgm_.stringConstant(part.literal)});
-
+    if (!part.literal.empty()) {
+      llvm::Value *text = cgm_.stringConstant(part.literal);
+      acc = builder_.CreateCall(cgm_.runtime(RuntimeFn::StrConcat), {acc, text});
     }
-    if(part.value) {
+    if (part.value) {
       llvm::Value *piece = emitToString(*part.value, part.spec);
-      acc = builder_.CreateCall(cgm_.runtime(RuntimeFn::StrConcat), {acc,piece});
+      acc = builder_.CreateCall(cgm_.runtime(RuntimeFn::StrConcat), {acc, piece});
     }
   }
   return acc;

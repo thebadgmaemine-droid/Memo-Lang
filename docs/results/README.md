@@ -22,7 +22,7 @@ rows, for comparing runs or making charts). Those files are written by
 - **No speed result yet.** CPU times vary up to 3.7× between runs of the
   same code. Speed has to be measured on a GPU, which needs the cuBLAS runtime
   and an NVIDIA GPU (see `docs/gpu-runtime.md`).
-- **All 36 automated tests pass** (Release and Debug, Windows MSVC; CI also
+- **All 48 automated tests pass** (Release and Debug, Windows MSVC; CI also
   runs Linux GCC).
 
 ## 1. Peak matrix memory (MiB)
@@ -111,15 +111,17 @@ part of the total.
 
 ## 5. Tests
 
-36 automated tests (`ctest`), all passing on 2026-11-23.
+48 automated tests (`ctest`), all passing on 2026-11-27 (36 on 2026-11-23,
+when the benchmarks above were run; the new tests cover language features,
+not the matrix runtime).
 
 | Kind | Tests | What they check |
 |---|---:|---|
-| `ast/` | 6 | The parser builds exactly the expected tree |
+| `ast/` | 8 | The parser builds exactly the expected tree |
 | `tokens/` | 4 | The lexer produces exactly the expected tokens |
-| `errors/` | 4 | Lexer and syntax errors: 38 deliberate mistakes, each reported once |
-| `check/` | 7 | Semantic and destructive analysis: 63 deliberate errors (types, pointers, returned constants, 9 use-after-consume cases), and valid programs accepted with no errors |
-| `run/` | 6 | Programs give the expected result in both modes, with no leaks: arithmetic, matrices, unsigned integers, inferred return types, a shape mismatch caught at run time |
+| `errors/` | 7 | Lexer and syntax errors: 62 deliberate mistakes, each reported once (including macros, `for`/`case`, matrix shapes) |
+| `check/` | 9 | Semantic and destructive analysis: 72 deliberate errors (types, pointers, constants that don't fit their type, 9 use-after-consume cases), and valid programs accepted with no errors |
+| `run/` | 11 | Programs give the expected result in both modes, with no leaks: arithmetic, matrices, signed and unsigned integers, inferred return types, pointers (including null and dangling), macros, a shape mismatch caught at run time |
 | `benchmarks/` | 4 | The benchmark programs give the same result in both modes, with no leaks |
 | `stress` | 1 | 36 extreme inputs (100,000-deep nesting, 1 MB lines, 10,000-term chains) |
 | `fuzz` | 1 | 9,000 random inputs: no crash, no hang, same result twice |
@@ -134,9 +136,9 @@ part of the total.
   realistic models are still to be measured.
 - Code generation (LLVM) isn't measured here: it needs an LLVM build, and
   this machine doesn't have LLVM.
-- The analysis doesn't follow pointers yet: using a consumed matrix through
-  a pointer (`*mp`) isn't caught. The workloads don't use pointers, so the
-  numbers above aren't affected.
+- A matrix whose address is taken (`&m`) is never consumed early, so
+  destructive reads give no saving for it. The workloads don't use pointers,
+  so the numbers above aren't affected.
 
 ## Conditions and how to reproduce
 

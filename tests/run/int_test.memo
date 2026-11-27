@@ -2,7 +2,7 @@
 
 # Type promotion check
 def i8Typepromotion() -> i8 {
-    i8 s = 300;
+    i8 s = 300 as i8;   # 300 doesn't fit an i8: the cast makes the wrap to 44 explicit
     int d = 200;
     int k = s + d;
     # error expected from return

@@ -19,11 +19,11 @@
 //--------------------------------------------------------------------------
 // 2026-11-17: added.
 #include <cstdint>
-#include <llvm-23/llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -76,7 +76,8 @@ private:
   llvm::Value *emitRuntimeExtern(const FunctionDef &function,
                                  std::vector<llvm::Value *> &args,
                                  const CallExpr &call);
-  llvm::Value *emitToString(const StringLiteral &string);
+  // One embedded value of an interpolated string, as text.
+  llvm::Value *emitToString(const Expr &value, std::string_view spec);
 
   // `lhs op rhs` (not `and`/`or`), converted to `result`. Releases matrix
   // operands.
