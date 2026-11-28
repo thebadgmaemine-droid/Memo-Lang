@@ -7,11 +7,13 @@ integer types `i8`/`i16`/`i32`/`i64` and `u8`/`u16`/`u32`/`u64`, macros (see 4b)
 interpolated strings `f"x = {x:.2f}"`, `import`, integer range checks.
 
 ## 0. Fix now (build broken)
-- [ ] SourceLocation ↔ LLVM 32-bit loc conversion for backend diagnostics (20-11 log) — `Include/Source/SourceLocation.h`, `Include/Diag/BackendDiagnostics.{h,cpp}`
+Nothing open: the LLVM build compiles, links and passes every test on Windows (MSVC) as of 2026-11-28.
+- [x] SourceLocation ↔ LLVM loc conversion for backend diagnostics (`BackendDiagnostics::toSourceRange`, 2026-11-20) — `Include/Diag/BackendDiagnostics.{h,cpp}`
+- [x] MSVC link error in the LLVM build (2026-11-28): `llvm::DiagnosticHandler` was forward-declared `class` but is a `struct`; MSVC mangles the two differently — `Include/Diag/BackendDiagnostics.h`
 
 ## 1. Codegen: unsupported constructs
 Files: `Include/Codegen/CodegenFunction.cpp`, `CodegenModule.cpp`
-- [x] Interpolated strings (2026-11-28): `emitInterpolatedString` / `emitToString` call `memolang_rt_{int,float,bool}_to_str`, which format through the same `runtime::format*` functions as the interpreter. Not compiled here (no LLVM): the CI LLVM job is the first check
+- [x] Interpolated strings (2026-11-28): `emitInterpolatedString` / `emitToString` call `memolang_rt_{int,float,bool}_to_str`, which format through the same `runtime::format*` functions as the interpreter. Compiled `run/fstring` gives the interpreter's result (16/16)
  `*p` → load (`CodegenModule.cpp:90`, `CodegenFunction.cpp` `emitUnary`)
 - [ ] Vector / generic / function-typed values (`CodegenModule.cpp:81,97,107,183`)
 - [ ] Calls through non-named callees
@@ -26,7 +28,9 @@ Files: `Include/Codegen/CodegenFunction.cpp`, `CodegenModule.cpp`
 - [x] Remove legacy `IRGenerator` stub (deleted `Include/IR/IRBuilder.{h,cpp}`)
 
 ## 3. Codegen tests / CI
-- [ ] `MemoLangTests codegen`: compile `tests/run/*.memo` + benchmarks, result must match interpreter — `tests/runner.cpp`, `CMakeLists.txt`
+- [ ] `MemoLangTests codegen`: compile `tests/run/*.memo` + benchmarks, result must match interpreter — `tests/runner.cpp`, `CMakeLists.txt`. Done by hand on 2026-11-28 (Windows, LLVM 23.1.6, `-c` + link with `MemoLangRuntime.lib`): 16 of 17 programs give exactly the interpreter's result, runtime errors exit 1, no leaks. The exception is `run/pointer_dangling` (see "Indirect escapes" in 4): compiled code reads the dead variable instead of stopping
+- [x] LLVM build on Windows (2026-11-28): the prebuilt `clang+llvm-23.1.6-x86_64-pc-windows-msvc` package needs zlib and zstd (built from source, static, `/MD`) and the DIA SDK from Visual Studio. Release only: the package's libraries can't link into a Debug build. Configure into a separate folder:
+  `cmake -S . -B build-llvm -DMEMOLANG_BUILD_TESTS=ON -DLLVM_DIR=<llvm>/lib/cmake/llvm -DCMAKE_PREFIX_PATH=<deps> -DZLIB_LIBRARY=<deps>/lib/libzs.lib -DZLIB_INCLUDE_DIR=<deps>/include -DMSVC_DIA_SDK_DIR="<VS>/DIA SDK"`, then `cmake --build build-llvm --config Release`. Link a program: `clang++ -fms-runtime-lib=dll prog.obj MemoLangRuntime.lib -o prog.exe`
 - [x] CI job with `-DMEMOLANG_USE_LLVM=ON` (`build-with-llvm`, Linux, LLVM 23 from apt.llvm.org; not yet seen running on GitHub) — `.github/workflows/ci.yml`. `MEMOLANG_USE_LLVM` now defaults to ON when LLVM 23.1 is installed
 
 ## 4. Language / front-end gaps
