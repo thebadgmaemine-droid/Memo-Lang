@@ -426,7 +426,8 @@ void CodegenFunction::emitAssign(const AssignStmt &assign) {
 llvm::Value *CodegenFunction::emitToString(const Expr &value,
                                            std::string_view spec) {
   const Type *type = value.resolvedType();
-  if (!isKind(type, Type::Kind::Str) || !spec.empty()) {
+  if (!isKind(type, Type::Kind::Str) || !spec.empty() || !isKind(type, Type::Kind::Int) || 
+      !isKind(type, Type::Kind::Float) || !isKind(type, Type::Kind::Bool)) {
     cgm_.error(value.range(),
                "code generation doesn't support interpolating a value of "
                "type " +

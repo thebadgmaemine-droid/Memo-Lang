@@ -224,3 +224,5 @@ Prompt was to fix this snippet:
 "Should token source be retrieved from parser in macroexpander?"
 
 "Fix the 17 clang warnings and replace unordered_map implementation with StringMap"
+
+"What's the next task to be done according to STATUS.md since teamate comitted"

@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 #include "Runtime/runtime_abi.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -229,11 +230,47 @@ void memolang_rt_print_nothing(void) { result("nothing"); }
 } // extern "C"
 
 namespace MemoLang::runtime_abi {
+struct cStringPart {
+  int64_t len;
+  char* data;
+};
 
 const std::string &lastResult() { return state().lastResult; }
 
 runtime::MemoryStats stats() { return rt().stats(); }
 
 void setEchoResult(bool echo) { state().echo = echo; }
+
+extern "C" void memolang_rt_int_to_str(int64_t value, cStringPart* out) {
+  if (!out) {
+    return;
+  }
+  char* buffer = static_cast<char*>(std::malloc(21));
+  if (!buffer) {
+    out->len = 0;
+    out->data = nullptr;
+    return;
+  }
+  int written = std::snprintf(buffer,21,"&lld", static_cast<long long>(value));
+  out->len = (written>0) ? static_cast<int64_t>(written) : 0;
+  out->data = buffer;
+}
+extern "C" void memolang_rt_float_to_str(double value, cStringPart *out) {
+  char* buffer = static_cast<char*>(std::malloc(32)); // defaults to f32
+  if (!out) {
+    return;
+  }
+  if (!buffer) {
+    out->len = 0;
+    out->data = nullptr;
+    return;
+  }
+  int written = std::snprintf(buffer,32,"&.15g",value);
+  out->len = (written>0) ? static_cast<int64_t>(written) : 0;
+  out->data = buffer;
+
+  
+}
+
 
 } // namespace MemoLang::runtime_abi
