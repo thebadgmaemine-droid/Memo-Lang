@@ -93,7 +93,12 @@ unary -  +  ~  ++  --
 pointer prefix &  *  (so *p ** 2 is (*p) ** 2, and -*p is -(*p))
 14
 call f(x), cast x as float, postfix ++ --  (so *f() is *(f()), and *p as float is *(p as float): write (*p) as float)
-The lexer recognizes for, import, try, catch, throw, case and none, but the parser rejects them as "not supported yet". Semantic analysis also rejects is, is not, in and not in.
+The lexer recognizes for, try, catch, throw, case and none, but they aren't supported yet (for and case parse, then semantic analysis rejects them). Semantic analysis also rejects is, is not, in and not in.
+Interpolated strings (2026-11-28)
+f"x = {x}, mean = {m:.2f}, {{literal braces}}"  is a str. Each {expression} becomes text: integers in decimal, floats like "main() returned" prints them (2.5, 0.1000000015 for an f32), bools as true/false, strings as they are. A float can take :.N or :.Nf for N decimals (up to 20). Matrices and pointers can't be interpolated (use matrix_sum(copy(m)) for a number). Inside {...} there can be no quotes or braces: put a string in a variable first. Escapes are the same as in "...".
+Imports (2026-11-28)
+import "lib/geometry.memo";  or  import geometry;  (meaning "geometry.memo")
+Only at the top level. The path is relative to the importing file. The imported file's functions, externs and variables join the program: there is one namespace, so two files defining the same name is a "redefinition" error. Each file is loaded once, however often it is imported, so import cycles are harmless. Module-level code runs dependencies first. Macros stay in the file that defines them.
 Team notes: add comments here.
 Semantic rules
 • Names must be declared before use; an inner block may shadow an outer name.

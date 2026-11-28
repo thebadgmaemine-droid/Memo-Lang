@@ -49,8 +49,17 @@ bool isHexDigit(char c) {
 
 } // namespace
 
-Lexer::Lexer(const SourceManager &sources, DiagnosticEngine &diags)
-    : sources_(sources), diags_(diags), text_(sources.text()) {}
+Lexer::Lexer(const SourceManager &sources, DiagnosticEngine &diags,
+             FileID file)
+    : sources_(sources), diags_(diags), file_(file),
+      text_(sources.text(file)) {}
+
+// Cutting text_ at `end` makes everything past it look like the end of the
+// input; offsets (and so locations) stay those of the whole file.
+Lexer::Lexer(const SourceManager &sources, DiagnosticEngine &diags,
+             FileID file, std::uint32_t begin, std::uint32_t end)
+    : sources_(sources), diags_(diags), file_(file),
+      text_(sources.text(file).substr(0, end)), pos_(begin) {}
 
 char Lexer::peek(std::uint32_t ahead) const noexcept {
   std::size_t i = static_cast<std::size_t>(pos_) + ahead;
@@ -85,7 +94,8 @@ void Lexer::skipWhitespaceAndComments() {
         ++pos_;
       if (pos_ >= text_.size()) {
         // Point at the opening '/*'.
-        diags_.error({sources_.locationAt(start), sources_.locationAt(start + 2)},
+        diags_.error({sources_.locationAt(file_, start),
+                      sources_.locationAt(file_, start + 2)},
                      "unterminated block comment");
         return;
       }
@@ -96,7 +106,7 @@ void Lexer::skipWhitespaceAndComments() {
 }
 
 SourceRange Lexer::rangeFrom(std::uint32_t start) const {
-  return {sources_.locationAt(start), sources_.locationAt(pos_)};
+  return {sources_.locationAt(file_, start), sources_.locationAt(file_, pos_)};
 }
 
 Token Lexer::makeToken(TokenKind kind, std::uint32_t start) const {
@@ -111,6 +121,10 @@ Token Lexer::next() {
     return makeToken(TokenKind::TOK_EOF, start);
 
   char c = advance();
+  if (c == 'f' && peek() == '"') { // f"..." is an interpolated string.
+    advance();
+    return lexFString(start);
+  }
   if (isIdentStart(c))
     return lexIdentifier(start);
   if (isDigit(c) || (c == '.' && isDigit(peek())))
@@ -243,6 +257,91 @@ Token Lexer::lexString(std::uint32_t start) {
   return Token(TokenKind::TOK_STRING, rangeFrom(start), std::move(value));
 }
 
+// fstring := 'f"' { char | escape | '{{' | '}}' | '{' expr [':' spec] '}' } '"'
+// The lexer only finds where the literal ends and checks its structure; the
+// parser splits it into parts and parses each `{expr}` (Parser::
+// parseInterpolated). The token's spelling is the whole literal, f"..." and
+// all. Inside `{...}` there can be no quote (it would end the literal) and
+// no braces. On any mistake the token is UNKNOWN_TOKEN_SYNTAX_ERROR, so the
+// parser doesn't report the same literal again.
+Token Lexer::lexFString(std::uint32_t start) {
+  bool ok = true;
+  auto fail = [&](std::uint32_t from, std::uint32_t to, std::string message) {
+    diags_.error({sources_.locationAt(file_, from),
+                  sources_.locationAt(file_, to)},
+                 std::move(message));
+    ok = false;
+  };
+  auto unterminated = [&] {
+    diags_.error(rangeFrom(start), "unterminated interpolated string");
+    return Token(TokenKind::UNKNOWN_TOKEN_SYNTAX_ERROR, rangeFrom(start),
+                 std::string(text_.substr(start, pos_ - start)));
+  };
+  while (true) {
+    if (pos_ >= text_.size() || peek() == '\n')
+      return unterminated();
+    std::uint32_t at = pos_;
+    char c = advance();
+    if (c == '"')
+      break;
+    if (c == '\\') {
+      if (pos_ >= text_.size() || peek() == '\n')
+        continue; // Reported as unterminated above.
+      char e = advance();
+      if (e != 'n' && e != 't' && e != 'r' && e != '0' && e != '\\' &&
+          e != '"')
+        fail(at, pos_, std::string("unknown escape sequence '\\") + e + "'");
+      continue;
+    }
+    if (c == '}') {
+      if (!match('}'))
+        fail(at, pos_, "single '}' in an interpolated string; write '}}' "
+                       "for a literal '}'");
+      continue;
+    }
+    if (c != '{')
+      continue;
+    if (match('{'))
+      continue; // `{{` is a literal '{'.
+    // An embedded expression runs to the next '}'.
+    while (peek() != '}') {
+      if (pos_ >= text_.size() || peek() == '\n')
+        return unterminated();
+      std::uint32_t inner = pos_;
+      char d = advance();
+      if (d == '"') {
+        // The quote ends the literal, so the rest of the line is a mess:
+        // report it once and skip to the end of the line.
+        fail(inner, pos_, "a string can't appear inside '{...}' in an "
+                          "interpolated string; put it in a variable first");
+        while (pos_ < text_.size() && peek() != '\n')
+          ++pos_;
+        return Token(TokenKind::UNKNOWN_TOKEN_SYNTAX_ERROR, rangeFrom(start),
+                     std::string(text_.substr(start, pos_ - start)));
+      }
+      if (d == '{') {
+        // Its '}' would close the expression early and leave a stray '}'.
+        // Report this once and skip to the closing quote.
+        fail(inner, pos_, "'{' can't appear inside '{...}' in an "
+                          "interpolated string");
+        while (pos_ < text_.size() && peek() != '\n' && peek() != '"')
+          ++pos_;
+        if (peek() != '"')
+          return Token(TokenKind::UNKNOWN_TOKEN_SYNTAX_ERROR, rangeFrom(start),
+                       std::string(text_.substr(start, pos_ - start)));
+        advance();
+        return Token(TokenKind::UNKNOWN_TOKEN_SYNTAX_ERROR, rangeFrom(start),
+                     std::string(text_.substr(start, pos_ - start)));
+      }
+    }
+    advance(); // '}'
+  }
+  return Token(ok ? TokenKind::TOK_FSTRING
+                  : TokenKind::UNKNOWN_TOKEN_SYNTAX_ERROR,
+               rangeFrom(start),
+               std::string(text_.substr(start, pos_ - start)));
+}
+
 Token Lexer::lexOperator(std::uint32_t start, char c) {
   using K = TokenKind;
   K kind;
@@ -359,6 +458,7 @@ void printTokens(const std::vector<Token> &tokens, std::ostream &out) {
     case TokenKind::TOK_INTEGER:
     case TokenKind::TOK_FLOAT:
     case TokenKind::TOK_STRING:
+    case TokenKind::TOK_FSTRING:
     case TokenKind::TOK_KEYWORDTYPE:
       out << "\t'" << tok.spelling() << '\'';
       break;

@@ -31,6 +31,7 @@
 #include "Driver/driver.h"
 #include "Interp/interpreter.h"
 #include "Lex/lexer.h"
+#include "Driver/ModuleLoader.h"
 #include "Macro/MacroExpander.h"
 #include "Parser/parser.h"
 #include "Semantics/sema.h"
@@ -256,6 +257,9 @@ int runDriver(int argc, char **argv) {
     // The module is named after the file: examples/basicadd.memo -> basicadd.
     Module module = parser.parseModule(
         std::filesystem::path(options.inputPath).stem().string());
+    // Imported files are parsed and merged in, so the stages below see one
+    // module (Driver/ModuleLoader.h).
+    loadImports(module, *sources, diags);
 
     TypeContext types;
     sema::SemanticAnalyzer sema(types, diags);

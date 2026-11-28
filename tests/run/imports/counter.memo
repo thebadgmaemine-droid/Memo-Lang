@@ -1,0 +1,7 @@
+# Helper for tests/run/imports.memo (not a test on its own).
+int count = 1;
+
+def bump() -> int {
+    count++;
+    return count;
+}

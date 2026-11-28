@@ -1,0 +1,20 @@
+# Interpolated strings: which values can become text, and which format specs
+# are allowed. Valid uses first, then one error per mistake.
+extern def zeros_matrix(int rows, int cols) -> matrix<float>;
+def nothing() {}
+
+def good(int i, u64 u, f32 g, float f, bool b, str s) -> str {
+    return f"{i} {u} {g} {f:.3f} {f:.0} {f:.20} {b} {s} {i + 1} {f * 2.0:.2}";
+}
+
+def bad_values(int i, float f, int* p) {
+    matrix<float> m = zeros_matrix(2, 2);
+    str a = f"m = {m}";           # expect-error: 20: can't put a value of type 'matrix<float>' in an interpolated string
+    str b = f"{p}";               # expect-error: 16: can't put a value of type 'int*'
+    str c = f"{nothing()}";       # expect-error: 16: can't put a value of type 'void'
+    str d = f"{i:.2f}";           # expect-error: 16: only float values take a format spec
+    str e = f"{f:x}";             # expect-error: 16: unsupported format spec ':x'
+    str g = f"{f:.21f}";          # expect-error: 16: unsupported format spec ':.21f'
+    str h = f"{undeclared}";      # expect-error: 16: use of undeclared name 'undeclared'
+    int n = f"{i}";               # expect-error: 13: cannot initialize 'n' of type 'int' with a value of type 'str'
+}

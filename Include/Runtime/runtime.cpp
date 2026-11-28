@@ -12,6 +12,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <string>
 
 namespace MemoLang::runtime {
@@ -182,5 +183,29 @@ double Runtime::sum(const Matrix &m) const {
       total += m.at(i, j);
   return total;
 }
+
+std::string formatInt(std::int64_t value, bool isUnsigned) {
+  return isUnsigned ? std::to_string(static_cast<std::uint64_t>(value))
+                    : std::to_string(value);
+}
+
+std::string formatFloat(double value, int precision) {
+  // Fixed notation can be long (1e300 with 2 decimals is 303 characters), so
+  // ask snprintf for the length first.
+  auto print = [&](char *buffer, std::size_t size) {
+    return precision < 0
+               ? std::snprintf(buffer, size, "%.10g", value)
+               : std::snprintf(buffer, size, "%.*f", precision, value);
+  };
+  int length = print(nullptr, 0);
+  if (length <= 0)
+    return {};
+  std::string text(static_cast<std::size_t>(length) + 1, '\0');
+  print(text.data(), text.size());
+  text.resize(static_cast<std::size_t>(length));
+  return text;
+}
+
+std::string formatBool(bool value) { return value ? "true" : "false"; }
 
 } // namespace MemoLang::runtime

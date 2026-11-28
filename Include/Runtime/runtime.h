@@ -97,6 +97,18 @@ private:
   std::mt19937 rng_;
 };
 
+// Text of a value inside an interpolated string (f"x = {x}"). The
+// interpreter and compiled code (runtime_abi.h) both call these, so a program
+// prints the same text either way.
+//   - Integers: decimal; `isUnsigned` reads the bits as a u64.
+//   - Floats: `precision` < 0 gives the shortest form with up to 10
+//     significant digits, as "main() returned" prints (2.5, 0.1, 1e+20);
+//     `precision` >= 0 gives that many decimals ({x:.2f} -> "2.50").
+//   - Bools: "true" / "false".
+[[nodiscard]] std::string formatInt(std::int64_t value, bool isUnsigned);
+[[nodiscard]] std::string formatFloat(double value, int precision = -1);
+[[nodiscard]] std::string formatBool(bool value);
+
 } // namespace MemoLang::runtime
 
 #endif // MEMOLANG_RUNTIME_H_

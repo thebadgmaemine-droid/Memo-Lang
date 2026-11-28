@@ -101,6 +101,7 @@ add_library(MemoLangFrontend STATIC
     Include/AST/ASTPrinter.cpp
     Include/Diag/diags.cpp
     Include/Driver/driver.cpp
+    Include/Driver/ModuleLoader.cpp
     Include/Interp/interpreter.cpp
     Include/Lex/lexer.cpp
     Include/Lex/token.cpp

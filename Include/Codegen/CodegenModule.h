@@ -81,6 +81,9 @@ enum class RuntimeFn {
   Release,
   StrConcat,
   StrCompare,
+  IntToStr,   // Interpolated strings (runtime_abi.h).
+  FloatToStr,
+  BoolToStr,
   IPow,
   UPow,
   Panic,

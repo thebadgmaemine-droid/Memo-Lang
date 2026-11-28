@@ -50,6 +50,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <optional>
 #include <random>
 #include <sstream>
 #include <stdexcept>
@@ -62,6 +63,7 @@
 #include "Interp/interpreter.h"
 #include "workloads.h" // benchmarks/cpp: the benchmarks in native C++
 #include "Diag/diagengine.h"
+#include "Driver/ModuleLoader.h"
 #include "Lex/lexer.h"
 #include "Macro/MacroExpander.h"
 #include "Parser/parser.h"
@@ -89,10 +91,19 @@ struct ParseResult {
 };
 
 // Parses `text`. With `analyze`, a clean parse also goes through semantic and
-// destructive analysis, as in the compiler.
+// destructive analysis, as in the compiler. With `file`, the text is that
+// file's and its imports are loaded relative to it, as the compiler does.
 ParseResult parseSource(const std::string &moduleName, std::string text,
-                        bool printTree = true, bool analyze = false) {
-  SourceManager sources(moduleName + ".memo", std::move(text));
+                        bool printTree = true, bool analyze = false,
+                        const std::filesystem::path *file = nullptr) {
+  std::string readError;
+  // fromFile registers the full path, so a file that imports this one back
+  // isn't loaded a second time.
+  std::optional<SourceManager> loaded =
+      file ? SourceManager::fromFile(file->string(), readError) : std::nullopt;
+  SourceManager sources = loaded ? std::move(*loaded)
+                                 : SourceManager(moduleName + ".memo",
+                                                 std::move(text));
   std::ostringstream diagOut;
   DiagnosticEngine diags(sources, diagOut);
   diags.setErrorLimit(0);
@@ -104,6 +115,8 @@ ParseResult parseSource(const std::string &moduleName, std::string text,
     MacroExpander expander(lexer, diags);
     Parser parser(expander, diags);
     Module module = parser.parseModule(moduleName);
+    if (file)
+      loadImports(module, sources, diags);
     if (analyze && !diags.hasErrors()) {
       TypeContext types;
       sema::SemanticAnalyzer sema(types, diags);
@@ -258,15 +271,19 @@ int runErrors(const std::filesystem::path &file, bool analyze = false) {
     return 1;
   }
   ParseResult result =
-      parseSource(file.stem().string(), source, false, analyze);
+      parseSource(file.stem().string(), source, false, analyze, &file);
 
   int failures = 0;
   for (const Diagnostic &d : result.diagnostics) {
     if (d.severity == Severity::Note)
       continue; // Notes explain an error; the error itself is what's checked.
+    // expect-error comments describe this file; an error in an imported file
+    // is always unexpected.
+    bool inThisFile = !d.range.begin.file.isValid() ||
+                      d.range.begin.file == SourceManager::mainFileID();
     auto match = std::find_if(
         expectations.begin(), expectations.end(), [&](const Expectation &e) {
-          return !e.met && e.line == d.range.begin.line &&
+          return inThisFile && !e.met && e.line == d.range.begin.line &&
                  e.column == d.range.begin.column &&
                  d.message.find(e.text) != std::string::npos;
         });
@@ -554,14 +571,20 @@ struct LoadedProgram {
 
 std::unique_ptr<LoadedProgram> loadProgram(const std::filesystem::path &file) {
   auto program = std::make_unique<LoadedProgram>();
-  program->sources = std::make_unique<SourceManager>(file.filename().string(),
-                                                     readFile(file));
+  // fromFile registers the full path: imports resolve next to the file, and
+  // a file importing this one back isn't loaded twice.
+  std::string readError;
+  auto loaded = SourceManager::fromFile(file.string(), readError);
+  if (!loaded)
+    throw std::runtime_error(readError);
+  program->sources = std::make_unique<SourceManager>(std::move(*loaded));
   program->diags =
       std::make_unique<DiagnosticEngine>(*program->sources, program->diagOut);
   Lexer lexer(*program->sources, *program->diags);
   MacroExpander expander(lexer, *program->diags);
   Parser parser(expander, *program->diags);
   program->module = parser.parseModule(file.stem().string());
+  loadImports(program->module, *program->sources, *program->diags);
   program->types = std::make_unique<TypeContext>();
   program->sema = std::make_unique<sema::SemanticAnalyzer>(*program->types,
                                                            *program->diags);

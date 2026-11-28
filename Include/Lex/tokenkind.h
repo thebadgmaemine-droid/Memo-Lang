@@ -23,6 +23,7 @@
   TOK(TOK_INTEGER, "integer literal")                                          \
   TOK(TOK_FLOAT, "float literal")                                              \
   TOK(TOK_STRING, "string literal")                                            \
+  TOK(TOK_FSTRING, "interpolated string")                                      \
   TOK(TOK_KEYWORDTYPE, "type name")                                            \
   TOK(UNKNOWN_TOKEN_SYNTAX_ERROR, "invalid token")                             \
   /* Punctuation */                                                            \

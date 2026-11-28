@@ -20,3 +20,13 @@ def too_big() {
     d = 1000;                     # expect-error: 9: 'd' has type 'i8', which can't hold 1000
     g = 256;                      # expect-error: 9: 'g' has type 'byte', which can't hold 256
 }
+
+# Call arguments too, positional or named (2026-11-28).
+def takes(u8 small, i16 medium) -> int { return small + medium; }
+
+def calls() {
+    int ok = takes(255, -32768) + takes(medium = 32767, small = 0);
+    int a = takes(300, 1);        # expect-error: 19: argument for 'small' of 'takes' has type 'byte', which can't hold 300
+    int b = takes(medium = -40000, small = 1);  # expect-error: 28: argument for 'medium' of 'takes' has type 'i16', which can't hold -40000
+    int c = takes(300 as u8, 1);  # An explicit cast still asks for the wrap.
+}

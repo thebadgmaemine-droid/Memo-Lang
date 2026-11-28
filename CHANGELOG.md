@@ -5,6 +5,35 @@ All notable changes to MemoLang. Versions follow `project(VERSION ...)` in
 
 ## [Unreleased]
 
+### Added (2026-11-28)
+- Interpolated strings: `f"x = {x}, mean = {m:.2f}, {{braces}}"`. A new
+  `TOK_FSTRING` token; the parser parses each `{expr}` from its own slice of
+  the file, so errors point at the right column. Values may be integers,
+  floats, bools or strings; floats take `.N` / `.Nf` (N decimals, up to 20).
+  The interpreter and code generation format through the same functions
+  (`runtime::formatInt/formatFloat/formatBool`, and
+  `memolang_rt_{int,float,bool}_to_str` for compiled code), so both give the
+  same text. Floats print like "main() returned" (`%.10g`).
+- `import "lib.memo";` and `import lib;` (top level). The driver loads each
+  imported file once, relative to the importing file, and merges its
+  top-level code in front of the importing module (`Driver/ModuleLoader`),
+  so every later stage sees one module. Import cycles are harmless.
+  Diagnostics print the file each location belongs to; the lexer lexes any
+  file of the SourceManager.
+- Integer constants passed as call arguments must fit the parameter type
+  (`f(300)` for a `u8` parameter), like declarations, assignments and returns.
+- Tests: `tokens/fstring`, `ast/fstring_import`, `errors/fstring`,
+  `check/fstring_errors`, `run/fstring`, `run/imports` (helpers in
+  `tests/run/imports/`), more cases in `check/constant_range`.
+
+### Fixed (2026-11-28)
+- The int/float-to-string runtime functions from be73f1f didn't compile
+  (declaration and definition disagreed, two different `cStringPart` types,
+  `"&lld"` format strings, buffers never freed). Replaced, and the
+  `emitToString` condition that rejected every value is rewritten.
+- `errors/syntax`: an `import` inside a function now says "only allowed at
+  the top level of a file".
+
 ### Fixed (2026-11-27)
 - An integer constant stored in a variable must fit its type, as a returned
   constant already had to: `i8 x = 1000;` and `x = 1000;` are errors instead
