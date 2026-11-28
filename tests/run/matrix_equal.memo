@@ -1,0 +1,22 @@
+# `==` / `!=` on matrices. main() returns how many checks passed. Both modes
+# must agree and free every matrix: comparing consumes nothing.
+# expect-result: 7
+
+extern def random_matrix(int rows, int cols) -> matrix<float>;
+extern def identity_matrix(int n) -> matrix<float>;
+
+def main() -> int {
+    int passed = 0;
+    matrix<float> m = random_matrix(3, 3);
+    matrix<float> i = identity_matrix(3);
+
+    if m == m { passed++; }                         # the same variable twice
+    if copy(m) == m { passed++; }
+    if not (m * 2 == m) { passed++; }               # m isn't all zeros
+    if m != m * 2 { passed++; }
+    if identity_matrix(3) == i { passed++; }
+    if identity_matrix(2) != i { passed++; }        # different shapes: unequal
+    matrix<float> p = copy(i) @ copy(m);            # m and i weren't consumed
+    if p == m { passed++; }                         # identity @ m is exact
+    return passed;
+}

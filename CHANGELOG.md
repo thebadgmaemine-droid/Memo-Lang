@@ -6,6 +6,15 @@ All notable changes to MemoLang. Versions follow `project(VERSION ...)` in
 ## [Unreleased]
 
 ### Added (2026-11-28)
+- `==` / `!=` on matrices: equal means the same element type, shape and
+  values (elements compare as floats, so NaN is unequal; different shapes are
+  unequal, not an error). Neither matrix is consumed. Ordering (`<`, ...) and
+  comparing a matrix with a number stay errors. Sema used to accept `m == m`
+  although neither the interpreter nor compiled code could run it. New
+  `Runtime::matequal` and `memolang_rt_matrix_equal`. Tests:
+  `tests/check/matrix_equal`, `tests/run/matrix_equal`.
+
+### Added (2026-11-28)
 - Interpolated strings: `f"x = {x}, mean = {m:.2f}, {{braces}}"`. A new
   `TOK_FSTRING` token; the parser parses each `{expr}` from its own slice of
   the file, so errors point at the right column. Values may be integers,

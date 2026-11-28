@@ -391,6 +391,10 @@ llvm::FunctionCallee CodegenModule::runtime(RuntimeFn fn) {
     name = "memolang_rt_print_nothing";
     signature = type(voidTy, {});
     break;
+  case RuntimeFn::MatrixEqual:
+    name = "memolang_rt_matrix_equal";
+    signature = type(i32, {ptr, ptr});
+    break;
   }
   llvm::Function *function = llvm::Function::Create(
       signature, llvm::Function::ExternalLinkage, name, module_.get());

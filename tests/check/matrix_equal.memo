@@ -1,0 +1,28 @@
+# `==` / `!=` on matrices: same element type, shapes that can agree, and
+# neither matrix is consumed.
+
+def ok(matrix<float> a, matrix<float> b) -> bool {
+    bool same = a == b;
+    bool different = a != b;
+    matrix<float> c = a @ b;      # a and b weren't consumed by the comparisons.
+    return same and not different and c == c;
+}
+
+def ok_shapes(matrix<float, 2, 2> a, matrix<float> b) -> bool {
+    return a == b;                # b's shape is unknown: checked at run time.
+}
+
+def wrong_element(matrix<float> a, matrix<f32> b) -> bool {
+    return a == b;                # expect-error: 12: cannot compare 'matrix<float>' and 'matrix<f32>' with '=='
+}
+
+# TODO: when sema reads the dims (STATUS §4), comparing matrix<float, 2, 2>
+# with matrix<float, 3, 3> is an error; checkComparison already handles it.
+
+def no_ordering(matrix<float> a, matrix<float> b) -> bool {
+    return a < b;                 # expect-error: 12: cannot compare 'matrix<float>' and 'matrix<float>' with '<'
+}
+
+def no_scalar(matrix<float> a) -> bool {
+    return a == 1;                # expect-error: 12: cannot compare 'matrix<float>' and 'int' with '=='
+}

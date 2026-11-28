@@ -633,6 +633,9 @@ Value Interpreter::applyBinary(BinaryOp op, const Value &lhs,
         fail("matrix divided by zero");
       return runtime_.scale(*asMatrix(lhs), 1.0 / d);
     }
+    if (op == BinaryOp::Eq || op == BinaryOp::Ne)
+      return runtime_.matequal(*asMatrix(lhs), *asMatrix(rhs)) ==
+             (op == BinaryOp::Eq);
     fail("this operation isn't supported on matrices at run time");
   }
   // Strings.

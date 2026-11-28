@@ -956,6 +956,17 @@ llvm::Value *CodegenFunction::emitMatrixOp(BinaryOp op, llvm::Value *lhs,
                                            const Node &where) {
   bool lhsMatrix = isMatrix(lhsType);
   bool rhsMatrix = isMatrix(rhsType);
+  if ((op == BinaryOp::Eq || op == BinaryOp::Ne) && lhsMatrix && rhsMatrix) {
+    // A bool, not a matrix, so it returns here. The releases balance the
+    // reference each (never consumed) operand read took.
+    llvm::Value *same = builder_.CreateCall(
+        cgm_.runtime(RuntimeFn::MatrixEqual), {lhs, rhs});
+    release(lhs);
+    release(rhs);
+    llvm::Value *zero = builder_.getInt32(0);
+    return op == BinaryOp::Eq ? builder_.CreateICmpNE(same, zero)
+                              : builder_.CreateICmpEQ(same, zero);
+  }
   llvm::Value *result = nullptr;
   if (op == BinaryOp::MatMul && lhsMatrix && rhsMatrix) {
     result = builder_.CreateCall(cgm_.runtime(RuntimeFn::Matmul), {lhs, rhs});

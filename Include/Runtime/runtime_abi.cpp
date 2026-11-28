@@ -139,6 +139,10 @@ double memolang_rt_sum(MemoMatrix *m) {
   return guarded([&] { return rt().sum(get(m)); });
 }
 
+std::int32_t memolang_rt_matrix_equal(MemoMatrix *a, MemoMatrix *b) {
+  return guarded([&] { return rt().matequal(get(a), get(b)) ? 1 : 0; });
+}
+
 void memolang_rt_retain(MemoMatrix *m) {
   if (m)
     ++m->refs;

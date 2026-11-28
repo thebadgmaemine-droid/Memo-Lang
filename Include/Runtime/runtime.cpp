@@ -176,6 +176,25 @@ MatrixRef Runtime::scale(const Matrix &m, double factor) {
   return out;
 }
 
+bool Runtime::matequal(const Matrix &a, const Matrix &b) const {
+  if (a.type() != b.type() || a.rows() != b.rows() || a.cols() != b.cols())
+    return false;
+// Exact comparison, as MemoLang's `==` on floats is (see the interpreter's
+// float ops), so -Wfloat-equal is wrong here.
+#if defined(__GNUC__) // GCC and Clang
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+#endif
+  for (std::int64_t i = 0; i < a.rows(); ++i)
+    for (std::int64_t j = 0; j < a.cols(); ++j)
+      if (!(a.at(i, j) == b.at(i, j))) // `!(==)`: NaN is unequal.
+        return false;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+  return true;
+}
+
 double Runtime::sum(const Matrix &m) const {
   double total = 0;
   for (std::int64_t i = 0; i < m.rows(); ++i)

@@ -433,6 +433,16 @@ bool SemanticAnalyzer::checkComparison(BinaryOp op, const Type &lhs,
                                        const Type &rhs) const {
   if (lhs.isError() || rhs.isError())
     return true;
+  // Matrices: only == and !=, for the same element type and shapes that can
+  // agree. Equal means the same shape and values (see Runtime::matequal).
+  // Comparing doesn't consume either matrix.
+  const auto *lm = dynCast<MatrixType>(&lhs);
+  const auto *rm = dynCast<MatrixType>(&rhs);
+  if (lm || rm)
+    return (op == BinaryOp::Eq || op == BinaryOp::Ne) && lm && rm &&
+           lm->element() == rm->element() &&
+           dimensionsAgree(lm->rows(), rm->rows()) &&
+           dimensionsAgree(lm->cols(), rm->cols());
   bool bothNumeric = lhs.isNumeric() && rhs.isNumeric();
   if (op == BinaryOp::Eq || op == BinaryOp::Ne)
     return bothNumeric || &lhs == &rhs;

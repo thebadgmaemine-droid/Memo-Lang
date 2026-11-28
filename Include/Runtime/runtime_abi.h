@@ -59,6 +59,9 @@ const char *memolang_rt_int_to_str(std::int64_t value, std::int32_t isUnsigned);
 const char *memolang_rt_float_to_str(double value, std::int32_t precision);
 const char *memolang_rt_bool_to_str(std::int32_t value);
 
+// 1 if the matrices are equal (Runtime::matequal), else 0. Releases neither.
+std::int32_t memolang_rt_matrix_equal(MemoMatrix *a, MemoMatrix *b);
+
 // Integer power with wrap-around; panics on a negative exponent.
 std::int64_t memolang_rt_ipow(std::int64_t base, std::int64_t exponent);
 // u64 power with wrap-around; every exponent is valid.

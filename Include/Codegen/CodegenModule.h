@@ -77,6 +77,7 @@ enum class RuntimeFn {
   Add,
   Scale,
   Sum,
+  MatrixEqual, // `==` / `!=` on matrices.
   Retain,
   Release,
   StrConcat,

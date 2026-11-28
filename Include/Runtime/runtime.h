@@ -86,6 +86,10 @@ public:
   MatrixRef scale(const Matrix &m, double factor);
 
   [[nodiscard]] double sum(const Matrix &m) const;
+  // `==` on matrices: the same element type, shape and values. Elements
+  // compare as floats, so a matrix holding NaN equals nothing. Different
+  // shapes are unequal, not an error.
+  [[nodiscard]] bool matequal(const Matrix &a, const Matrix &b) const;
 
   [[nodiscard]] const MemoryStats &stats() const noexcept MEMOLANG_LIFETIMEBOUND { return stats_; }
 
