@@ -255,7 +255,7 @@ extern "C" void memolang_rt_int_to_str(int64_t value, cStringPart* out) {
   out->len = (written>0) ? static_cast<int64_t>(written) : 0;
   out->data = buffer;
 }
-extern "C" void memolang_rt_float_to_str(double value, cStringPart *out) {
+extern "C" void memolang_rt_float_to_str(double value, cStringPart* out) {
   char* buffer = static_cast<char*>(std::malloc(32)); // defaults to f32
   if (!out) {
     return;

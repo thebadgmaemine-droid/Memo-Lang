@@ -62,7 +62,7 @@ std::uint64_t memolang_rt_upow(std::uint64_t base, std::uint64_t exponent);
 [[noreturn]] void memolang_rt_shift_error(std::int64_t amount);
 struct cStringPart;
 extern "C" void memolang_rt_int_to_str(int64_t value, cStringPart* out);
-extern "C" void memolang_rt_float_to_str(float value, cStringPart* out);
+extern "C" void memolang_rt_float_to_str(double value, cStringPart* out);
 
 // Printing the value main() returned: "main() returned <value>".
 void memolang_rt_print_int(std::int64_t value);
