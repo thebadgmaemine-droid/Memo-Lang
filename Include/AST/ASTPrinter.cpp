@@ -365,6 +365,8 @@ private:
 
 void printAST(const Module &module, std::ostream &out) {
   out << "Module " << module.name << '\n';
+  for (const Import &import : module.imports)
+    out << "  Import \"" << import.path << "\"\n";
   Printer printer(out);
   printer.printBody(module.body);
 }

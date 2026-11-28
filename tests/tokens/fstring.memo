@@ -1,0 +1,3 @@
+# An interpolated string is one token, f"..." and all; the parser splits it.
+# `f` followed by anything but a quote is still an identifier.
+f"x = {x}" f"{a + b:.2f} {{braces}} \"q\"" f "plain" f2"no" f""

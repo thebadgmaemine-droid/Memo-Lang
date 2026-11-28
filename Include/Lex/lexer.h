@@ -25,7 +25,17 @@ class SourceManager;
 // run reports every problem instead of stopping at the first.
 class Lexer final : public TokenSource {
 public:
-  Lexer(const SourceManager &sources MEMOLANG_LIFETIMEBOUND, DiagnosticEngine &diags MEMOLANG_LIFETIMEBOUND);
+  // Lexes file `file` of `sources` (the main file unless an import says
+  // otherwise). Every token's location carries that file.
+  Lexer(const SourceManager &sources MEMOLANG_LIFETIMEBOUND,
+        DiagnosticEngine &diags MEMOLANG_LIFETIMEBOUND,
+        FileID file = SourceManager::mainFileID());
+  // Lexes only the bytes [begin, end) of `file`, then returns TOK_EOF. The
+  // parser uses it for the `{expression}` parts of an interpolated string,
+  // so their tokens keep their real positions in the file.
+  Lexer(const SourceManager &sources MEMOLANG_LIFETIMEBOUND,
+        DiagnosticEngine &diags MEMOLANG_LIFETIMEBOUND, FileID file,
+        std::uint32_t begin, std::uint32_t end);
 
   // Returns the next token. Keeps returning TOK_EOF once the input is used up.
   [[nodiscard]] Token next() override;
@@ -45,10 +55,12 @@ private:
   [[nodiscard]] Token lexIdentifier(std::uint32_t start);
   [[nodiscard]] Token lexNumber(std::uint32_t start);
   [[nodiscard]] Token lexString(std::uint32_t start);
+  [[nodiscard]] Token lexFString(std::uint32_t start);
   [[nodiscard]] Token lexOperator(std::uint32_t start, char c);
 
   const SourceManager &sources_;
   DiagnosticEngine &diags_;
+  FileID file_;
   std::string_view text_;
   std::uint32_t pos_ = 0;
 };

@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -349,6 +350,27 @@ public:
 protected:
   explicit Expr(NodeKind k) noexcept : Node(k) {}
 };
+
+// The decimals a format spec asks for: "" -> -1 (the default form), ".2" or
+// ".2f" -> 2, and nothing for any other spec (semantic analysis reports it).
+// Only floats take a spec. At most 20 decimals.
+[[nodiscard]] inline std::optional<int> floatPrecision(std::string_view spec) {
+  if (spec.empty())
+    return -1;
+  if (spec.size() >= 2 && spec.back() == 'f')
+    spec.remove_suffix(1);
+  if (spec.size() < 2 || spec.size() > 3 || spec.front() != '.')
+    return std::nullopt;
+  int digits = 0;
+  for (char c : spec.substr(1)) {
+    if (c < '0' || c > '9')
+      return std::nullopt;
+    digits = digits * 10 + (c - '0');
+  }
+  if (digits > 20)
+    return std::nullopt;
+  return digits;
+}
 
 // A piece of an interpolated string: literal text and/or an embedded
 // expression.
@@ -958,8 +980,17 @@ private:
 };
 
 // One parsed source file.
+// `import "lib.memo";` or `import lib;` at the top of a file. The driver
+// (Driver/ModuleLoader.h) loads the file and merges its top-level code into
+// the importing module before semantic analysis.
+struct Import {
+  std::string path;  // As written: "lib.memo", or "lib" for `import lib;`.
+  SourceRange range; // The whole import statement.
+};
+
 struct Module {
   std::string name;
+  std::vector<Import> imports; // In source order.
   std::vector<std::unique_ptr<Statement>> body;
 };
 

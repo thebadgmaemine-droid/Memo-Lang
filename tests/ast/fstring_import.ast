@@ -1,0 +1,35 @@
+Module fstring_import
+  Import "lib/geometry.memo"
+  Import "counter.memo"
+  FunctionDef greet(str name, int n, float f) -> str
+    Return
+      InterpolatedString (4 parts)
+        Text "hi "
+        Value
+          Name name
+        Text ": n="
+        Value
+          Binary +
+            Name n
+            Integer 1
+        Text ", f="
+        Value :.2f
+          Name f
+        Text " {x}\t"
+        Value
+          Binary *
+            Name n
+            Integer 2
+  DeclareVar empty : str
+    InterpolatedString (1 parts)
+  DeclareVar only_text : str
+    InterpolatedString (1 parts)
+      Text "no values"
+  DeclareVar only_value : str
+    InterpolatedString (1 parts)
+      Value
+        Call
+          Name greet
+          Name only_text
+          Integer 1
+          Float 2

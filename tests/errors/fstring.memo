@@ -1,0 +1,22 @@
+# Interpolated-string and import syntax errors (parse only): one mistake,
+# one error. (On line 7 the comment is inside the unterminated string.)
+import 3;                         # expect-error: 8: expected a module name or a file name in quotes after 'import'
+import "";                        # expect-error: 1: empty file name in 'import'
+import no_semicolon               # expect-error: 20: expected ';' after import
+import "no_such_file.memo";       # expect-error: 1: can't import 'no_such_file.memo': no file
+
+def lexer_errors(int x) {
+    str a = f"unclosed {x};       # expect-error: 13: unterminated interpolated string
+    str b = f"one } brace";       # expect-error: 19: single '}' in an interpolated string; write '}}'
+    str c = f"bad \q escape";     # expect-error: 19: unknown escape sequence '\q'
+    str d = f"{x {x}}";           # expect-error: 18: '{' can't appear inside '{...}'
+    str e = f"{f"inner"}";        # expect-error: 17: a string can't appear inside '{...}'
+}
+
+def parser_errors(int x) {
+    str a = f"{}";                # expect-error: 15: empty '{}' in an interpolated string
+    str b = f"{x +}";             # expect-error: 19: expected an expression
+    str c = f"{x y}";             # expect-error: 18: unexpected identifier in an interpolated expression
+    str d = f"ok {x} then {)}";   # expect-error: 28: expected an expression
+    import "late.memo";           # expect-error: 5: 'import' is only allowed at the top level of a file
+}

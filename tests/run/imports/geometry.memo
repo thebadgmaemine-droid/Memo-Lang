@@ -1,0 +1,14 @@
+# Helper for tests/run/imports.memo (not a test on its own).
+import counter;               # `import name;` is "name.memo" next to this file.
+import "../imports.memo";     # A cycle back to the main file: skipped.
+
+extern def identity_matrix(int n) -> matrix<float>;
+extern def matrix_sum(matrix<float> m) -> float;
+
+count = count + 1;            # Runs after counter.memo's code.
+
+def area(float w, float h) -> float { return w * h; }
+
+def describe(int sides) -> str { return f"{sides} sides"; }
+
+def square(matrix<float> m) -> matrix<float> { return copy(m) @ m; }

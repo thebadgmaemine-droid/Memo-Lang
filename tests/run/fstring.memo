@@ -1,0 +1,48 @@
+# Interpolated strings: each check compares an f-string with the text it must
+# give. Compiled code formats through the same runtime functions
+# (runtime::formatInt/formatFloat/formatBool), so it must give the same text.
+# main() returns how many checks passed.
+# expect-result: 16
+
+extern def zeros_matrix(int rows, int cols) -> matrix<float>;
+extern def matrix_sum(matrix<float> m) -> float;
+
+def label(str name, int n) -> str {
+    return f"{name}#{n}";
+}
+
+def main() -> int {
+    int score = 0;
+    int i = -42;
+    u64 big = 18446744073709551615;
+    u8 small = 200;
+    float f = 2.5;
+    f32 g = 0.1;
+    bool yes = true;
+    str s = "text";
+
+    if f"{i}" == "-42" { score++; }
+    if f"{big}" == "18446744073709551615" { score++; }   # u64 prints unsigned
+    if f"{small}" == "200" { score++; }
+    if f"{f}" == "2.5" { score++; }                      # like "main() returned"
+    if f"{g}" == "0.1000000015" { score++; }             # an f32 isn't exactly 0.1
+    if f"{f:.2f}" == "2.50" { score++; }
+    if f"{f:.0}" == "2" { score++; }                     # rounds half to even
+    if f"{1.0 / 3.0:.3}" == "0.333" { score++; }
+    if f"{yes} {not yes}" == "true false" { score++; }
+    if f"<{s}>" == "<text>" { score++; }
+    if f"{{literal}} {{{i}}}" == "{literal} {-42}" { score++; }
+    if f"a\tb\n\"" == "a\tb\n\"" { score++; }            # same escapes as "..."
+    if f"" == "" { score++; }
+    if f"{label(s, i + 43)}!" == "text#1!" { score++; }   # calls, nesting
+
+    if f"{matrix_sum(zeros_matrix(2, 2))}" == "0" { score++; }   # matrix via a number
+    str many = "";
+    int k = 0;
+    while k < 3 {
+        many = f"{many}{k},";
+        k++;
+    }
+    if many == "0,1,2," { score++; }
+    return score;
+}

@@ -49,7 +49,13 @@ void DiagnosticEngine::report(Severity severity, SourceRange range,
 
 void DiagnosticEngine::print(const Diagnostic &diagnostic) const {
   const SourceLocation &loc = diagnostic.range.begin;
-  out_ << sources_.fileName();
+  // A location from an imported file names that file; one without a file
+  // (or no location at all) belongs to the main file.
+  FileID file =
+      loc.file.isValid() && loc.file.id <= sources_.fileCount()
+          ? loc.file
+          : SourceManager::mainFileID();
+  out_ << sources_.fileName(file);
   if (loc.isValid())
     out_ << ':' << loc.line << ':' << loc.column;
   out_ << ": " << severityName(diagnostic.severity) << ": "
@@ -57,7 +63,7 @@ void DiagnosticEngine::print(const Diagnostic &diagnostic) const {
   if (!loc.isValid())
     return;
 
-  std::string_view line = sources_.lineText(loc.line);
+  std::string_view line = sources_.lineText(file, loc.line);
   std::size_t caret =
       loc.column - 1; // 0-based; may be just past the end of the line.
 
@@ -71,7 +77,8 @@ void DiagnosticEngine::print(const Diagnostic &diagnostic) const {
     line = line.substr(first, kMaxShown);
   }
   bool cutBefore = first != 0;
-  bool cutAfter = first + line.size() < sources_.lineText(loc.line).size();
+  bool cutAfter =
+      first + line.size() < sources_.lineText(file, loc.line).size();
   caret -= first;
 
   std::string lineNumber = std::to_string(loc.line);

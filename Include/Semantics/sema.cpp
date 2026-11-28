@@ -876,10 +876,31 @@ const Type *SemanticAnalyzer::inferExpressionType(const Expr &expr) {
     type = types_.strType();
     break;
   case NodeKind::InterpolatedString:
+    // Each `{value}` becomes text: integers, floats, bools and strings can.
+    // A matrix would need a whole table; print matrix_sum(copy(m)) instead.
+    // Only floats take a format spec, `.N` or `.Nf` (N decimals, up to 20).
     for (const StringPart &part :
-         static_cast<const InterpolatedString &>(expr).parts())
-      if (part.value)
-        inferExpressionType(*part.value);
+         static_cast<const InterpolatedString &>(expr).parts()) {
+      if (!part.value)
+        continue;
+      const Type *valueType = inferExpressionType(*part.value);
+      if (valueType->isError())
+        continue;
+      Type::Kind kind = valueType->kind();
+      if (kind != Type::Kind::Int && kind != Type::Kind::Float &&
+          kind != Type::Kind::Bool && kind != Type::Kind::Str) {
+        error(*part.value, "can't put a value of type " + typeName(valueType) +
+                               " in an interpolated string");
+        continue;
+      }
+      if (!part.spec.empty() &&
+          (kind != Type::Kind::Float || !floatPrecision(part.spec)))
+        error(*part.value,
+              "unsupported format spec " + quoteForMessage(":" + part.spec) +
+                  (kind == Type::Kind::Float
+                       ? "; use ':.N' or ':.Nf' for N decimals (up to 20)"
+                       : "; only float values take a format spec"));
+    }
     type = types_.strType();
     break;
   case NodeKind::BooleanLiteral:
@@ -1192,12 +1213,17 @@ const Type *SemanticAnalyzer::inferCall(const CallExpr &call) {
                       quoteForMessage(params[p].name) + " of " + quotedName);
       continue;
     }
+    const Expr &arg = *args[static_cast<std::size_t>(argForParam[p])];
     const Type *argType = argTypes[static_cast<std::size_t>(argForParam[p])];
     if (!checkAssignment(*info.paramTypes[p], *argType))
-      error(*args[static_cast<std::size_t>(argForParam[p])],
-            "argument for " + quoteForMessage(params[p].name) + " of " +
-                quotedName + " must be " + typeName(info.paramTypes[p]) +
-                ", found " + typeName(argType));
+      error(arg, "argument for " + quoteForMessage(params[p].name) + " of " +
+                     quotedName + " must be " + typeName(info.paramTypes[p]) +
+                     ", found " + typeName(argType));
+    // Like declarations and returns: f(300) for a u8 parameter would pass 44.
+    else if (auto overflow = constantOverflow(*info.paramTypes[p], arg))
+      error(arg, "argument for " + quoteForMessage(params[p].name) + " of " +
+                     quotedName + " has type " +
+                     typeName(info.paramTypes[p]) + ", " + *overflow);
   }
   return functionReturnType(function, call);
 }

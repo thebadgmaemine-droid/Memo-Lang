@@ -1,0 +1,12 @@
+# Imports are listed at the top of the module (the AST tests don't load
+# them), and an interpolated string becomes text and value parts.
+import "lib/geometry.memo";
+import counter;
+
+def greet(str name, int n, float f) -> str {
+    return f"hi {name}: n={n + 1}, f={f:.2f} {{x}}\t{n * 2}";
+}
+
+str empty = f"";
+str only_text = f"no values";
+str only_value = f"{greet(only_text, 1, 2.0)}";

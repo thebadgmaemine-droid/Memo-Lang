@@ -52,6 +52,12 @@ void memolang_rt_release(MemoMatrix *m);
 // ends (concatenation results are kept until memolang_rt_end()).
 const char *memolang_rt_str_concat(const char *a, const char *b);
 std::int32_t memolang_rt_str_compare(const char *a, const char *b);
+// Text of a value inside an interpolated string (f"x = {x}"), formatted by
+// runtime::formatInt/formatFloat/formatBool exactly as the interpreter does.
+// Kept like concatenation results. `precision` < 0 means the default form.
+const char *memolang_rt_int_to_str(std::int64_t value, std::int32_t isUnsigned);
+const char *memolang_rt_float_to_str(double value, std::int32_t precision);
+const char *memolang_rt_bool_to_str(std::int32_t value);
 
 // Integer power with wrap-around; panics on a negative exponent.
 std::int64_t memolang_rt_ipow(std::int64_t base, std::int64_t exponent);
@@ -60,9 +66,6 @@ std::uint64_t memolang_rt_upow(std::uint64_t base, std::uint64_t exponent);
 
 [[noreturn]] void memolang_rt_panic(const char *message);
 [[noreturn]] void memolang_rt_shift_error(std::int64_t amount);
-struct cStringPart;
-extern "C" void memolang_rt_int_to_str(int64_t value, cStringPart* out);
-extern "C" void memolang_rt_float_to_str(double value, cStringPart* out);
 
 // Printing the value main() returned: "main() returned <value>".
 void memolang_rt_print_int(std::int64_t value);

@@ -1,0 +1,8 @@
+3:1	interpolated string	'f"x = {x}"'
+3:12	interpolated string	'f"{a + b:.2f} {{braces}} \"q\""'
+3:44	identifier	'f'
+3:46	string literal	'plain'
+3:54	identifier	'f2'
+3:56	string literal	'no'
+3:61	interpolated string	'f""'
+4:1	end of file

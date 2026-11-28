@@ -329,6 +329,18 @@ llvm::FunctionCallee CodegenModule::runtime(RuntimeFn fn) {
     name = "memolang_rt_str_concat";
     signature = type(ptr, {ptr, ptr});
     break;
+  case RuntimeFn::IntToStr:
+    name = "memolang_rt_int_to_str";
+    signature = type(ptr, {i64, i32});
+    break;
+  case RuntimeFn::FloatToStr:
+    name = "memolang_rt_float_to_str";
+    signature = type(ptr, {f64, i32});
+    break;
+  case RuntimeFn::BoolToStr:
+    name = "memolang_rt_bool_to_str";
+    signature = type(ptr, {i32});
+    break;
   case RuntimeFn::StrCompare:
     name = "memolang_rt_str_compare";
     signature = type(i32, {ptr, ptr});

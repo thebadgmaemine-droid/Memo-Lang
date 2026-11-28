@@ -380,9 +380,59 @@ Module Parser::parseModule(std::string name) {
       consume();
       continue;
     }
+    if (check(TokenKind::TOK_IMPORT)) {
+      parseImport(module);
+      continue;
+    }
     parseStatementInto(module.body);
   }
   return module;
+}
+
+// import := 'import' ( STRING | IDENT ) ';'
+// `import lib;` means `import "lib.memo";`. The path is relative to the
+// importing file; the driver loads it (Driver/ModuleLoader.h).
+void Parser::parseImport(Module &module) {
+  SourceLocation begin = tok_.location();
+  consume(); // 'import'
+  std::string path;
+  if (check(TokenKind::TOK_STRING)) {
+    path = std::string(consume().spelling());
+    if (path.empty()) {
+      error(SourceRange{begin, prevEnd_}, "empty file name in 'import'");
+      path.clear();
+    }
+  } else if (check(TokenKind::TOK_IDENTIFIER)) {
+    path = std::string(consume().spelling()) + ".memo";
+  } else {
+    if (!check(TokenKind::UNKNOWN_TOKEN_SYNTAX_ERROR))
+      error(tok_.range(), "expected a module name or a file name in quotes "
+                          "after 'import'");
+    synchronize(begin.offset);
+    return;
+  }
+  if (!expect(TokenKind::TOK_SEMICOLON, "after import")) {
+    synchronize(begin.offset);
+    return;
+  }
+  if (!path.empty())
+    module.imports.push_back({std::move(path), SourceRange{begin, prevEnd_}});
+}
+
+std::unique_ptr<Expr> Parser::parseEmbeddedExpression() {
+  if (check(TokenKind::TOK_EOF)) {
+    error(tok_.range(), "empty '{}' in an interpolated string; write '{{}}' "
+                        "for literal braces");
+    return nullptr;
+  }
+  auto expr = parseExpression();
+  if (expr && !check(TokenKind::TOK_EOF)) {
+    if (!check(TokenKind::UNKNOWN_TOKEN_SYNTAX_ERROR))
+      error(tok_.range(), "unexpected " + describe(tok_.kind()) +
+                              " in an interpolated expression");
+    return nullptr;
+  }
+  return expr;
 }
 
 // Parses one statement and appends it to `out`. Constructs that produce no
@@ -414,7 +464,10 @@ void Parser::parseStatementInto(StmtList &out) {
       return;
     }
     break;
-  case TokenKind::TOK_IMPORT:
+  case TokenKind::TOK_IMPORT: // Top-level imports never get here.
+    error(tok_.range(), "'import' is only allowed at the top level of a file");
+    skipUnsupported();
+    return;
   case TokenKind::TOK_TRY:
   case TokenKind::TOK_CATCH:
   case TokenKind::TOK_THROW:
@@ -1160,6 +1213,8 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
     return parseFloatLiteral(consume());
   case TokenKind::TOK_STRING:
     return make<StringLiteral>(loc, std::string(consume().spelling()));
+  case TokenKind::TOK_FSTRING:
+    return parseInterpolated(consume());
   case TokenKind::TOK_TRUE:
     consume();
     return make<BooleanLiteral>(loc, true);
@@ -1232,6 +1287,81 @@ std::unique_ptr<Expr> Parser::parseIntegerLiteral(const Token &tok) {
   }
   return make<IntegerLiteral>(tok.location(), static_cast<std::int64_t>(*value),
                               /*isByte=*/false, exceedsInt64(*value));
+}
+
+// f"a{x}b{y:.2f}" -> parts {"a", x}, {"b", y, ".2f"}. The lexer already
+// checked the structure (Lexer::lexFString), so here every '}' outside an
+// expression is the first of a `}}` pair and every '{' either starts `{{` or
+// has a matching '}'. Each expression is parsed from its own slice of the
+// file, so its tokens and errors point at the right column.
+std::unique_ptr<Expr> Parser::parseInterpolated(const Token &tok) {
+  SourceLocation loc = tok.location();
+  std::string_view raw = tok.spelling(); // f"..."
+  std::vector<StringPart> parts;
+  std::string literal;
+  bool failed = false;
+  std::size_t end = raw.size() - 1; // The closing quote.
+  for (std::size_t i = 2; i < end;) {
+    char c = raw[i];
+    if (c == '\\') {
+      switch (raw[i + 1]) {
+      case 'n': literal += '\n'; break;
+      case 't': literal += '\t'; break;
+      case 'r': literal += '\r'; break;
+      case '0': literal += '\0'; break;
+      default: literal += raw[i + 1]; break; // '\\' and '"'.
+      }
+      i += 2;
+      continue;
+    }
+    if (c == '}' || (c == '{' && raw[i + 1] == '{')) {
+      literal += c; // `}}` or `{{`.
+      i += 2;
+      continue;
+    }
+    if (c != '{') {
+      literal += c;
+      ++i;
+      continue;
+    }
+    std::size_t close = raw.find('}', i + 1);
+    std::string_view inside = raw.substr(i + 1, close - i - 1);
+    std::size_t colon = inside.find(':');
+    auto offset = [&](std::size_t index) {
+      return loc.offset + static_cast<std::uint32_t>(index);
+    };
+    std::string_view expression = inside.substr(0, colon);
+    if (expression.find_first_not_of(" \t") == std::string_view::npos) {
+      const SourceManager &sources = diags_.sources();
+      error({sources.locationAt(loc.file, offset(i)),
+             sources.locationAt(loc.file, offset(close + 1))},
+            "empty '{}' in an interpolated string; write '{{' and '}}' for "
+            "literal braces");
+      failed = true;
+      i = close + 1;
+      continue;
+    }
+    StringPart part;
+    part.literal = std::move(literal);
+    literal.clear();
+    if (colon != std::string_view::npos)
+      part.spec = std::string(inside.substr(colon + 1));
+    Lexer lexer(diags_.sources(), diags_, loc.file, offset(i + 1),
+                offset(colon == std::string_view::npos ? close
+                                                       : i + 1 + colon));
+    Parser parser(lexer, diags_);
+    parser.depth_ = depth_; // The expression is nested inside this one.
+    part.value = parser.parseEmbeddedExpression();
+    if (!part.value)
+      failed = true;
+    parts.push_back(std::move(part));
+    i = close + 1;
+  }
+  if (!literal.empty() || parts.empty())
+    parts.push_back(StringPart{std::move(literal), nullptr, {}});
+  if (failed)
+    return nullptr; // Already reported.
+  return make<InterpolatedString>(loc, std::move(parts));
 }
 
 std::unique_ptr<Expr> Parser::parseFloatLiteral(const Token &tok) {

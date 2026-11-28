@@ -160,6 +160,27 @@ std::int32_t memolang_rt_str_compare(const char *a, const char *b) {
   return c < 0 ? -1 : (c > 0 ? 1 : 0);
 }
 
+// 2026-11-28: replaces the first draft (out-parameter struct, malloc'd
+// buffers nobody freed, "&lld" format strings), which didn't compile. The
+// text comes from the same functions the interpreter uses, and is kept like
+// concatenation results.
+const char *memolang_rt_int_to_str(std::int64_t value,
+                                   std::int32_t isUnsigned) {
+  State &s = state();
+  s.strings.push_back(MemoLang::runtime::formatInt(value, isUnsigned != 0));
+  return s.strings.back().c_str();
+}
+
+const char *memolang_rt_float_to_str(double value, std::int32_t precision) {
+  State &s = state();
+  s.strings.push_back(MemoLang::runtime::formatFloat(value, precision));
+  return s.strings.back().c_str();
+}
+
+const char *memolang_rt_bool_to_str(std::int32_t value) {
+  return value ? "true" : "false";
+}
+
 std::int64_t memolang_rt_ipow(std::int64_t base, std::int64_t exponent) {
   if (exponent < 0)
     memolang_rt_panic("negative exponent for an integer power; use a float");
@@ -230,47 +251,11 @@ void memolang_rt_print_nothing(void) { result("nothing"); }
 } // extern "C"
 
 namespace MemoLang::runtime_abi {
-struct cStringPart {
-  int64_t len;
-  char* data;
-};
 
 const std::string &lastResult() { return state().lastResult; }
 
 runtime::MemoryStats stats() { return rt().stats(); }
 
 void setEchoResult(bool echo) { state().echo = echo; }
-
-extern "C" void memolang_rt_int_to_str(int64_t value, cStringPart* out) {
-  if (!out) {
-    return;
-  }
-  char* buffer = static_cast<char*>(std::malloc(21));
-  if (!buffer) {
-    out->len = 0;
-    out->data = nullptr;
-    return;
-  }
-  int written = std::snprintf(buffer,21,"&lld", static_cast<long long>(value));
-  out->len = (written>0) ? static_cast<int64_t>(written) : 0;
-  out->data = buffer;
-}
-extern "C" void memolang_rt_float_to_str(double value, cStringPart* out) {
-  char* buffer = static_cast<char*>(std::malloc(32)); // defaults to f32
-  if (!out) {
-    return;
-  }
-  if (!buffer) {
-    out->len = 0;
-    out->data = nullptr;
-    return;
-  }
-  int written = std::snprintf(buffer,32,"&.15g",value);
-  out->len = (written>0) ? static_cast<int64_t>(written) : 0;
-  out->data = buffer;
-
-  
-}
-
 
 } // namespace MemoLang::runtime_abi

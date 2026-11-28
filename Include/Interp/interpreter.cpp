@@ -545,6 +545,29 @@ Value Interpreter::eval(const Expr &expr) {
   }
   case NodeKind::StringLiteral:
     return static_cast<const StringLiteral &>(expr).value();
+  case NodeKind::InterpolatedString: {
+    // Left to right, like compiled code: text, then the value after it.
+    // Semantic analysis allows only int, float, bool and str values.
+    std::string text;
+    for (const StringPart &part :
+         static_cast<const InterpolatedString &>(expr).parts()) {
+      text += part.literal;
+      if (!part.value)
+        continue;
+      Value v = eval(*part.value);
+      if (isInt(v))
+        text += runtime::formatInt(std::get<std::int64_t>(v),
+                                   isU64(part.value->resolvedType()));
+      else if (isFloat(v))
+        text += runtime::formatFloat(std::get<double>(v),
+                                     floatPrecision(part.spec).value_or(-1));
+      else if (std::holds_alternative<bool>(v))
+        text += runtime::formatBool(std::get<bool>(v));
+      else if (std::holds_alternative<std::string>(v))
+        text += std::get<std::string>(v);
+    }
+    return text;
+  }
   case NodeKind::BooleanLiteral:
     return static_cast<const BooleanLiteral &>(expr).value();
   case NodeKind::UnaryExpr:

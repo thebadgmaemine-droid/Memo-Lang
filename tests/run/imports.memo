@@ -1,0 +1,21 @@
+# import: functions, externs, globals and module-level code from other files.
+# The helpers are in tests/run/imports/ (not tests themselves).
+# main() returns how many checks passed.
+# expect-result: 6
+import "imports/geometry.memo";   # A path, relative to this file.
+import "imports/counter.memo";    # geometry imports it too: merged once.
+
+def main() -> int {
+    int score = 0;
+    if area(2.0, 3.0) == 6.0 { score++; }
+    # counter.memo's module-level code ran first (count = 1), then
+    # geometry's (count + 1), then this file's.
+    if count == 2 { score++; }
+    if describe(3) == "3 sides" { score++; }      # An f-string in another file.
+    if bump() == 3 { score++; }
+    if count == 3 { score++; }                    # One `count`, shared.
+    # A matrix function and an extern declared in geometry.memo; the matrix
+    # is consumed across the file boundary and freed (no leak).
+    if matrix_sum(square(identity_matrix(3))) == 3.0 { score++; }
+    return score;
+}

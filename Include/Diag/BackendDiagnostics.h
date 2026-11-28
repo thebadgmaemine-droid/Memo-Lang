@@ -33,7 +33,10 @@
 #include "Support/Compiler.h"
 
 namespace llvm {
-class DiagnosticHandler;
+// A struct in LLVM (IR/DiagnosticHandler.h). MSVC puts class/struct into
+// mangled names, so declaring it `class` made the LLVMContext handler calls
+// unresolved at link time on Windows (GCC and Clang don't mind).
+struct DiagnosticHandler;
 class DiagnosticInfo;
 class DiagnosticInfoDontCall;
 class DiagnosticInfoMisExpect;

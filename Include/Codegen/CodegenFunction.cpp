@@ -420,22 +420,37 @@ void CodegenFunction::emitAssign(const AssignStmt &assign) {
     builder_.CreateStore(value, slot.address);
   }
 }
-// The text of one embedded value in an interpolated string. Only `str`
-// values are supported for now: the runtime has no number-to-text functions
-// yet, and the format spec (`{x:.2f}`) isn't applied.
+// The text of one embedded value in an interpolated string, made by the
+// runtime's *_to_str functions, which format exactly as the interpreter does
+// (runtime::formatInt/formatFloat/formatBool). Semantic analysis allows only
+// int, float, bool and str values, and a spec only on floats.
 llvm::Value *CodegenFunction::emitToString(const Expr &value,
                                            std::string_view spec) {
   const Type *type = value.resolvedType();
-  if (!isKind(type, Type::Kind::Str) || !spec.empty() || !isKind(type, Type::Kind::Int) || 
-      !isKind(type, Type::Kind::Float) || !isKind(type, Type::Kind::Bool)) {
-    cgm_.error(value.range(),
-               "code generation doesn't support interpolating a value of "
-               "type " +
-                   Detail::displayOrUnknown(type) +
-                   (spec.empty() ? "" : " with a format spec") + " yet");
+  llvm::Value *v = emitExpr(value);
+  if (!v)
+    return cgm_.stringConstant("");
+  switch (type->kind()) {
+  case Type::Kind::Str:
+    return v;
+  case Type::Kind::Int:
+    return builder_.CreateCall(cgm_.runtime(RuntimeFn::IntToStr),
+                               {toI64(v, type),
+                                builder_.getInt32(isU64(type) ? 1 : 0)});
+  case Type::Kind::Float:
+    return builder_.CreateCall(
+        cgm_.runtime(RuntimeFn::FloatToStr),
+        {toF64(v, type), builder_.getInt32(static_cast<std::uint32_t>(
+                             floatPrecision(spec).value_or(-1)))});
+  case Type::Kind::Bool:
+    return builder_.CreateCall(cgm_.runtime(RuntimeFn::BoolToStr),
+                               {builder_.CreateZExt(v, builder_.getInt32Ty())});
+  default:
+    cgm_.error(value.range(), "internal error: can't interpolate a value of "
+                              "type " +
+                                  Detail::displayOrUnknown(type));
     return cgm_.stringConstant("");
   }
-  return emitExpr(value);
 }
 
 void CodegenFunction::emitReturn(const ReturnStmt &ret) {

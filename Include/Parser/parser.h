@@ -34,6 +34,11 @@ public:
 
   [[nodiscard]] Module parseModule(std::string name);
 
+  // Parses one expression that must use up all the input. Used for the
+  // `{expression}` parts of an interpolated string, each read by a Lexer
+  // limited to that part. Null on errors (already reported).
+  [[nodiscard]] std::unique_ptr<Expr> parseEmbeddedExpression();
+
 private:
   using StmtList = std::vector<std::unique_ptr<Statement>>;
 
@@ -67,6 +72,8 @@ private:
   void skipUnsupported();
 
   // Statements
+  // import := 'import' ( STRING | IDENT ) ';'   (top level only)
+  void parseImport(Module &module);
   void parseStatementInto(StmtList &out);
   std::unique_ptr<Statement> parseStatement();
   std::unique_ptr<Statement> parseFunctionDef(SourceLocation loc,
@@ -97,6 +104,8 @@ private:
   // True for a literal past int64's range (it's a u64).
   static bool integerLiteralIsU64(std::string_view spelling);
   std::unique_ptr<Expr> parseFloatLiteral(const Token &tok);
+  // Splits an f"..." token into literal text and parsed `{expr}` parts.
+  std::unique_ptr<Expr> parseInterpolated(const Token &tok);
   std::unique_ptr<Expr> parsePointerPrefix();
   TokenSource &tokens_;
   DiagnosticEngine &diags_;
